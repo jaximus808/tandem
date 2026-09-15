@@ -1,79 +1,68 @@
 # syntax=docker/dockerfile:1.7
 #
-# Tandem Canvas — single image containing the Go API server with the React
-# web bundle baked in. The Go server's spaHandler serves the bundle at /*.
-# The MCP gateway is NOT part of this image — it runs as a stdio process
-# alongside Claude Code on the user's machine.
+# Tandem — OPTIONAL container image for people who want to self-host.
+#
+# Tandem is a locally run tool first: the normal path is the release binary
+# (`npx @jaximus/tandem-mcp up`, or download it from GitHub Releases), which
+# needs no container. This image exists so a team can put one Tandem on a box:
+# the same single binary, SQLite in a /data volume, and — if they want accounts
+# — Google sign-in turned on with TANDEM_AUTH=google.
+#
+#   docker build -t tandem .
+#   docker run -p 7891:7891 -v tandem-data:/data tandem
+#
+# Self-hosting with sign-in (all optional; local mode needs none of these):
+#   -e TANDEM_AUTH=google -e GOOGLE_CLIENT_ID=… -e PUBLIC_BASE_URL=https://… \
+#   -e COOKIE_SECURE=true  and build with --build-arg VITE_GOOGLE_CLIENT_ID=…
 
-# ── Web bundle stage ──────────────────────────────────────────────────────────
-# Node 22: pnpm 11+ requires Node 22.13+. Pin pnpm via corepack so the build
-# stays reproducible regardless of corepack's "latest" rolling forward.
+# ── Web bundle ────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS web-builder
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@11.2.2 --activate
-
 WORKDIR /repo
 
-# Copy lockfile + all workspace package.json files first so the install layer
-# caches independently from source changes. pnpm install requires every
-# workspace member's package.json even if we only build one of them.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/mcp-gateway/package.json apps/mcp-gateway/package.json
-COPY apps/server/package.json apps/server/package.json
 COPY internal/shared/package.json internal/shared/package.json
-
 RUN pnpm install --frozen-lockfile
 
-# Now copy sources that the web bundle depends on and build.
 COPY internal/shared internal/shared
 COPY apps/web apps/web
 
-# Vite inlines VITE_*-prefixed env vars into the static bundle at build time, so
-# the Google client id must be present HERE, not as a runtime container env.
-# Declared right before the build so changing it only busts this layer, not the
-# (slow) pnpm install layer above. Passed in via docker-compose build.args.
+# Only needed when the image will run with TANDEM_AUTH=google: Vite inlines the
+# client id into the bundle at build time. Empty is fine for local mode.
 ARG VITE_GOOGLE_CLIENT_ID
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-# PostHog analytics: public client key + ingestion host, also inlined by Vite at
-# build time. Absent → posthog.ts skips init and the prod bundle captures nothing.
-ARG VITE_POSTHOG_KEY
-ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
-ARG VITE_POSTHOG_HOST
-ENV VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST
+RUN pnpm --filter @agentcanvas/shared build && pnpm --filter web build
 
-RUN pnpm --filter @agentcanvas/shared build \
- && pnpm --filter web build
-
-# ── Go API stage ──────────────────────────────────────────────────────────────
-# Must track apps/api/go.mod's `go` directive — bumping go.mod without bumping
-# this version fails the build with a "requires go >= …" error.
+# ── Go binary with the bundle embedded ────────────────────────────────────────
+# Tracks apps/api/go.mod's `go` directive.
 FROM golang:1.25-alpine AS api-builder
 WORKDIR /src
-
 COPY apps/api/go.mod apps/api/go.sum ./
 RUN go mod download
-
 COPY apps/api ./
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+COPY --from=web-builder /repo/apps/web/dist ./internal/webdist/bundle
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+      -ldflags="-s -w -X main.version=$(tr -d '[:space:]' < VERSION)" \
+      -o /out/tandem ./cmd/server
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tini \
- && adduser -D -u 10001 tandem
-WORKDIR /app
-
-COPY --from=api-builder /out/server /app/server
-COPY --from=web-builder /repo/apps/web/dist /app/web/dist
-
-RUN mkdir -p /app/canvas-images && chown -R tandem:tandem /app
+ && adduser -D -u 10001 tandem \
+ && mkdir -p /data && chown tandem:tandem /data
+COPY --from=api-builder /out/tandem /usr/local/bin/tandem
 USER tandem
 
 ENV PORT=7891 \
-    WEB_DIST_PATH=/app/web/dist \
-    IMAGE_DIR=/app/canvas-images
-
+    TANDEM_DATA_DIR=/data \
+    TANDEM_AUTH=none
+VOLUME ["/data"]
 EXPOSE 7891
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+  CMD wget -qO- http://127.0.0.1:7891/healthz || exit 1
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["/app/server"]
+CMD ["tandem"]

@@ -1,0 +1,107 @@
+# Build the Tandem binaries and attach them to a GitHub Release.
+#
+# Tandem is a locally run tool: ONE Go binary with the web bundle embedded and a
+# SQLite database in ~/.tandem. There is no server to deploy to — a "release" is
+# the set of binaries `npx @jaximus/tandem-mcp up` downloads (see
+# apps/mcp-gateway/src/up.ts) and that anyone can grab from the Releases page.
+#
+# Two ways to run it:
+#
+#   1. Push a tag — this is a real release:
+#        git tag v0.1.0 && git push origin v0.1.0
+#      The tag's version must equal apps/api/VERSION (checked below).
+#
+#   2. Actions → "Release Tandem binaries" → Run workflow. Builds everything and
+#      uploads the binaries as a workflow artifact; publishes NO release.
+#
+# The gateway's npm release stays in release-mcp-gateway.yml (mcp-v* tags) so
+# the two can move independently: a binary release does not imply a new
+# gateway, and vice versa.
+
+name: Release Tandem binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-binaries
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build all platforms
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # On a tag push the tag must name the version baked into the binary, so a
+      # v0.2.0 release can never ship a binary that reports 0.1.0.
+      - name: Verify tag matches apps/api/VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          WANT="v$(tr -d '[:space:]' < apps/api/VERSION)"
+          if [ "$WANT" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match apps/api/VERSION (${WANT}). Bump VERSION or retag."
+            exit 1
+          fi
+
+      - name: Go tests
+        working-directory: apps/api
+        run: go test ./...
+
+      # Builds the web bundle, embeds it, and cross-compiles every target into
+      # dist/ as tandem_<os>_<arch>[.exe] plus .tar.gz / .zip archives and a
+      # SHA256SUMS file. CGO is off (modernc.org/sqlite is pure Go), which is
+      # what makes a single cross-compiling job possible.
+      - name: Build binaries
+        run: scripts/build.sh --all
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tandem-binaries
+          path: |
+            dist/tandem_*
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          # Raw binaries are attached alongside the archives on purpose: the
+          # gateway's `tandem-mcp up` downloads tandem_<os>_<arch>[.exe] straight
+          # to ~/.tandem/bin without needing an extractor.
+          files: |
+            dist/tandem_*
+            dist/SHA256SUMS
+          generate_release_notes: true
