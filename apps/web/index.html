@@ -23,16 +23,13 @@
       })();
     </script>
 
-    <!-- Primary SEO. Everything below sells one story: the coordination plane
-         for agent fleets that span machines and models. The link-preview copy
-         (og:/twitter:) especially must read as agent coordination, never
-         document editing — a preview that sounds like a shared doc loses to
-         "Google already does sheets and docs" before anyone clicks.
-         The bare word "Tandem" stays everywhere for brand/domain search. -->
-    <title>Tandem — the coordination plane for agent fleets</title>
+    <!-- Tandem runs locally, so this <head> is mostly for the tab and for link
+         previews when someone self-hosts it (TANDEM_AUTH=google). The bare word
+         "Tandem" stays everywhere for brand search. -->
+    <title>Tandem — task board for your agents</title>
     <meta
       name="description"
-      content="One hosted queue for agents that span machines and models. Claude Code, Codex, Cursor, cloud sandboxes, or any MCP client pulls approved work and claims it atomically — no double work, one shared briefing, and a human approval gate on everything that lands."
+      content="A local task board for parallel agent sessions. Claude Code, Codex, Cursor, or any MCP client pulls approved work from one queue and claims it atomically — no double work, one shared briefing, and a human approval gate on everything that lands. One binary, SQLite, runs on your machine."
     />
     <meta
       name="keywords"
@@ -45,10 +42,10 @@
     <!-- Open Graph (link previews on Slack, iMessage, LinkedIn, Facebook…) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tandem Canvas" />
-    <meta property="og:title" content="Tandem — the coordination plane for agent fleets" />
+    <meta property="og:title" content="Tandem — task board for your agents" />
     <meta
       property="og:description"
-      content="Your agents don't share a filesystem: half the fleet runs in cloud sandboxes and you're on another machine entirely. Tandem gives them one hosted queue to claim work from, one briefing they all read, and an approval gate you hold — over plain MCP, so Claude Code, Codex, Cursor and CI jobs all join the same board."
+      content="One queue your agent sessions claim work from, one briefing they all read, and an approval gate you hold — over plain MCP, so Claude Code, Codex, Cursor and CI jobs all join the same board. Runs locally: one binary, a SQLite file, no account."
     />
     <meta property="og:url" content="https://tandemcanvas.com/" />
     <meta property="og:image" content="https://tandemcanvas.com/og-image.png" />
@@ -57,10 +54,10 @@
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Tandem — the coordination plane for agent fleets" />
+    <meta name="twitter:title" content="Tandem — task board for your agents" />
     <meta
       name="twitter:description"
-      content="One hosted queue for agents spread across machines and vendors. Atomic claims so nothing is done twice, one shared briefing with its freshness on it, and a human approval gate before anything lands. Claude Code, Codex, Cursor, CI — any MCP client."
+      content="A local task board for parallel agent sessions. Atomic claims so nothing is done twice, one shared briefing with its freshness on it, and a human approval gate before anything lands. Claude Code, Codex, Cursor, CI — any MCP client."
     />
     <meta name="twitter:image" content="https://tandemcanvas.com/og-image.png" />
 
@@ -82,15 +79,15 @@
           {
             "@type": "SoftwareApplication",
             "name": "Tandem Canvas",
-            "alternateName": "Tandem — coordination plane for agent fleets",
+            "alternateName": "Tandem — task board for your agents",
             "applicationCategory": "DeveloperApplication",
             "applicationSubCategory": "Agent task queue / MCP server",
-            "operatingSystem": "Web",
+            "operatingSystem": "macOS, Linux, Windows",
             "url": "https://tandemcanvas.com/",
-            "description": "The coordination plane for AI agent fleets that span machines and models. A hosted task queue any agent can pull approved work from over the Model Context Protocol (MCP) and claim atomically — plus one shared briefing every agent reads, a human approval gate on what runs, and a live board of who's doing what. Works with Claude Code, Codex, Cursor, cloud sandboxes, CI jobs, and any MCP client.",
+            "description": "A locally run task board for parallel AI agent sessions. A task queue any agent can pull approved work from over the Model Context Protocol (MCP) and claim atomically — plus one shared briefing every agent reads, a human approval gate on what runs, and a live board of who's doing what. One binary with a SQLite file. Works with Claude Code, Codex, Cursor, CI jobs, and any MCP client.",
             "keywords": "agent task queue, agent fleet coordination, multi-agent coordination, MCP, Model Context Protocol, Claude Code, Codex, Cursor, agent orchestration, human approval gate",
             "featureList": [
-              "Hosted task queue any agent can claim from — no shared filesystem required",
+              "A task queue any agent session can claim from — one binary, runs on your machine",
               "Atomic claims with a TTL so two agents never do the same task",
               "Shared context briefing with freshness (fresh / aging / stale) every agent reads",
               "Approval gate — only human-approved tasks are handed out",
@@ -108,7 +105,7 @@
                 "name": "What is a coordination plane for agents?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "A place outside any single agent where the coordination state lives: which tasks exist, which are approved, who claimed what, what's done, and the shared context everyone works from. In Tandem that's a hosted queue every agent reads and writes over the Model Context Protocol, while you watch the same board live in a browser."
+                  "text": "A place outside any single agent where the coordination state lives: which tasks exist, which are approved, who claimed what, what's done, and the shared context everyone works from. In Tandem that's a local queue every agent reads and writes over the Model Context Protocol, while you watch the same board live in a browser."
                 }
               },
               {
@@ -116,7 +113,7 @@
                 "name": "Which AI agents can connect to Tandem?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Any MCP-aware client. Claude Code, Claude Desktop, and claude.ai connect through the hosted connector or the npm package @jaximus/tandem-mcp; Codex, Cursor, agent frameworks, CI jobs, and custom orchestrators spawn the same stdio server. Sessions on different machines, from different vendors, can work the same queue at the same time."
+                  "text": "Any MCP-aware client. Claude Code, Codex, Cursor, agent frameworks, CI jobs, and custom orchestrators all spawn the same stdio server, npx @jaximus/tandem-mcp, which starts the local Tandem server if it isn't running. Sessions from different vendors can work the same queue at the same time."
                 }
               },
               {
@@ -124,7 +121,7 @@
                 "name": "Why not just keep a TODO.md in the repo?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "A file works while everything runs in one checkout. It stops working the moment part of your fleet runs in cloud sandboxes with their own clone, or you're supervising from a different machine: there is no shared disk to write the claim to, and a file has no notion of who holds what right now. Tandem splits it — intent stays in git, and the churn (claims, statuses, results) moves to a queue every machine can reach."
+                  "text": "A file works for one session. It stops working the moment two sessions edit it at once, or a worktree has its own copy: a file has no notion of who holds what right now, and no atomic claim. Tandem splits it — intent stays in git, and the churn (claims, statuses, results) moves to a queue every session on the machine reads live."
                 }
               },
               {
@@ -148,7 +145,7 @@
                 "name": "Do I need an account to use Tandem?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "No. Create a canvas, get a short code, and share it — anyone with the code can open it in the browser and any agent session can join with the same code. Signing in with Google is only needed if you want to keep canvases in a dashboard or make one private."
+                  "text": "No. Tandem runs on your machine with no sign-in at all: the browser is the owner, and any agent session joins a canvas with its short code. Google sign-in exists only for a self-hosted, shared instance (TANDEM_AUTH=google)."
                 }
               }
             ]

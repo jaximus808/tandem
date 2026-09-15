@@ -18,11 +18,11 @@ gets out of the way (SPEC.md §2: *launchable-FROM every launcher, never the
 launcher*).
 
 ```
-  board (tandemcanvas.com)          your machine
-  ────────────────────────          ────────────
+  board (tandem on :7891)           same machine
+  ───────────────────────           ────────────
   you click Approve
         │
-        └─ task.approved ──► tunnel ──► tandem-mcp listen :8787
+        └─ task.approved ──────────► tandem-mcp listen :8787
                                               │
                                               └─ exec: claude -p "…orchestrator…"
                                                         │
@@ -104,7 +104,7 @@ call.
 |---|---|---|
 | Precondition | An agent is already running | Nothing is running |
 | Latency to start | Instant — it is already there | One process launch |
-| Setup | None. It is on the default tool surface | Tunnel + signing secret + a listener process (§1–3) |
+| Setup | None. It is on the default tool surface | A webhook + a listener process (§1–3); a tunnel only when the server is not on this machine |
 | Good for | You are at the keyboard approving as you go; an agent that just proposed work and must not end its turn | You approve from your phone at 2am; you want work to start without a session open |
 | Ends when | The agent stops waiting, or you interrupt | You stop the listener |
 
@@ -147,18 +147,44 @@ primitive; the gate is the browser.**
 
 ---
 
-## 2. Topology: prod cannot reach your laptop
+## 2. Topology: where the server is
 
-`tandemcanvas.com` runs on GCP. Your listener is on `127.0.0.1:8787` behind
-whatever NAT your coffee shop has. There is no route. **You need a tunnel.** This
-is the step people skip and then wonder why nothing fires.
+### Local install (the default) — nothing to set up
 
-### cloudflared (one command, no account needed for a quick tunnel)
+Tandem runs on your machine (`npx @jaximus/tandem-mcp up`, `http://127.0.0.1:7891`),
+and so does the listener. Point the canvas's webhook at
+
+```
+http://127.0.0.1:8787/webhook
+```
+
+and that is the whole topology. In local mode (`TANDEM_AUTH=none`, the default)
+the delivery worker's SSRF guard is **off by default**, precisely so the server
+can reach a listener on loopback — there is no `TANDEM_WEBHOOKS_ALLOW_PRIVATE=1`
+to set and no `host.docker.internal` to route through any more. The startup log
+says so once:
+
+```
+WARNING: webhook SSRF guard disabled — private targets allowed (TANDEM_WEBHOOKS_ALLOW_PRIVATE)
+```
+
+If you would rather keep the guard on locally, `TANDEM_WEBHOOKS_ALLOW_PRIVATE=0`
+(or `false`) turns it back on; deliveries to private addresses are then refused
+at dial time with `webhook target blocked` and dead-lettered without retrying.
+
+### Self-hosted with sign-in (`TANDEM_AUTH=google`) — the guard is on, so tunnel
+
+A server other people can reach keeps the guard on: with it off, anyone who can
+edit a canvas's webhook config could make the server connect to its internal
+network — including `169.254.169.254`, the cloud metadata endpoint. There it is a
+strict opt-in (only the exact values `1` / `true`, read in
+`apps/api/internal/config/config.go` and passed as
+`webhooks.WithAllowPrivateTargets(true)` in `cmd/server/main.go`); leave it
+unset and give the server a route to your listener instead:
 
 ```bash
 # terminal 1 — the tunnel, pointed at the port the listener will bind
 cloudflared tunnel --url http://127.0.0.1:8787
-#   …
 #   Your quick Tunnel has been created! Visit it at:
 #   https://picked-mars-tone-brave.trycloudflare.com
 ```
@@ -167,54 +193,6 @@ Put `https://picked-mars-tone-brave.trycloudflare.com/webhook` in the UI's URL
 field. Quick tunnels get a **new hostname every restart** — if you restart
 `cloudflared`, update the URL in the UI or deliveries dead-letter. For a stable
 hostname, use a named tunnel or `tailscale funnel 8787`.
-
-### Local dev (`tandem-local` on :7891) — no tunnel needed
-
-Against a local API you can skip the tunnel entirely: the container reaches the
-listener on your host directly. Two steps.
-
-**1. Start the local API with the SSRF guard off.**
-
-```bash
-TANDEM_WEBHOOKS_ALLOW_PRIVATE=1   # on the tandem-local container's environment
-```
-
-**2. Point the local canvas's webhook at the host.**
-
-```
-http://host.docker.internal:8787/webhook
-```
-
-(On a Linux bridge without `host.docker.internal`, use the gateway address —
-`http://172.17.0.1:8787/webhook` — or run the container with
-`--add-host=host.docker.internal:host-gateway`.)
-
-Without step 1 this fails in a way worth recognising: the config saves fine (URL
-validation is syntactic only — no DNS), then every delivery is refused at dial
-time with `webhook target blocked` and dead-lettered **without retrying**. The
-delivery worker's SSRF guard (`apps/api/internal/webhooks/sender.go`) rejects
-loopback, RFC1918, link-local and CGNAT addresses in the dialer's `Control` hook,
-after DNS resolution — and `host.docker.internal` resolves to a private address
-(192.168.65.254 on Docker Desktop, 172.17.0.1 on a Linux bridge).
-
-`TANDEM_WEBHOOKS_ALLOW_PRIVATE` is read in `apps/api/internal/config/config.go`
-and passes `webhooks.WithAllowPrivateTargets(true)` to the worker's sender in
-`cmd/server/main.go`. Only the exact values `1` and `true` enable it — anything
-else (including `TRUE` and `yes`) leaves the guard on, so a typo fails closed. On
-startup you get one line in the log:
-
-```
-WARNING: webhook SSRF guard disabled — private targets allowed (TANDEM_WEBHOOKS_ALLOW_PRIVATE)
-```
-
-> **Never set this in production.** With the guard off, anyone who can edit a
-> canvas's webhook config can make the server connect to your internal network —
-> including `169.254.169.254`, the cloud metadata endpoint. It is off by default
-> and this env var is the *only* thing that can turn it on; keep it unset
-> everywhere but your own machine.
-
-Against **prod** (`tandemcanvas.com`) the guard is on and always will be, so a
-tunnel is the only route to your laptop. See above.
 
 ---
 

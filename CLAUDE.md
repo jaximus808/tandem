@@ -1,22 +1,38 @@
 # Tandem — project guide for Claude
 
-Tandem is a shared planning canvas that humans and AI agents co-edit in real time.
+Tandem is a shared task board that humans and AI agents co-edit in real time. It
+is a **locally run tool**: one Go binary with the web bundle embedded and a
+SQLite database in `~/.tandem` (`TANDEM_DATA_DIR`). No hosted service, no
+Supabase, no accounts in local mode — the browser is the single local owner.
 Monorepo:
 
-- `apps/api` — Go API (HTTP + WebSocket hub + Supabase/Postgres). Issues canvas JWTs
-  and (new) Google-OAuth user sessions.
-- `apps/web` — React + Vite + Tailwind frontend.
-- `apps/mcp-gateway` — Node stdio MCP server (`@jaximus/tandem-mcp`) that proxies tool
-  calls to the API.
+- `apps/api` — Go server (HTTP + WebSocket hub). Store is
+  `internal/store/sqlite` (pure-Go `modernc.org/sqlite`); schema is
+  `internal/store/sqlite/schema.sql`, applied by `migrate.go` (a
+  `schema_version` table — bump `schemaVersion` and add a step when the schema
+  changes). Issues canvas JWTs; Google sign-in exists only behind
+  `TANDEM_AUTH=google` (self-hosting). `internal/webdist` embeds the web bundle.
+- `apps/web` — React + Vite + Tailwind frontend. Boots from `GET /api/config`
+  (`{auth, local, version}`): local mode is the dashboard at `/`, no sign-in,
+  no landing page.
+- `apps/mcp-gateway` — `@jaximus/tandem-mcp`: the stdio MCP server that proxies
+  tool calls to the API, and the launcher (`up` / `open` / `down` / `init` /
+  `listen`). Defaults to `http://127.0.0.1:7891` and auto-starts the server.
 - `internal/shared` — TypeScript types shared by web + gateway.
-- `supabase/migrations/` — hand-written, numbered SQL. Applied manually to Supabase.
+- `scripts/build.sh` — web bundle → embed → `dist/tandem` (`--all` cross-compiles).
 
-Live at https://tandemcanvas.com. Deploy = push to `main` (GitHub Actions → GCP).
+Users run it with `npx -y @jaximus/tandem-mcp up`. A release is a git tag
+`v<apps/api/VERSION>`: `.github/workflows/release.yml` builds the binaries and
+attaches them to the GitHub Release the gateway downloads from. Nothing deploys
+on push to `main` any more.
 
 ## Work from the canvas task queue
 
 The living roadmap for THIS project is itself a Tandem canvas: **code `TEGLQFXR`**
-("tandem planning"). Dogfooding — we plan Tandem in Tandem.
+("tandem planning"). Dogfooding — we plan Tandem in Tandem. It lives in Jaxon's
+local instance (imported from the old hosted one with `cmd/import-supabase`);
+if the MCP server cannot reach it, the local server is simply not running —
+say so, don't hunt for a hosted URL.
 
 The tool names below are the **default MCP surface** — the 18-tool intent facade
 (`FACADE_NAMES` in `apps/mcp-gateway/src/facade.ts`): `canvas_connect`,
@@ -235,24 +251,28 @@ the facade at the raw API with a hand-built token.
 
 - API: `cd apps/api && go build ./... && go test ./...`
 - Web: `cd apps/web && pnpm build`
-- Gateway: `cd apps/mcp-gateway && pnpm build`
+- Gateway: `cd apps/mcp-gateway && pnpm build && pnpm test`
+- Whole binary (only when the change is to the build itself): `scripts/build.sh`
+  → `dist/tandem` with the web bundle embedded.
 
-Env: see `apps/api/.env.example`. Never commit secrets — `GOOGLE_CLIENT_ID` is public,
-the rest (`SUPABASE_KEY`, `JWT_SECRET`) are not.
+Env: every server setting is in `apps/api/.env.example`, and none is required —
+a bare `tandem` runs in local mode. Never commit secrets: `GOOGLE_CLIENT_ID` is
+public, `JWT_SECRET` (auto-generated into `~/.tandem/secret`) is not.
 
 ## Division of labour (important)
 
 Your job stops at the code: **make the changes, then build all three packages
 and run the Go tests to prove it compiles and passes.** That's the whole
-deliverable. Jaxon handles everything runtime — starting the server, applying
-migrations to Supabase, rebuilding the local container, and manual QA in the
-browser.
+deliverable. Jaxon handles everything runtime — building and restarting the
+local binary, and manual QA in the browser.
 
 So: **do not** spend effort (or tokens) working out how to run the server,
-rebuild the `tandem-local` docker image, point the MCP at localhost, or drive a
-browser to verify UI. When a change needs a migration, write the numbered SQL in
-`supabase/migrations/` and just tell him to apply it — don't try to run it yourself.
-Report what you changed and what's left for him to do, and stop there.
+rebuild the binary, or drive a browser to verify UI. When a change needs a
+schema change, edit `apps/api/internal/store/sqlite/schema.sql`, bump
+`schemaVersion` in `migrate.go` with a migration step for existing databases,
+cover it with the package's `:memory:` tests, and just tell him to restart the
+server — `migrate` runs at boot. Report what you changed and what's left for
+him to do, and stop there.
 
 **Git: commit ticket work — one commit per ticket.** When your changes belong to
 a ticket, commit them as `TDM-<n>: <short change summary>` right after builds/

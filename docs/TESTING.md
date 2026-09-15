@@ -1,3 +1,8 @@
+> **Historical.** This checklist predates the local-first move (SQLite in
+> `~/.tandem`, no Supabase, no Docker, `TANDEM_WEBHOOKS_ALLOW_PRIVATE` on by
+> default locally). The board behaviour it checks still applies; the setup steps
+> do not — see `docs/DEV.md` for how to run things now.
+
 # QA — working-tree batch, 2026-07-29
 
 Everything below is uncommitted. Four change sets, each mapped to its board item
