@@ -775,52 +775,6 @@ func (s *supabaseStore) DeleteCanvas(_ context.Context, canvasID uuid.UUID) erro
 		Eq("id", canvasID.String()))
 }
 
-func (s *supabaseStore) CanvasCount(_ context.Context) (int, error) {
-	_, count, err := s.client.From("canvases").
-		Select("id", "exact", true).
-		Execute()
-	if err != nil {
-		return 0, err
-	}
-	return int(count), nil
-}
-
-// UserCount returns the total number of registered user accounts. Same
-// count=exact HEAD trick as CanvasCount — no rows transferred.
-func (s *supabaseStore) UserCount(_ context.Context) (int, error) {
-	_, count, err := s.client.From("users").
-		Select("id", "exact", true).
-		Execute()
-	if err != nil {
-		return 0, err
-	}
-	return int(count), nil
-}
-
-// CanvasRecurrence returns how many canvases saw activity on a later calendar
-// day than they were created (revisited), alongside the total. It's a proxy
-// for "someone came back" — canvas-level, since edits carry no per-user
-// identity yet, and updated_at is last-touch only, so it UNDERcounts (stays
-// conservative). A full scan of created_at/updated_at, fine at current scale.
-func (s *supabaseStore) CanvasRecurrence(_ context.Context) (revisited int, total int, err error) {
-	var rows []struct {
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-	}
-	if _, err = s.client.From("canvases").
-		Select("created_at,updated_at", "", false).
-		ExecuteTo(&rows); err != nil {
-		return 0, 0, err
-	}
-	for _, row := range rows {
-		total++
-		if row.UpdatedAt.UTC().Format("2006-01-02") != row.CreatedAt.UTC().Format("2006-01-02") {
-			revisited++
-		}
-	}
-	return revisited, total, nil
-}
-
 func (s *supabaseStore) GetCanvasByCode(_ context.Context, code string) (*Canvas, error) {
 	var rows []dbCanvas
 	_, err := s.client.From("canvases").

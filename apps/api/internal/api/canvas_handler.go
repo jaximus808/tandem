@@ -243,36 +243,6 @@ func (h *Handler) ClaimCanvas(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, canvas)
 }
 
-func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
-	canvases, err := h.store.CanvasCount(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	users, err := h.store.UserCount(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	recurring, _, err := h.store.CanvasRecurrence(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	// % of canvases touched again on a later day — the recurrence proxy. Integer
-	// round-half-up so we don't drag in math just for one percentage.
-	pct := 0
-	if canvases > 0 {
-		pct = (recurring*100 + canvases/2) / canvases
-	}
-	writeJSON(w, http.StatusOK, map[string]int{
-		"canvases":     canvases,
-		"users":        users,
-		"recurring":    recurring,
-		"recurringPct": pct,
-	})
-}
-
 // GET /api/canvas/state  (JWT required)
 //
 // Read shapes (query params), to keep a big canvas from barfing the agent's

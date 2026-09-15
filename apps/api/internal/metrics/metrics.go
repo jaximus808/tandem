@@ -240,6 +240,17 @@ func (reg *Registry) RecordOp(op string, d time.Duration) {
 // method ws.Hub's Observer seam calls, so the hub never imports this package.
 func (reg *Registry) ObserveBroadcast(d time.Duration) { reg.RecordOp(OpBroadcastFanout, d) }
 
+// GaugeWSClients is the gauge name the router registers for the hub's connected
+// client count. Named here so the extraction and the router agree on the string.
+const GaugeWSClients = "ws_clients"
+
+// GaugeQueueWaiters is how many agents are parked on the queue long poll right
+// now (TDM-148). Published because a wait that is never cleaned up is invisible
+// otherwise: this number rising and never falling is the signature of leaked
+// waiters, and is the difference between noticing that in a graph and noticing it
+// when the process runs out of memory.
+const GaugeQueueWaiters = "queue_waiters"
+
 // RegisterGauge attaches a pull-style gauge, read once per snapshot. Pull (not
 // push) because the authoritative number lives in the component that owns it —
 // the hub knows exactly how many clients are connected, and a pushed counter

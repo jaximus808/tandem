@@ -81,32 +81,10 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 	// (public canvases only).
 	r.With(OptionalUser(authSvc, s)).Post("/api/mcp/auth", mcpAuthHandlerFunc(h, authSvc))
 	r.Get("/ws", wsH.ServeWS)
-	r.Get("/api/stats", h.Stats)
 	if metricsReg != nil {
 		// Aggregates only (no canvas data) — open by design.
 		r.Get("/api/metrics", metricsReg.Handler)
 	}
-
-	// ── Metrics history (TDM-94 / migration 0040) ────────────────────────────────
-	//
-	// Registered UNCONDITIONALLY, unlike /api/metrics above: reading the stored
-	// series does not need a live registry (the rows may have been written by a
-	// previous process, or by a different instance), so gating these on
-	// METRICS_ENABLED would make the history unreadable exactly when you most want
-	// it — after turning collection off to investigate something.
-	//
-	// OptionalUser then RequireMetricsOwner: OptionalUser resolves cookie / PAT /
-	// OAuth into a user, the gate checks that user against METRICS_OWNER_EMAILS and
-	// 404s the whole subtree when the allowlist is unset. Not RequireUser, because
-	// `cmd/loadtest -publish` carries a PAT and no cookie.
-	r.Group(func(r chi.Router) {
-		r.Use(OptionalUser(authSvc, s))
-		r.Use(RequireMetricsOwner(s))
-		r.Get("/api/metrics/history", h.MetricsHistory)
-		r.Get("/api/metrics/history/latest", h.MetricsSnapshotLatest)
-		r.Get("/api/metrics/loadtest", h.LoadtestRuns)
-		r.Post("/api/metrics/loadtest", h.PublishLoadtest)
-	})
 
 	// ── OAuth 2.1 authorization server (hosted MCP connector) ────────────────────
 	// Discovery metadata (RFC 8414 / 9728). Registered with a trailing wildcard
