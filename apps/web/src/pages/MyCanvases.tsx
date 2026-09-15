@@ -15,6 +15,7 @@ import {
 import type { CanvasMeta, CanvasMode } from "../types";
 import { listMyCanvases, listSharedWithMe, deleteCanvas } from "../lib/api";
 import { fetchMe, getCachedUser, type User } from "../lib/auth";
+import { useConfig } from "../lib/config";
 import TandemLogo from "../components/TandemLogo";
 import AccountMenu from "../components/AccountMenu";
 import CanvasLauncher from "../components/CanvasLauncher";
@@ -94,6 +95,9 @@ function sortCanvases(list: CanvasMeta[], key: SortKey): CanvasMeta[] {
 }
 
 export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSettings, onShowAbout }: Props) {
+  // Local mode: this page IS the home screen — one owner, every local canvas,
+  // no "shared with you", no account chrome (AccountMenu hides itself).
+  const config = useConfig();
   const [user, setUser] = useState<User | null>(getCachedUser);
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [query, setQuery] = useState("");
@@ -151,7 +155,8 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
         // owned list, so it defaults to [].
         const [canvases, shared] = await Promise.all([
           listMyCanvases(),
-          listSharedWithMe().catch(() => [] as CanvasMeta[]),
+          // No other accounts exist locally, so there is nothing to ask for.
+          config.local ? Promise.resolve([] as CanvasMeta[]) : listSharedWithMe().catch(() => [] as CanvasMeta[]),
         ]);
         if (!cancelled) setLoad({ status: "ready", canvases, shared });
       } catch (e) {
@@ -188,7 +193,9 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
     return sortCanvases(list, sortKey);
   }, [owned, query, modeFilter, sortKey]);
 
-  const firstName = user?.displayName ? user.displayName.split(" ")[0] : null;
+  // The local user is a placeholder ("You"), so the page speaks in the second
+  // person rather than possessive-ing a placeholder.
+  const firstName = !config.local && user?.displayName ? user.displayName.split(" ")[0] : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-paper text-ink">
@@ -201,7 +208,7 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
           </span>
         </button>
         <span className="text-ink/20">/</span>
-        <span className="text-[15px] font-medium">Dashboard</span>
+        <span className="text-[15px] font-medium">{config.local ? "Canvases" : "Dashboard"}</span>
         <div className="ml-auto flex items-center gap-2">
           {load.status === "ready" && (
             <button
@@ -256,7 +263,8 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
                 {firstName ? `${firstName}'s canvases` : "Your canvases"}
               </h1>
               <p className="mt-1 text-sm text-ink/55">
-                {owned.length} {owned.length === 1 ? "canvas" : "canvases"} saved to your account
+                {owned.length} {owned.length === 1 ? "canvas" : "canvases"}
+                {config.local ? " on this machine" : " saved to your account"}
               </p>
             </div>
 
@@ -320,6 +328,12 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
           </>
         )}
       </main>
+
+      {config.local && (
+        <footer className="mx-auto w-full max-w-6xl px-4 pb-6 text-[11px] text-ink/35 sm:px-6">
+          Tandem{config.version ? ` v${config.version}` : ""} · running locally
+        </footer>
+      )}
 
       {launcherOpen && (
         <CanvasLauncher

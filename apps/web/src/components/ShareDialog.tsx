@@ -9,6 +9,7 @@ import {
   setCanvasVisibility,
   type CanvasAccessEntry,
 } from "../lib/api";
+import { useConfig } from "../lib/config";
 
 interface Props {
   code: string;
@@ -65,6 +66,20 @@ function Segmented<T extends string>({
 
 export default function ShareDialog({ code, canvas, onClose }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Local mode: no accounts, so no visibility posture and no member list — the
+  // dialog is the canvas link plus the agent-approval policy, nothing else.
+  const config = useConfig();
+  const [copied, setCopied] = useState(false);
+  const canvasUrl = `${window.location.origin}/c/${code}`;
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(canvasUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — the link is still selectable */
+    }
+  }
 
   const [visibility, setVisibility] = useState<Visibility>(canvas.visibility ?? "public");
   const [publicRole, setPublicRole] = useState<Role>(canvas.publicRole ?? "write");
@@ -92,8 +107,9 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Load the member list once.
+  // Load the member list once (hosted only — there are no members locally).
   useEffect(() => {
+    if (config.local) return;
     let live = true;
     listCanvasAccess(code)
       .then((rows) => live && setAccess(rows))
@@ -101,7 +117,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
     return () => {
       live = false;
     };
-  }, [code]);
+  }, [code, config.local]);
 
   // Persist a visibility/role change, optimistically reflecting it.
   async function persistPosture(next: { visibility: Visibility; publicRole: Role }) {
@@ -189,10 +205,32 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
         <div className="overflow-y-auto px-5 pb-5 pt-5">
           <Kicker>Share · {code}</Kicker>
           <h2 id="share-title" className="mt-1 text-xl font-semibold tracking-tight">
-            Who can open this canvas
+            {config.local ? "Canvas link and approval" : "Who can open this canvas"}
           </h2>
 
+          {/* ── Local mode: the link is the whole sharing story ────────────── */}
+          {config.local && (
+            <div className="mt-4 rounded-md border border-ink/15 bg-paper p-3">
+              <p className="text-[13px] font-medium text-ink">Open this canvas</p>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-ink/55">
+                Agents connect with the code; a browser on this machine opens the link.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate rounded-md border border-ink/10 bg-surface px-2.5 py-1.5 font-code text-[12px] text-ink">
+                  {canvasUrl}
+                </span>
+                <button
+                  onClick={copyLink}
+                  className="tandem-tap flex shrink-0 items-center justify-center rounded-md border border-ink/15 bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                >
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── General access ─────────────────────────────────────────────── */}
+          {!config.local && (
           <div className="mt-4 rounded-md border border-ink/15 bg-paper p-3">
             {/* Label above the control below sm, beside it above — the setting
                 and its explanation both get the full 390px column. */}
@@ -232,6 +270,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
             )}
             {postureError && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{postureError}</p>}
           </div>
+          )}
 
           {/* ── Agent task approval policy (migrations 0033 + 0041) ────────── */}
           <div className="mt-4 rounded-md border border-ink/15 bg-paper p-3">
@@ -267,7 +306,8 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
             {policyError && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{policyError}</p>}
           </div>
 
-          {/* ── Share with specific people ─────────────────────────────────── */}
+          {/* ── Share with specific people (hosted only) ───────────────────── */}
+          {!config.local && (
           <div className="mt-4">
             <Kicker>People with access</Kicker>
             {/* Three controls in one row is a desktop row. Below sm the email
@@ -352,6 +392,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
               )}
             </ul>
           </div>
+          )}
         </div>
 
         <div className="border-t border-ink/10 px-5 py-3.5">

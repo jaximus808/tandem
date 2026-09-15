@@ -56,9 +56,6 @@ interface Props {
 // by animating one. Any entry is a single-line edit if a client stops working.
 const HERO_CLIENTS: string[] = ["Claude Code", "claude.ai", "Codex", "Cursor"];
 
-// Only show the public "N canvases created" counter once it's real social
-// proof — a tiny number reads as anti-proof. Bump down as adoption grows.
-const CANVAS_COUNT_FLOOR = 50;
 
 // The board's view modes, name-dropped once in the workspace note below —
 // deliberately NOT a full section of demos; the queue is the story.
@@ -260,7 +257,6 @@ export default function Landing({ onJoin, onOpenMCP, onShowCanvases, onShowSetti
   // FULL_DEMO_VIDEO_URL empty the CTA below never renders and the hero is
   // untouched. See lib/launchMedia.ts.
   const [demoOpen, setDemoOpen] = useState(false);
-  const [canvasCount, setCanvasCount] = useState<number | null>(null);
 
   const hasRecents = useMemo(() => recents.length > 0, [recents]);
 
@@ -273,21 +269,6 @@ export default function Landing({ onJoin, onOpenMCP, onShowCanvases, onShowSetti
     fetchMe().then((u) => {
       if (!cancelled) setUser(u);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Public social-proof counter. Degrades silently — no error UI, and the
-  // number only renders once it's worth showing (see threshold below).
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/stats")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled && d && typeof d.canvases === "number") setCanvasCount(d.canvases);
-      })
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -421,11 +402,6 @@ export default function Landing({ onJoin, onOpenMCP, onShowCanvases, onShowSetti
                   </>
                 )}
               </span>
-              {canvasCount !== null && canvasCount >= CANVAS_COUNT_FLOOR && (
-                <span className="tabular-nums">
-                  {canvasCount.toLocaleString()} canvases created
-                </span>
-              )}
             </div>
           </div>
 

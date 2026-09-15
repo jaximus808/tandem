@@ -1,4 +1,5 @@
 import { applyFollowStyle, type FollowStyle } from "./followStyle";
+import { isLocalMode } from "./config";
 
 export interface User {
   id: string;
@@ -21,9 +22,23 @@ export interface User {
 }
 
 // Public client id (not a secret). Inlined at build time by Vite. If unset,
-// AccountMenu renders nothing and sign-in is unavailable.
+// AccountMenu renders nothing and sign-in is unavailable. Irrelevant in local
+// mode, where nothing that reads it ever renders.
 export const GOOGLE_CLIENT_ID = (import.meta.env as Record<string, string | undefined>)
   .VITE_GOOGLE_CLIENT_ID;
+
+// LOCAL MODE has exactly one human, and the server resolves every browser
+// request to this fixed user row (see TASKS.md "Shared contracts"). The web
+// never fetches it: fetchMe / getCachedUser answer with this constant, with no
+// network round trip and no localStorage cache, so ownership checks
+// (`canvas.ownerUserId === me.id`) work and no account chrome has to exist.
+export const LOCAL_USER_ID = "00000000-0000-4000-8000-000000000001";
+export const LOCAL_USER: User = {
+  id: LOCAL_USER_ID,
+  email: "local@tandem",
+  displayName: "You",
+  avatarUrl: "",
+};
 
 // Optimistic identity cache. Every page mount used to start from `null` and
 // flip to the real user once /api/auth/me resolved — a disorienting logged-out→
@@ -36,6 +51,7 @@ const USER_CACHE_KEY = "tandem.user";
 // The last user the server confirmed, read synchronously — pass as the lazy
 // initializer to useState so components render signed-in on first paint.
 export function getCachedUser(): User | null {
+  if (isLocalMode()) return LOCAL_USER;
   try {
     const raw = localStorage.getItem(USER_CACHE_KEY);
     return raw ? (JSON.parse(raw) as User) : null;
@@ -58,6 +74,9 @@ function cacheUser(user: User | null): void {
 }
 
 export async function fetchMe(): Promise<User | null> {
+  // Local mode: the auth routes don't exist (they 404) and the answer is a
+  // constant, so don't ask.
+  if (isLocalMode()) return LOCAL_USER;
   try {
     const res = await fetch("/api/auth/me", { credentials: "same-origin" });
     if (res.ok) {

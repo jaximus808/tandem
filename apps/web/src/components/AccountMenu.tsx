@@ -8,6 +8,7 @@ import {
 } from "../lib/api";
 import SignInModal from "./SignInModal";
 import ThemeToggle from "./ThemeToggle";
+import { isLocalMode } from "../lib/config";
 
 // AccountMenu shows the signed-in user's avatar (with a sign-out dropdown), or a
 // "Sign in" button that opens SignInModal when signed out. Renders nothing if
@@ -37,6 +38,9 @@ export default function AccountMenu({
   // Open a canvas from a notification (e.g. an invite someone sent).
   onOpenCanvas?: (code: string) => void;
 } = {}) {
+  // Local mode has no accounts: this control never renders and never polls.
+  // Read once — the mode is fixed for the life of the page.
+  const local = isLocalMode();
   const [user, setUser] = useState<User | null>(getCachedUser);
   const [ready, setReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,6 +52,7 @@ export default function AccountMenu({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (local) return;
     let cancelled = false;
     fetchMe().then((u) => {
       if (cancelled) return;
@@ -74,7 +79,7 @@ export default function AccountMenu({
   // Poll the inbox while signed in so an invite that lands shows up without a
   // refresh. Clears when signed out.
   useEffect(() => {
-    if (!user) {
+    if (!user || local) {
       setNotes([]);
       setUnread(0);
       return;
@@ -126,6 +131,7 @@ export default function AccountMenu({
     }
   }
 
+  if (local) return null;
   if (!GOOGLE_CLIENT_ID) return null;
   if (!ready) return null;
 

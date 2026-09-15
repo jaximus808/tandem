@@ -23,6 +23,7 @@ import MyCanvases from "./pages/MyCanvases";
 import UserSettings from "./pages/UserSettings";
 import OAuthConsent from "./pages/OAuthConsent";
 import { fetchMe, getCachedUser, type User } from "./lib/auth";
+import { useConfig, isLocalMode } from "./lib/config";
 import { copyCanvas, claimCanvas, setCanvasName } from "./lib/api";
 import ConnectModal, { hasDismissedConnect } from "./components/ConnectModal";
 import SignInModal from "./components/SignInModal";
@@ -127,7 +128,9 @@ function ticketWasPushed(): boolean {
 // (/c/CODE?claim=clm_…). Present → the visitor should take ownership of THIS
 // canvas (not a copy). Read once on load; stripped from the URL after claiming.
 function getClaimTokenFromURL(): string | null {
-  if (MOCK_ENABLED) return null;
+  // Local mode has one owner and nothing to claim — a ?claim= param on a link
+  // pasted from a hosted canvas is just ignored.
+  if (MOCK_ENABLED || isLocalMode()) return null;
   const t = new URLSearchParams(window.location.search).get("claim");
   return t && t.trim() ? t.trim() : null;
 }
@@ -318,7 +321,14 @@ function crumbName(user: { displayName?: string; email?: string } | null): strin
   return local || "You";
 }
 
+// The paths that only exist in HOSTED mode. In local mode they all mean "the
+// dashboard", and the address bar is rewritten to "/" so a stale bookmark or a
+// hand-typed /about doesn't leave the URL lying about what is on screen.
+// /dashboard is deliberately not here: it keeps working as an alias for "/".
+const HOSTED_ONLY_PATHS = new Set(["/mcp", "/me", "/about", "/why-tandem", "/features"]);
+
 export default function App() {
+  const config = useConfig();
   const [route, setRoute] = useState<Route>(routeFromPath);
   const [canvasCode, setCanvasCode] = useState<string | null>(getCodeFromURL);
   // The ticket page (/c/CODE/ticket/TDM-n). Set → the canvas renders ONE ticket
@@ -617,6 +627,17 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Local mode: collapse the hosted-only pages onto the dashboard. Runs on
+  // mount and on every back/forward, alongside the route resolver below.
+  useEffect(() => {
+    if (!config.local) return;
+    const p = window.location.pathname.replace(/\/$/, "") || "/";
+    if (HOSTED_ONLY_PATHS.has(p)) {
+      window.history.replaceState(null, "", "/");
+      setRoute("home");
+    }
+  }, [config.local, route]);
 
   useEffect(() => {
     function onPop() {
@@ -1148,6 +1169,28 @@ export default function App() {
     return <OAuthConsent />;
   }
 
+  // LOCAL MODE: "/" IS the dashboard. There is no landing page, no marketing
+  // surface and no settings page to route to — every path that isn't a canvas
+  // (or the OAuth consent screen above) lands on the canvas list. The hosted
+  // routes below this block are unreachable when config.local is set.
+  if (config.local && !(route === "home" && canvasCode)) {
+    return (
+      <MyCanvases
+        onOpenCanvas={(code) => {
+          setRoute("home");
+          handleJoin(code);
+        }}
+        onHome={() => {
+          setRoute("home");
+          handleJoin("");
+        }}
+        onOpenMCP={() => setConnectOpen(true)}
+        onShowSettings={() => {}}
+        onShowAbout={() => {}}
+      />
+    );
+  }
+
   if (route === "mcp") {
     return (
       <MCPSupport
@@ -1636,7 +1679,7 @@ export default function App() {
               sees them, and only one of the three ever renders at a time. Each
               is `shrink-0`: they must never be squeezed into a two-line label,
               which is what would silently blow up the header's height. */}
-          {claiming ? (
+          {config.local ? null : claiming ? (
             <span className="inline-flex h-9 shrink-0 items-center rounded-md border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/60 sm:h-8">
               <span className="sm:hidden">Saving…</span>
               <span className="hidden sm:inline">Saving to your account…</span>

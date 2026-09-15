@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useConfig } from "../lib/config";
 import type { PresentAgent } from "../lib/useAgentActivity";
 
 interface Props {
@@ -13,6 +14,11 @@ interface Props {
 // Hosted Streamable-HTTP MCP endpoint — the zero-install path for Claude's own
 // web / desktop / mobile clients (Customize → Connectors).
 const CONNECTOR_URL = "https://tandemcanvas.com/api/mcp";
+
+// Where the published gateway looks for a LOCAL server by default. When this
+// page is served from somewhere else (another port, another host on the LAN),
+// the snippet pins API_URL so the agent lands on THIS server.
+const GATEWAY_LOCAL_DEFAULTS = new Set(["http://127.0.0.1:7891", "http://localhost:7891"]);
 
 function dismissalKey(code: string) {
   return `tandem.connected.${code}`;
@@ -145,10 +151,26 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
   // default is the one thing they need — the code. The one-time server setup is
   // tucked behind a disclosure for genuine first-timers.
   const [showSetup, setShowSetup] = useState(false);
-  const [setupTab, setSetupTab] = useState<"claude" | "editor">("claude");
+  // Local mode: there is no hosted connector to paste into Claude.ai, so the
+  // setup disclosure has one tab — the MCP config — and that config names this
+  // server unless it is already the gateway's default.
+  const local = useConfig().local;
+  const [setupTab, setSetupTab] = useState<"claude" | "editor">(local ? "editor" : "claude");
 
   const prompt = `Connect to Tandem canvas ${code}`;
-  const config = `{
+  const origin = window.location.origin;
+  const pinApiUrl = local && !GATEWAY_LOCAL_DEFAULTS.has(origin);
+  const config = pinApiUrl
+    ? `{
+  "mcpServers": {
+    "tandem": {
+      "command": "npx",
+      "args": ["-y", "@jaximus/tandem-mcp"],
+      "env": { "API_URL": "${origin}" }
+    }
+  }
+}`
+    : `{
   "mcpServers": {
     "tandem": {
       "command": "npx",
@@ -287,16 +309,18 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
                     {/* flex-wrap: "Claude · web / desktop" + "Editor / CLI" is
                         wider than the box inside a 390px modal once the pills
                         carry a touch target. */}
-                    <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => setSetupTab("claude")} className={tabPill(setupTab === "claude")}>
-                        Claude · web / desktop
-                      </button>
-                      <button onClick={() => setSetupTab("editor")} className={tabPill(setupTab === "editor")}>
-                        Editor / CLI
-                      </button>
-                    </div>
+                    {!local && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <button onClick={() => setSetupTab("claude")} className={tabPill(setupTab === "claude")}>
+                          Claude · web / desktop
+                        </button>
+                        <button onClick={() => setSetupTab("editor")} className={tabPill(setupTab === "editor")}>
+                          Editor / CLI
+                        </button>
+                      </div>
+                    )}
 
-                    {setupTab === "claude" ? (
+                    {setupTab === "claude" && !local ? (
                       <div className="mt-2.5">
                         <p className="text-[12px] leading-relaxed text-ink/65">
                           In Claude, open{" "}
