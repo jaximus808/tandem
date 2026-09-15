@@ -1,15 +1,20 @@
-.PHONY: build run migrate tidy
+.PHONY: build run test tidy dist
 
+# Host-platform binary with the embedded web bundle → ../../dist/tandem
+dist:
+	../../scripts/build.sh
+
+# API only (no web bundle refresh): quick local build
 build:
-	go build -o bin/server ./cmd/server
+	go build -o bin/tandem ./cmd/server
 
+# Local mode, data under ~/.tandem; set WEB_DIST_PATH=../../apps/web/dist to
+# serve a freshly built web bundle instead of the embedded one.
 run:
 	go run ./cmd/server
 
+test:
+	go test ./...
+
 tidy:
 	go mod tidy
-
-# Apply migrations (requires DATABASE_URL env var)
-migrate:
-	psql "$(DATABASE_URL)" -f ../../migrations/0001_initial_schema.sql
-	psql "$(DATABASE_URL)" -f ../../migrations/0002_add_canvas_indexes.sql

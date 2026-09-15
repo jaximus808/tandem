@@ -1,8 +1,10 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"github.com/agentcanvas/api/internal/auth"
 	"github.com/agentcanvas/api/internal/metrics"
 	"github.com/agentcanvas/api/internal/store"
+	"github.com/agentcanvas/api/internal/webdist"
 	"github.com/agentcanvas/api/internal/webhooks"
 	"github.com/agentcanvas/api/internal/ws"
 	"github.com/go-chi/chi/v5"
@@ -29,7 +32,13 @@ import (
 // the handlers is a no-op. It is created by the CALLER (cmd/server) rather than
 // here because the hub and the webhook delivery worker are built before the
 // router and need the same registry — one process, one set of numbers.
-func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier *auth.GoogleVerifier, cookieSecure bool, webDistPath string, imageDir string, publicBaseURL string, metricsReg *metrics.Registry, emitter *webhooks.Emitter) http.Handler {
+func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier *auth.GoogleVerifier, cookieSecure bool, webDistPath string, imageDir string, publicBaseURL string, metricsReg *metrics.Registry, emitter *webhooks.Emitter, opts ...RouterOption) http.Handler {
+	rc := routerConfig{authMode: AuthModeNone}
+	for _, o := range opts {
+		o(&rc)
+	}
+	local := rc.authMode == AuthModeNone
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -53,6 +62,9 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 	}
 	if emitter != nil {
 		hOpts = append(hOpts, WithTaskEvents(emitter))
+	}
+	if local {
+		hOpts = append(hOpts, WithLocalOwner(LocalUserID))
 	}
 	if metricsReg != nil {
 		hOpts = append(hOpts, WithMetrics(metricsReg))
@@ -86,6 +98,21 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 		r.Get("/api/metrics", metricsReg.Handler)
 	}
 
+	// ── Process + deployment facts ───────────────────────────────────────────────
+	// /healthz is what `tandem-mcp up` polls to know the server is ready.
+	// /api/config is the web's first request: it decides whether sign-in, the
+	// landing page and the account surfaces exist at all (local mode has none).
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": rc.version})
+	})
+	r.Get("/api/config", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"auth":    rc.authMode,
+			"local":   local,
+			"version": rc.version,
+		})
+	})
+
 	// ── OAuth 2.1 authorization server (hosted MCP connector) ────────────────────
 	// Discovery metadata (RFC 8414 / 9728). Registered with a trailing wildcard
 	// too because some clients append the resource path to the well-known URL.
@@ -100,7 +127,12 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 	r.Post("/oauth/token", oauthH.Token)
 
 	// ── Auth (human login; cookie-based session) ─────────────────────────────────
-	r.Post("/api/auth/google", authH.GoogleLogin)
+	// Sign-in exists only under TANDEM_AUTH=google; in local mode the route is
+	// not registered at all (404), and /api/auth/me answers with the local user
+	// via the session minted on index.html (see local.go).
+	if !local {
+		r.Post("/api/auth/google", authH.GoogleLogin)
+	}
 	r.Get("/api/auth/me", authH.Me)
 	r.Post("/api/auth/logout", authH.Logout)
 
@@ -384,11 +416,57 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 	})
 
 	// ── SPA (web app) ──────────────────────────────────────────────────────────
-	if _, err := os.Stat(webDistPath); err == nil {
-		r.Handle("/*", spaHandler(webDistPath))
+	// WEB_DIST_PATH (a directory) wins when set and present — the dev loop —
+	// otherwise the bundle embedded at build time by scripts/build.sh serves,
+	// which is how a release binary is one file. Neither → no SPA (API only).
+	var spa http.Handler
+	if webDistPath != "" {
+		if fi, err := os.Stat(webDistPath); err == nil && fi.IsDir() {
+			spa = spaHandler(os.DirFS(webDistPath), local, authSvc, cookieSecure)
+		}
+	}
+	if spa == nil {
+		if fsys, ok := webdist.FS(); ok {
+			spa = spaHandler(fsys, local, authSvc, cookieSecure)
+		}
+	}
+	if spa != nil {
+		r.Handle("/*", spa)
 	}
 
 	return r
+}
+
+// AuthMode values for TANDEM_AUTH. "none" is local mode: one machine, one
+// user, no sign-in. "google" is the self-hosted posture: Google sign-in,
+// accounts, PATs, sharing.
+const (
+	AuthModeNone   = "none"
+	AuthModeGoogle = "google"
+)
+
+// RouterOption carries the deployment facts NewRouter needs beyond its
+// dependencies. Variadic so the many test call sites keep compiling.
+type RouterOption func(*routerConfig)
+
+type routerConfig struct {
+	authMode string
+	version  string
+}
+
+// WithAuthMode sets the auth posture (AuthModeNone | AuthModeGoogle). Default
+// is AuthModeNone — a router built without options is a local one.
+func WithAuthMode(mode string) RouterOption {
+	return func(c *routerConfig) {
+		if mode != "" {
+			c.authMode = mode
+		}
+	}
+}
+
+// WithVersion is the build version reported by /healthz and /api/config.
+func WithVersion(v string) RouterOption {
+	return func(c *routerConfig) { c.version = v }
 }
 
 // spaHandler serves static files and falls back to index.html for SPA routing.
@@ -401,23 +479,48 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 // index.html with a self-referencing canonical + a route-specific <title>, so each
 // indexable URL returns 200 at its own canonical. Everything else falls through to
 // the default index.html and the SPA renders the right view from the path.
-func spaHandler(distPath string) http.Handler {
-	indexPath := filepath.Join(distPath, "index.html")
-	base, _ := os.ReadFile(indexPath)
+func spaHandler(fsys fs.FS, local bool, authSvc *auth.Service, cookieSecure bool) http.Handler {
+	base, _ := fs.ReadFile(fsys, "index.html")
 	variants := buildRouteVariants(base)
+	files := http.FileServer(http.FS(fsys))
+
+	serveIndex := func(w http.ResponseWriter, r *http.Request, html []byte) {
+		if local {
+			// The browser's identity in local mode — see local.go.
+			ensureLocalSession(authSvc, w, r, cookieSecure)
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Write(html)
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Join(distPath, r.URL.Path)
-		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
-			http.ServeFile(w, r, path)
+		// The SPA is a GET-only surface, and nothing under /api/ is ever a page:
+		// an unrouted API call (e.g. POST /api/auth/google in local mode) must
+		// be a 404, not index.html with a 200.
+		if (r.Method != http.MethodGet && r.Method != http.MethodHead) ||
+			strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/ws" {
+			http.NotFound(w, r)
 			return
 		}
-		if html, ok := variants[strings.TrimRight(r.URL.Path, "/")]; ok {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write(html)
+		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if name != "" && name != "index.html" {
+			if fi, err := fs.Stat(fsys, name); err == nil && !fi.IsDir() {
+				files.ServeHTTP(w, r)
+				return
+			}
+		}
+		if !local {
+			if html, ok := variants[strings.TrimRight(r.URL.Path, "/")]; ok {
+				serveIndex(w, r, html)
+				return
+			}
+		}
+		if base == nil {
+			http.NotFound(w, r)
 			return
 		}
-		http.ServeFile(w, r, indexPath)
+		serveIndex(w, r, base)
 	})
 }
 

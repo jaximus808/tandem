@@ -176,6 +176,11 @@ type Notification struct {
 	actorID     *uuid.UUID // who caused it (notifications.actor_user_id)
 }
 
+// RecipientID is whose inbox this notification lands in (write-only routing;
+// see the unexported fields above). ActorID is who caused it, nil for system.
+func (n *Notification) RecipientID() uuid.UUID { return n.recipientID }
+func (n *Notification) ActorID() *uuid.UUID    { return n.actorID }
+
 // NewNotification builds a notification ready for CreateNotification, carrying
 // the recipient + actor in the unexported routing fields.
 func NewNotification(recipientID uuid.UUID, kind string, canvasID *uuid.UUID, actorID *uuid.UUID, role string) *Notification {

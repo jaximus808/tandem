@@ -20,10 +20,14 @@ import (
 	"github.com/agentcanvas/api/internal/auth"
 	"github.com/agentcanvas/api/internal/config"
 	"github.com/agentcanvas/api/internal/metrics"
-	"github.com/agentcanvas/api/internal/store"
+	"github.com/agentcanvas/api/internal/store/sqlite"
 	"github.com/agentcanvas/api/internal/webhooks"
 	"github.com/agentcanvas/api/internal/ws"
 )
+
+// version is stamped by scripts/build.sh (-X main.version=…); "dev" for a
+// plain `go run`. Reported by /healthz and /api/config.
+var version = "dev"
 
 func main() {
 	cfg, err := config.Load()
@@ -35,23 +39,30 @@ func main() {
 		log.Fatalf("image dir: %v", err)
 	}
 
-	db, err := store.NewSupabase(cfg.SupabaseURL, cfg.SupabaseKey, store.WithClaimTTL(cfg.ClaimTTL))
+	db, err := sqlite.Open(cfg.DBPath, sqlite.WithClaimTTL(cfg.ClaimTTL))
 	if err != nil {
-		log.Fatalf("supabase: %v", err)
+		log.Fatalf("sqlite %s: %v", cfg.DBPath, err)
 	}
 	defer db.Close()
+	log.Printf("tandem %s — data in %s (db %s)", version, cfg.DataDir, cfg.DBPath)
 
 	authSvc := auth.NewService(cfg.JWTSecret, cfg.JWTTokenTTL)
 
 	var googleVerifier *auth.GoogleVerifier
-	if cfg.GoogleClientID != "" {
+	if cfg.Local() {
+		// Local mode: one user, no sign-in. The row exists so ownership, the
+		// approval gate and /api/auth/me all work exactly as for a signed-in
+		// owner — the browser gets its session from index.html (api/local.go).
+		if err := ensureLocalUser(db); err != nil {
+			log.Fatalf("local user: %v", err)
+		}
+		log.Printf("local mode (TANDEM_AUTH=none) — no sign-in; the browser is the owner")
+	} else {
 		googleVerifier, err = auth.NewGoogleVerifier(context.Background(), cfg.GoogleClientID)
 		if err != nil {
 			log.Fatalf("google verifier: %v", err)
 		}
-		log.Printf("google sign-in enabled")
-	} else {
-		log.Printf("GOOGLE_CLIENT_ID not set — google sign-in disabled")
+		log.Printf("google sign-in enabled (TANDEM_AUTH=google)")
 	}
 
 	// Operational metrics (TDM-42): ONE registry for the process, built here
@@ -94,10 +105,14 @@ func main() {
 			wOpts = append(wOpts, webhooks.WithObserver(metricsReg))
 		}
 		if cfg.WebhooksAllowPrivateTargets {
-			// Local-dev escape hatch (TDM-56): lets the container deliver to a
-			// `tandem-mcp listen` on the host. NewWorker's default sender has the
-			// guard on, so this is the only way it can ever be off in a server.
-			log.Printf("WARNING: webhook SSRF guard disabled — private targets allowed (TANDEM_WEBHOOKS_ALLOW_PRIVATE)")
+			// Default in local mode (the receiver is a `tandem-mcp listen` on this
+			// machine); a strict opt-in under TANDEM_AUTH=google. NewWorker's default
+			// sender has the guard on, so this is the only way it can be off.
+			if cfg.Local() {
+				log.Printf("webhooks may target private addresses (local mode; TANDEM_WEBHOOKS_ALLOW_PRIVATE=0 to re-arm the guard)")
+			} else {
+				log.Printf("WARNING: webhook SSRF guard disabled — private targets allowed (TANDEM_WEBHOOKS_ALLOW_PRIVATE)")
+			}
 			wOpts = append(wOpts, webhooks.WithSender(webhooks.NewSender(webhooks.WithAllowPrivateTargets(true))))
 		}
 		go webhooks.NewWorker(db, wOpts...).Run(webhookCtx)
@@ -110,7 +125,8 @@ func main() {
 	// reads the env, so the proxy can never surface private-repo state cross-canvas.
 	api.VetGitHubTokenEnv()
 
-	router := api.NewRouter(db, hub, authSvc, googleVerifier, cfg.CookieSecure, cfg.WebDistPath, cfg.ImageDir, cfg.PublicBaseURL, metricsReg, emitter)
+	router := api.NewRouter(db, hub, authSvc, googleVerifier, cfg.CookieSecure, cfg.WebDistPath, cfg.ImageDir, cfg.PublicBaseURL, metricsReg, emitter,
+		api.WithAuthMode(cfg.AuthMode), api.WithVersion(version))
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
@@ -126,7 +142,7 @@ func main() {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("AgentCanvas API listening on %s", srv.Addr)
+		log.Printf("Tandem listening on http://127.0.0.1:%s", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
@@ -155,4 +171,29 @@ func main() {
 		_ = srv.Close()
 	}
 	log.Printf("bye")
+}
+
+// ensureLocalUser upserts the fixed local owner (api.LocalUserID) with the
+// posture local canvases need: public + writable, so a bare canvas code lets an
+// agent propose and claim work. Idempotent; runs on every boot.
+func ensureLocalUser(db *sqlite.Store) error {
+	ctx := context.Background()
+	u, err := db.UpsertUserByGoogleSub(ctx, api.LocalUserTemplate())
+	if err != nil {
+		return err
+	}
+	if u.ID != api.LocalUserID {
+		return fmt.Errorf("local user has id %s, want %s (was the database created by a different build?)", u.ID, api.LocalUserID)
+	}
+	if u.DefaultCanvasVisibility != "public" {
+		if _, err := db.UpdateUserDefaultVisibility(ctx, u.ID, "public"); err != nil {
+			return err
+		}
+	}
+	if u.DefaultPublicRole != "write" {
+		if _, err := db.UpdateUserDefaultPublicRole(ctx, u.ID, "write"); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/google/uuid"
 
@@ -84,7 +82,7 @@ func (s *Store) CreateCanvas(ctx context.Context, name string, ownerUserID *uuid
 	var claimToken any
 	token := ""
 	if ownerUserID == nil {
-		token = generateClaimToken()
+		token = store.GenerateClaimToken()
 		claimToken = token
 	}
 	if visibility == "" {
@@ -95,7 +93,7 @@ func (s *Store) CreateCanvas(ctx context.Context, name string, ownerUserID *uuid
 	}
 	for range 10 {
 		id := uuid.New()
-		code := generateCode()
+		code := store.GenerateCode()
 		now := nowStr()
 		_, err := s.db.ExecContext(ctx, `INSERT INTO canvases
 			(id, code, name, mode, enabled_modes, owner_user_id, claim_token, visibility, public_role, created_at, updated_at)
@@ -146,7 +144,7 @@ func (s *Store) ListAllCanvases(ctx context.Context) ([]*store.Canvas, error) {
 // tabs and its briefing designation.
 func (s *Store) CopyCanvas(ctx context.Context, srcID, ownerUserID uuid.UUID, name string) (*store.Canvas, error) {
 	for range 10 {
-		code := generateCode()
+		code := store.GenerateCode()
 		newID := uuid.New()
 		err := s.withTx(ctx, func(tx *sql.Tx) error {
 			src, err := getCanvasByID(ctx, tx, srcID)
@@ -448,24 +446,8 @@ func prefixCols(prefix, cols string) string {
 
 // ── Notifications (migration 0022) ────────────────────────────────────────────
 
-// notificationRouting reads the write-only recipient/actor ids off a
-// store.Notification. They are unexported fields (set by store.NewNotification)
-// that this package cannot name, so they are read through reflect. Replace with
-// exported accessors on store.Notification when the store package is next
-// edited (T5).
-func notificationRouting(n *store.Notification) (recipient uuid.UUID, actor *uuid.UUID) {
-	v := reflect.ValueOf(n).Elem()
-	if f := v.FieldByName("recipientID"); f.IsValid() && f.CanAddr() {
-		recipient = *(*uuid.UUID)(unsafe.Pointer(f.UnsafeAddr()))
-	}
-	if f := v.FieldByName("actorID"); f.IsValid() && f.CanAddr() {
-		actor = *(**uuid.UUID)(unsafe.Pointer(f.UnsafeAddr()))
-	}
-	return recipient, actor
-}
-
 func (s *Store) CreateNotification(ctx context.Context, n *store.Notification) error {
-	recipient, actor := notificationRouting(n)
+	recipient, actor := n.RecipientID(), n.ActorID()
 	if n.ID == uuid.Nil {
 		n.ID = uuid.New()
 	}

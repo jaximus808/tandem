@@ -21,9 +21,7 @@ package sqlite
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -176,33 +174,6 @@ func isUniqueViolation(err error, column string) bool {
 	return column == "" || strings.Contains(msg, column)
 }
 
-// Ambiguous glyphs (0/O, 1/I/L) intentionally excluded so codes are easy to
-// dictate. Mirrors the canonical generator in the store package (unexported
-// there) — same alphabet, same length, same crypto/rand.
-const codeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
-func generateCode() string {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		panic(fmt.Errorf("crypto/rand: %w", err))
-	}
-	out := make([]byte, 8)
-	for i, x := range b {
-		out[i] = codeChars[int(x)%len(codeChars)]
-	}
-	return string(out)
-}
-
-// generateClaimToken mirrors the store package's (unexported) generator: a
-// "clm_" prefix plus 32 lowercase hex chars — unmistakable for a canvas code.
-func generateClaimToken() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(fmt.Errorf("crypto/rand: %w", err))
-	}
-	return "clm_" + hex.EncodeToString(b)
-}
-
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 // Store is the SQLite-backed store.Store.
@@ -220,13 +191,6 @@ type Option func(*Store)
 func WithClaimTTL(d time.Duration) Option {
 	return func(s *Store) { s.claimTTL = d }
 }
-
-// SkipVersionBump reports whether ctx was marked with store.WithoutVersionBump
-// (the batch path's "I'll bump once myself" flag). The store package keeps that
-// context key unexported, so it cannot be read from here: wiring (T5) points
-// this at an exported accessor in the store package. Until then every write
-// bumps, which is the pre-batch behaviour and never wrong, only chattier.
-var SkipVersionBump = func(ctx context.Context) bool { return false }
 
 // Open opens (creating if needed) the SQLite database at path and brings it to
 // the current schema. ":memory:" gives a private in-memory database, which is
@@ -333,7 +297,7 @@ func (s *Store) BumpCanvasVersion(ctx context.Context, canvasID uuid.UUID) (int,
 // bumpVersion is the per-write bump: a no-op (0, nil) on a WithoutVersionBump
 // context, the real thing otherwise.
 func (s *Store) bumpVersion(ctx context.Context, q dbtx, canvasID uuid.UUID) (int, error) {
-	if SkipVersionBump(ctx) {
+	if store.ShouldSkipVersionBump(ctx) {
 		return 0, nil
 	}
 	return doBump(ctx, q, canvasID)
@@ -436,3 +400,6 @@ func carryContentAudit(incoming, stored json.RawMessage, entry *store.ContentAud
 	}
 	return json.Marshal(p)
 }
+
+// Compile-time proof that *Store implements the full store.Store surface.
+var _ store.Store = (*Store)(nil)

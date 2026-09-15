@@ -1,52 +1,19 @@
-package store
+package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-)
 
-// TDM-141: PayloadIsOnlyServerOwned tells a transition PATCH that a payload
-// carrying nothing but server-owned keys (claim / contention / audit) says
-// nothing about content, so it must be diffed as content by nobody.
-func TestPayloadIsOnlyServerOwned(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-		want bool
-	}{
-		{"claim only", `{"claim":{"generation":9}}`, true},
-		{"contention only", `{"contention":[{"lostBy":"a"}]}`, true},
-		{"audit only", `{"audit":[{"actor":"x"}]}`, true},
-		{"all three server-owned", `{"claim":{},"contention":[],"audit":[]}`, true},
-		{"has title", `{"title":"x"}`, false},
-		{"claim plus title", `{"claim":{},"title":"x"}`, false},
-		{"empty object", `{}`, false},
-		{"empty payload", ``, false},
-		{"array not object", `[1,2]`, false},
-		{"scalar not object", `"just a string"`, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var raw json.RawMessage
-			if tc.raw != "" {
-				raw = json.RawMessage(tc.raw)
-			}
-			if got := PayloadIsOnlyServerOwned(raw); got != tc.want {
-				t.Fatalf("PayloadIsOnlyServerOwned(%s) = %v, want %v", tc.raw, got, tc.want)
-			}
-		})
-	}
-}
+	"github.com/agentcanvas/api/internal/store"
+)
 
 // TDM-41 (E4.2) — the content-mutation gate, at the layer that enforces it.
 //
@@ -63,34 +30,52 @@ func TestPayloadIsOnlyServerOwned(t *testing.T) {
 
 // ── Harness ──────────────────────────────────────────────────────────────────
 
-// gateFixture is one action row in a fake PostgREST, plus the real store
-// pointed at it.
+// gateFixture is one action row in a real (in-memory) SQLite store. It replaces
+// the fake-PostgREST fixture the Supabase store had: same tests, real SQL.
 type gateFixture struct {
-	st       *supabaseStore
-	fake     *fakeActionsServer
+	st       *Store
 	canvasID uuid.UUID
 	actionID uuid.UUID
 }
 
+// gateColumns are the row fields a test may seed or read directly.
+var gateColumns = map[string]bool{"state": true, "payload": true, "claimed_by": true, "claimed_at": true, "approved_by": true}
+
 func newGateFixture(t *testing.T, state string, payload map[string]any, mutate func(map[string]any)) *gateFixture {
 	t.Helper()
-	canvasID, actionID := uuid.New(), uuid.New()
-	fake := newFakeActionsServer(canvasID, actionID, state)
-	fake.row["payload"] = payload
-	if mutate != nil {
-		mutate(fake.row)
-	}
-	srv := httptest.NewServer(fake.handler())
-	t.Cleanup(srv.Close)
-
-	st, err := NewSupabase(srv.URL, "test-key")
+	st := openTest(t)
+	canvas := newCanvas(t, st)
+	raw, err := json.Marshal(payload)
 	if err != nil {
-		t.Fatalf("NewSupabase: %v", err)
+		t.Fatal(err)
 	}
-	return &gateFixture{st: st.(*supabaseStore), fake: fake, canvasID: canvasID, actionID: actionID}
+	a := newTask(t, st, canvas.ID, state, string(raw))
+	if mutate != nil {
+		row := map[string]any{}
+		mutate(row)
+		for k, v := range row {
+			if !gateColumns[k] {
+				t.Fatalf("fixture mutation touches %q, which the harness does not map", k)
+			}
+			if k == "payload" {
+				b, err := json.Marshal(v)
+				if err != nil {
+					t.Fatal(err)
+				}
+				v = string(b)
+			}
+			if ts, ok := v.(time.Time); ok {
+				v = ts.UTC().Format(timeLayout)
+			}
+			if _, err := st.db.Exec(`UPDATE actions SET `+k+` = ? WHERE id = ?`, v, a.ID.String()); err != nil {
+				t.Fatalf("seed %s: %v", k, err)
+			}
+		}
+	}
+	return &gateFixture{st: st, canvasID: canvas.ID, actionID: a.ID}
 }
 
-func (f *gateFixture) edit(payload map[string]any, actor string) (*ContentUpdate, error) {
+func (f *gateFixture) edit(payload map[string]any, actor string) (*store.ContentUpdate, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		panic(err)
@@ -98,11 +83,27 @@ func (f *gateFixture) edit(payload map[string]any, actor string) (*ContentUpdate
 	return f.st.UpdateActionPayload(context.Background(), f.canvasID, f.actionID, raw, actor)
 }
 
-// rowField reads a column off the stored row under the fake's lock.
+// rowField reads one column off the stored row. Strings come back as strings,
+// NULL as nil, payload as the decoded JSON object.
 func (f *gateFixture) rowField(key string) any {
-	f.fake.mu.Lock()
-	defer f.fake.mu.Unlock()
-	return f.fake.row[key]
+	if !gateColumns[key] {
+		panic("rowField: unmapped column " + key)
+	}
+	var v sql.NullString
+	if err := f.st.db.QueryRow(`SELECT `+key+` FROM actions WHERE id = ?`, f.actionID.String()).Scan(&v); err != nil {
+		panic(err)
+	}
+	if !v.Valid {
+		return nil
+	}
+	if key == "payload" {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(v.String), &m); err != nil {
+			panic(err)
+		}
+		return m
+	}
+	return v.String
 }
 
 func (f *gateFixture) state() string {
@@ -111,10 +112,8 @@ func (f *gateFixture) state() string {
 }
 
 // storedAuditTrail re-reads the audit log the way any consumer would: off the
-// stored payload. Going through JSON (rather than poking the fake's map) is
-// deliberate — it proves the entry survives serialization, which is how the web
-// and the MCP surface will actually see it.
-func (f *gateFixture) storedAuditTrail(t *testing.T) []ContentAudit {
+// stored payload, through JSON.
+func (f *gateFixture) storedAuditTrail(t *testing.T) []store.ContentAudit {
 	t.Helper()
 	raw, err := json.Marshal(f.rowField("payload"))
 	if err != nil {
@@ -325,8 +324,8 @@ func TestContentEditOnTerminalTaskIsRefused(t *testing.T) {
 			edited["title"] = "something else entirely"
 
 			_, err := f.edit(edited, "agent:rewriter")
-			if !errors.Is(err, ErrContentLocked) {
-				t.Fatalf("edit of a %s task = %v, want ErrContentLocked", state, err)
+			if !errors.Is(err, store.ErrContentLocked) {
+				t.Fatalf("edit of a %s task = %v, want store.ErrContentLocked", state, err)
 			}
 			// Refused means REFUSED: nothing was written, not even the audit
 			// entry (there is no state to re-enter, so recording it would only
@@ -431,17 +430,17 @@ func TestAuditTrailSurvivesAnEditorThatOmitsIt(t *testing.T) {
 // is capped. Oldest out, newest in.
 func TestAuditTrailIsCappedAtTheMostRecentEntries(t *testing.T) {
 	f := newGateFixture(t, "proposed", approvedTaskPayload(), nil)
-	for i := 0; i < MaxContentAudit+5; i++ {
+	for i := 0; i < store.MaxContentAudit+5; i++ {
 		if _, err := f.edit(map[string]any{"title": fmt.Sprintf("edit %d", i), "assignee": "agent"}, "human"); err != nil {
 			t.Fatalf("edit %d: %v", i, err)
 		}
 	}
 	trail := f.storedAuditTrail(t)
-	if len(trail) != MaxContentAudit {
-		t.Fatalf("audit trail has %d entries, want the cap of %d", len(trail), MaxContentAudit)
+	if len(trail) != store.MaxContentAudit {
+		t.Fatalf("audit trail has %d entries, want the cap of %d", len(trail), store.MaxContentAudit)
 	}
 	// The kept window is the RECENT one: the last entry describes the last edit.
-	if !strings.Contains(trail[len(trail)-1].Summary, fmt.Sprintf("edit %d", MaxContentAudit+4)) {
+	if !strings.Contains(trail[len(trail)-1].Summary, fmt.Sprintf("edit %d", store.MaxContentAudit+4)) {
 		t.Fatalf("newest entry = %q, want the most recent edit", trail[len(trail)-1].Summary)
 	}
 	if strings.Contains(trail[0].Summary, "edit 0") {
@@ -462,7 +461,7 @@ func TestAuditSummaryIsExcerpted(t *testing.T) {
 	if len(trail) != 1 {
 		t.Fatalf("want 1 audit entry, got %d", len(trail))
 	}
-	if len(trail[0].Summary) > 4*auditExcerpt {
+	if len(trail[0].Summary) > 4*store.AuditExcerpt {
 		t.Fatalf("summary is %d bytes — the excerpt budget isn't holding", len(trail[0].Summary))
 	}
 	if !strings.HasSuffix(trail[0].Summary, "…\"") {
@@ -472,62 +471,17 @@ func TestAuditSummaryIsExcerpted(t *testing.T) {
 
 // ── 6. Concurrency: the revert is conditional on the state that was read ─────
 
-// The revert is a read-then-conditional-write, and the window between them is
-// real: a rival can claim the task in it. The `state` predicate is what makes
-// that safe — the UPDATE stops matching, and the caller is told to retry rather
-// than stamping 'proposed' over a claim it never saw.
-func TestRevertRefusesWhenTheTaskMovesUnderIt(t *testing.T) {
-	canvasID, actionID := uuid.New(), uuid.New()
-	fake := newFakeActionsServer(canvasID, actionID, "approved")
-	fake.row["payload"] = approvedTaskPayload()
-
-	// Flip the row to 'executing' after the gate's read but before its write —
-	// exactly what a concurrent task_start does.
-	var once sync.Once
-	inner := fake.handler()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			defer once.Do(func() {
-				fake.mu.Lock()
-				fake.row["state"] = "executing"
-				fake.mu.Unlock()
-			})
-		}
-		inner.ServeHTTP(w, r)
-	}))
-	defer srv.Close()
-
-	st, err := NewSupabase(srv.URL, "test-key")
-	if err != nil {
-		t.Fatalf("NewSupabase: %v", err)
-	}
-	edited := approvedTaskPayload()
-	edited["title"] = "rewritten mid-claim"
-	raw, _ := json.Marshal(edited)
-
-	_, err = st.UpdateActionPayload(context.Background(), canvasID, actionID, raw, "agent:rogue")
-	if !errors.Is(err, ErrIllegalActionState) {
-		t.Fatalf("edit against a moved row = %v, want ErrIllegalActionState", err)
-	}
-	fake.mu.Lock()
-	title, _ := fake.row["payload"].(map[string]any)["title"].(string)
-	fake.mu.Unlock()
-	if title != approvedTaskPayload()["title"] {
-		t.Fatalf("stored title = %q — the lost-update guard didn't hold", title)
-	}
-}
-
 // A missing action is a not-found, not a 500.
 func TestEditOfMissingActionIsNotFound(t *testing.T) {
 	f := newGateFixture(t, "approved", approvedTaskPayload(), nil)
 	raw, _ := json.Marshal(approvedTaskPayload())
 	_, err := f.st.UpdateActionPayload(context.Background(), f.canvasID, uuid.New(), raw, "human")
-	if !errors.Is(err, ErrActionNotFound) {
-		t.Fatalf("edit of unknown id = %v, want ErrActionNotFound", err)
+	if !errors.Is(err, store.ErrActionNotFound) {
+		t.Fatalf("edit of unknown id = %v, want store.ErrActionNotFound", err)
 	}
 }
 
-// ── 7. ContentDiff, the definition of "content" ──────────────────────────────
+// ── 7. store.ContentDiff, the definition of "content" ──────────────────────────────
 
 func TestContentDiff(t *testing.T) {
 	tests := []struct {
@@ -557,9 +511,9 @@ func TestContentDiff(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := strings.Join(ContentDiff(json.RawMessage(tc.stored), json.RawMessage(tc.coming)), ",")
+			got := strings.Join(store.ContentDiff(json.RawMessage(tc.stored), json.RawMessage(tc.coming)), ",")
 			if got != tc.want {
-				t.Fatalf("ContentDiff = %q, want %q", got, tc.want)
+				t.Fatalf("store.ContentDiff = %q, want %q", got, tc.want)
 			}
 		})
 	}

@@ -63,10 +63,10 @@ import (
 // kept.
 const MaxContentAudit = 20
 
-// auditExcerpt is how much of a value a summary quotes. Long enough to see WHAT
+// AuditExcerpt is how much of a value a summary quotes. Long enough to see WHAT
 // changed at a glance, short enough that a 5000-word body can't smuggle itself
 // into the audit log twenty times over.
-const auditExcerpt = 80
+const AuditExcerpt = 80
 
 // ContentAudit is one entry in an action payload's server-owned audit[] log.
 //
@@ -93,7 +93,7 @@ type ContentAudit struct {
 	Summary string `json:"summary"`
 	// Note is the mover's own words, VERBATIM and unexcerpted, on the entries
 	// that carry one (state moves — see NewStateAudit). Summary quotes it at
-	// auditExcerpt runes, which is right for a glance and wrong for the one case
+	// AuditExcerpt runes, which is right for a glance and wrong for the one case
 	// where the note IS the payload: a reviewer sending finished work back for
 	// rework (TDM-154) writes the reason the author has to act on, and truncating
 	// it at 80 characters would throw away the instruction. Empty (and omitted)
@@ -278,10 +278,10 @@ func contentSummary(changed []string, stored, incoming json.RawMessage) string {
 func excerpt(s string) string {
 	s = strings.TrimSpace(s)
 	r := []rune(s)
-	if len(r) <= auditExcerpt {
+	if len(r) <= AuditExcerpt {
 		return s
 	}
-	return string(r[:auditExcerpt]) + "…"
+	return string(r[:AuditExcerpt]) + "…"
 }
 
 // carryContentAudit produces the payload to actually store: the incoming

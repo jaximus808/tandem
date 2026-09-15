@@ -10,7 +10,7 @@ import (
 // guards the property migration 0020 relies on for the two-capability split.
 func TestClaimTokenFormatDistinctFromCode(t *testing.T) {
 	for range 200 {
-		tok := generateClaimToken()
+		tok := GenerateClaimToken()
 		if !strings.HasPrefix(tok, "clm_") {
 			t.Fatalf("claim token missing clm_ prefix: %q", tok)
 		}
@@ -23,7 +23,7 @@ func TestClaimTokenFormatDistinctFromCode(t *testing.T) {
 		if strings.ToUpper(tok) == tok {
 			t.Fatalf("claim token has no lowercase, could collide with code space: %q", tok)
 		}
-		code := generateCode()
+		code := GenerateCode()
 		if len(code) != 8 || strings.Contains(code, "_") {
 			t.Fatalf("canvas code unexpectedly shaped: %q", code)
 		}

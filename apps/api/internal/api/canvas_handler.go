@@ -16,6 +16,8 @@ import (
 type Handler struct {
 	store store.Store
 	hub   *ws.Hub
+	// localOwner, when set, owns every canvas created anonymously (local mode).
+	localOwner *uuid.UUID
 	// events is the outbound task-webhook seam (TDM-37). OPTIONAL: nil means
 	// "no webhooks wired" and every emit is a no-op, which is what handler tests
 	// and a WEBHOOKS_ENABLED=false deployment get. See task_events.go.
@@ -56,6 +58,14 @@ func WithTaskEvents(e TaskEventEmitter) HandlerOption {
 // rather than an interface so a nil stays a usable nil.
 func WithMetrics(reg *metrics.Registry) HandlerOption {
 	return func(h *Handler) { h.metrics = reg }
+}
+
+// WithLocalOwner makes every canvas created WITHOUT a signed-in user owned by
+// the given user — local mode, where the one user on the machine owns whatever
+// an agent creates too (otherwise agent-created boards would not appear on the
+// dashboard and would have no owner to approve on them).
+func WithLocalOwner(id uuid.UUID) HandlerOption {
+	return func(h *Handler) { h.localOwner = &id }
 }
 
 // WithAuthService attaches the session validator so the public-by-code endpoints
@@ -112,7 +122,12 @@ func (h *Handler) CreateCanvas(w http.ResponseWriter, r *http.Request) {
 	// MCP/gateway creates have no session cookie → anonymous, as intended.
 	var owner *uuid.UUID
 	var visibility, publicRole string
-	if uid, ok := UserIDFromCtx(r.Context()); ok {
+	uid, ok := UserIDFromCtx(r.Context())
+	if !ok && h.localOwner != nil {
+		// Local mode: an agent's canvas_create is still the local user's board.
+		uid, ok = *h.localOwner, true
+	}
+	if ok {
 		owner = &uid
 		// Apply the owner's default posture (visibility + public role) to the new
 		// canvas. If the lookup fails we leave them "" and fall back to the column

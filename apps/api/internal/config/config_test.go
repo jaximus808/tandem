@@ -2,16 +2,19 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
-// setRequired sets the three vars Load() refuses to start without, so a test can
-// focus on one optional flag.
+// setRequired isolates Load() from the developer's real ~/.tandem and pins the
+// posture under test to TANDEM_AUTH=google, where the SSRF opt-in is strict.
+// (Local mode defaults the flag ON — see TestLocalModeAllowsPrivateWebhooks.)
 func setRequired(t *testing.T) {
 	t.Helper()
-	t.Setenv("SUPABASE_URL", "https://example.supabase.co")
-	t.Setenv("SUPABASE_KEY", "service-role-key")
+	t.Setenv("TANDEM_DATA_DIR", t.TempDir())
 	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("TANDEM_AUTH", "google")
+	t.Setenv("GOOGLE_CLIENT_ID", "client-id")
 }
 
 // TANDEM_WEBHOOKS_ALLOW_PRIVATE turns off the webhook delivery worker's SSRF
@@ -66,5 +69,95 @@ func TestWebhooksAllowPrivateTargetsDefaultsOff(t *testing.T) {
 	}
 	if cfg.WebhooksAllowPrivateTargets {
 		t.Error("the SSRF guard must be ON when TANDEM_WEBHOOKS_ALLOW_PRIVATE is unset")
+	}
+}
+
+// Local mode is the default and needs NO environment: the data dir is created,
+// the JWT secret is generated once and reused on the next Load.
+func TestLocalModeNeedsNoEnv(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TANDEM_DATA_DIR", dir)
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("TANDEM_AUTH", "")
+	t.Setenv("GOOGLE_CLIENT_ID", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Local() || cfg.AuthMode != AuthModeNone {
+		t.Fatalf("AuthMode = %q, want none", cfg.AuthMode)
+	}
+	if cfg.DataDir != dir {
+		t.Errorf("DataDir = %q, want %q", cfg.DataDir, dir)
+	}
+	if want := filepath.Join(dir, "tandem.db"); cfg.DBPath != want {
+		t.Errorf("DBPath = %q, want %q", cfg.DBPath, want)
+	}
+	if want := filepath.Join(dir, "images"); cfg.ImageDir != want {
+		t.Errorf("ImageDir = %q, want %q", cfg.ImageDir, want)
+	}
+	if len(cfg.JWTSecret) != 64 {
+		t.Fatalf("generated JWTSecret = %q, want 64 hex chars", cfg.JWTSecret)
+	}
+	again, err := Load()
+	if err != nil {
+		t.Fatalf("second Load: %v", err)
+	}
+	if again.JWTSecret != cfg.JWTSecret {
+		t.Errorf("JWT secret not persisted: %q then %q", cfg.JWTSecret, again.JWTSecret)
+	}
+	fi, err := os.Stat(filepath.Join(dir, "secret"))
+	if err != nil {
+		t.Fatalf("secret file: %v", err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("secret file mode = %o, want 600", fi.Mode().Perm())
+	}
+}
+
+// The only receiver a local install ever has is a `tandem-mcp listen` on the
+// same machine, so local mode allows private targets unless told otherwise.
+func TestLocalModeAllowsPrivateWebhooks(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want bool
+	}{
+		{"", true},
+		{"1", true},
+		{"true", true},
+		{"0", false},
+		{"false", false},
+		{"maybe", true},
+	}
+	for _, tc := range cases {
+		t.Run("value="+tc.raw, func(t *testing.T) {
+			t.Setenv("TANDEM_DATA_DIR", t.TempDir())
+			t.Setenv("JWT_SECRET", "secret")
+			t.Setenv("TANDEM_AUTH", "none")
+			t.Setenv("TANDEM_WEBHOOKS_ALLOW_PRIVATE", tc.raw)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.WebhooksAllowPrivateTargets != tc.want {
+				t.Errorf("WebhooksAllowPrivateTargets = %v for %q, want %v", cfg.WebhooksAllowPrivateTargets, tc.raw, tc.want)
+			}
+		})
+	}
+}
+
+func TestGoogleModeRequiresClientID(t *testing.T) {
+	t.Setenv("TANDEM_DATA_DIR", t.TempDir())
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("TANDEM_AUTH", "google")
+	t.Setenv("GOOGLE_CLIENT_ID", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("TANDEM_AUTH=google without GOOGLE_CLIENT_ID must fail to load")
+	}
+	t.Setenv("TANDEM_AUTH", "basic")
+	t.Setenv("GOOGLE_CLIENT_ID", "x")
+	if _, err := Load(); err == nil {
+		t.Fatal("unknown TANDEM_AUTH must fail to load")
 	}
 }

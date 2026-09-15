@@ -1,8 +1,11 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,25 +19,39 @@ const defaultJWTTokenTTL = 24 * time.Hour
 const defaultClaimTTL = 15 * time.Minute
 
 type Config struct {
-	SupabaseURL string
-	SupabaseKey string // service role key
+	// AuthMode is TANDEM_AUTH: "none" (default — local mode: one machine, one
+	// user, no sign-in) or "google" (self-hosted: Google sign-in, accounts,
+	// PATs, sharing; requires GOOGLE_CLIENT_ID).
+	AuthMode string
+
+	// DataDir is TANDEM_DATA_DIR (default ~/.tandem): the SQLite database, the
+	// auto-generated JWT secret, uploaded images and logs all live under it.
+	DataDir string
+	// DBPath is TANDEM_DB (default <DataDir>/tandem.db). ":memory:" works and
+	// gives a throwaway board.
+	DBPath string
+
+	// JWTSecret signs canvas tokens and sessions. JWT_SECRET when set; otherwise
+	// read from — or generated into — <DataDir>/secret, so a local install never
+	// has to configure one and a restart keeps every token valid.
 	JWTSecret   string
 	JWTTokenTTL time.Duration
 	Port        string
+	// WebDistPath overrides the embedded web bundle with a directory (the dev
+	// loop). Empty = serve the bundle compiled into the binary.
 	WebDistPath string
 	ImageDir    string
 
-	// GoogleClientID enables Google sign-in. Optional — if empty, auth routes
-	// return 503 and the rest of the app runs normally.
+	// GoogleClientID enables Google sign-in. Only read under AuthMode "google".
 	GoogleClientID string
 	// CookieSecure marks the session cookie Secure. Leave false in local dev
-	// (http); set COOKIE_SECURE=true in production (https behind Caddy).
+	// (http); set COOKIE_SECURE=true when serving over https.
 	CookieSecure bool
 
 	// PublicBaseURL is the externally-reachable origin (e.g.
-	// https://tandemcanvas.com), used as the OAuth issuer + to build the
+	// https://tandem.example.com), used as the OAuth issuer + to build the
 	// authorization-server metadata URLs. Empty → the OAuth handlers derive it
-	// per-request from the Host / X-Forwarded-Proto headers (fine for local dev).
+	// per-request from the Host / X-Forwarded-Proto headers (fine locally).
 	PublicBaseURL string
 
 	// ClaimTTL is how long an 'executing' task claim is honored before it is
@@ -43,52 +60,75 @@ type Config struct {
 	// 0 disables expiry (claims are held until released/completed).
 	ClaimTTL time.Duration
 
-	// WebhooksEnabled starts the outbound-webhook delivery worker (migration
-	// 0038 / internal/webhooks). Defaults to enabled — set
-	// WEBHOOKS_ENABLED=false to keep the loop off, e.g. before 0038 has been
-	// applied, or on a second process that shouldn't also drain the queue.
+	// WebhooksEnabled starts the outbound-webhook delivery worker. Defaults to
+	// enabled — set WEBHOOKS_ENABLED=false to keep the loop off.
 	WebhooksEnabled bool
 
 	// WebhooksAllowPrivateTargets disables the delivery worker's SSRF guard
-	// (webhooks.IsBlockedIP, wired into the dialer's Control hook), letting
-	// deliveries reach loopback / RFC1918 / link-local addresses.
+	// (webhooks.IsBlockedIP), letting deliveries reach loopback / RFC1918 /
+	// link-local addresses.
 	//
-	// LOCAL DEV ONLY, and off unless TANDEM_WEBHOOKS_ALLOW_PRIVATE is exactly
-	// "1" or "true". It exists so the `tandem-local` container can deliver to a
-	// `tandem-mcp listen` running on the host (http://host.docker.internal:8787),
-	// which the guard otherwise refuses non-retryably. Setting it in production
-	// turns every canvas's webhook config into an internal-network port scanner
-	// — including the 169.254.169.254 cloud metadata endpoint. Never set it there.
+	// In LOCAL mode this defaults to ON: the only receiver that exists is a
+	// `tandem-mcp listen` on this same machine, which the guard would refuse.
+	// TANDEM_WEBHOOKS_ALLOW_PRIVATE=0|false turns it back off there.
+	//
+	// Under TANDEM_AUTH=google (a server other people reach) it stays a strict
+	// opt-in — only the exact values "1" / "true" enable it — because with it
+	// on, anyone who can edit a canvas's webhook config can make the server
+	// connect to the internal network, including a cloud metadata endpoint.
 	WebhooksAllowPrivateTargets bool
 
 	// MetricsEnabled registers GET /api/metrics — in-memory per-route and
-	// per-op latency percentiles, task-queue counters (claims, claim conflicts,
-	// TTL takeovers), webhook delivery outcomes and the connected-client gauge.
-	// Aggregates only: no canvas ids, names or payloads, which is why the
-	// endpoint is open.
-	//
-	// Defaults to enabled. METRICS_ENABLED=false switches the whole subsystem
-	// off, not just the endpoint: the registry is never created, the latency
-	// middleware becomes a pass-through, and every counter call in the hub, the
-	// webhook worker and the handlers is a nil-receiver no-op. Nothing is
-	// recorded-but-hidden.
+	// per-op latency percentiles, task-queue counters and gauges. Aggregates
+	// only. METRICS_ENABLED=false switches the whole subsystem off.
 	MetricsEnabled bool
 }
 
+// AuthMode values. Mirrored (not imported) by internal/api so config stays a
+// leaf package.
+const (
+	AuthModeNone   = "none"
+	AuthModeGoogle = "google"
+)
+
+// Local reports whether this process runs in local mode (no sign-in).
+func (c *Config) Local() bool { return c.AuthMode == AuthModeNone }
+
+// Load reads the environment. Nothing is required: a bare `tandem` starts in
+// local mode with everything under ~/.tandem.
 func Load() (*Config, error) {
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	if supabaseURL == "" {
-		return nil, fmt.Errorf("SUPABASE_URL is required (e.g. https://abcdef.supabase.co)")
+	authMode := strings.ToLower(strings.TrimSpace(os.Getenv("TANDEM_AUTH")))
+	switch authMode {
+	case "":
+		authMode = AuthModeNone
+	case AuthModeNone, AuthModeGoogle:
+	default:
+		return nil, fmt.Errorf("TANDEM_AUTH=%q: expected \"none\" (local, the default) or \"google\"", authMode)
+	}
+	googleClientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+	if authMode == AuthModeGoogle && googleClientID == "" {
+		return nil, fmt.Errorf("TANDEM_AUTH=google requires GOOGLE_CLIENT_ID")
 	}
 
-	supabaseKey := os.Getenv("SUPABASE_KEY")
-	if supabaseKey == "" {
-		return nil, fmt.Errorf("SUPABASE_KEY is required (use the service_role key)")
+	dataDir, err := resolveDataDir(os.Getenv("TANDEM_DATA_DIR"))
+	if err != nil {
+		return nil, err
+	}
+	dbPath := os.Getenv("TANDEM_DB")
+	if dbPath == "" {
+		dbPath = filepath.Join(dataDir, "tandem.db")
+	}
+	imageDir := os.Getenv("IMAGE_DIR")
+	if imageDir == "" {
+		imageDir = filepath.Join(dataDir, "images")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET is required")
+		jwtSecret, err = loadOrCreateSecret(filepath.Join(dataDir, "secret"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	jwtTTL := defaultJWTTokenTTL
@@ -120,42 +160,86 @@ func Load() (*Config, error) {
 		port = "7891"
 	}
 
-	webDist := os.Getenv("WEB_DIST_PATH")
-	if webDist == "" {
-		webDist = "../../apps/web/dist"
-	}
-
-	imageDir := os.Getenv("IMAGE_DIR")
-	if imageDir == "" {
-		imageDir = "./canvas-images"
+	allowPrivate := envOptIn("TANDEM_WEBHOOKS_ALLOW_PRIVATE")
+	if authMode == AuthModeNone {
+		allowPrivate = !envOptOut("TANDEM_WEBHOOKS_ALLOW_PRIVATE")
 	}
 
 	return &Config{
-		SupabaseURL:     supabaseURL,
-		SupabaseKey:     supabaseKey,
-		JWTSecret:       jwtSecret,
-		JWTTokenTTL:     jwtTTL,
-		ClaimTTL:        claimTTL,
-		Port:            port,
-		WebDistPath:     webDist,
-		ImageDir:        imageDir,
-		GoogleClientID:  os.Getenv("GOOGLE_CLIENT_ID"),
-		CookieSecure:    os.Getenv("COOKIE_SECURE") == "true",
-		PublicBaseURL:   strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/"),
-		MetricsEnabled:  os.Getenv("METRICS_ENABLED") != "false",
-		WebhooksEnabled: os.Getenv("WEBHOOKS_ENABLED") != "false",
-
-		WebhooksAllowPrivateTargets: envOptIn("TANDEM_WEBHOOKS_ALLOW_PRIVATE"),
+		AuthMode:                    authMode,
+		DataDir:                     dataDir,
+		DBPath:                      dbPath,
+		JWTSecret:                   jwtSecret,
+		JWTTokenTTL:                 jwtTTL,
+		ClaimTTL:                    claimTTL,
+		Port:                        port,
+		WebDistPath:                 os.Getenv("WEB_DIST_PATH"),
+		ImageDir:                    imageDir,
+		GoogleClientID:              googleClientID,
+		CookieSecure:                os.Getenv("COOKIE_SECURE") == "true",
+		PublicBaseURL:               strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/"),
+		MetricsEnabled:              os.Getenv("METRICS_ENABLED") != "false",
+		WebhooksEnabled:             os.Getenv("WEBHOOKS_ENABLED") != "false",
+		WebhooksAllowPrivateTargets: allowPrivate,
 	}, nil
 }
 
-// envOptIn reads a flag that turns an UNSAFE behaviour on. Only "1" and "true"
-// count; anything else (including "yes", "TRUE", or an unset var) leaves the
-// safe default in place.
-//
-// Deliberately stricter than the `!= "false"` flags above: those are opt-OUTs of
-// a safe default, where being lenient costs nothing. This is an opt-IN to an
-// unsafe one, so a typo has to fail closed.
+// resolveDataDir expands the data directory (default ~/.tandem) and creates it.
+func resolveDataDir(raw string) (string, error) {
+	dir := strings.TrimSpace(raw)
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("TANDEM_DATA_DIR unset and no home directory: %w", err)
+		}
+		dir = filepath.Join(home, ".tandem")
+	} else if dir == "~" || strings.HasPrefix(dir, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("TANDEM_DATA_DIR: %w", err)
+		}
+		dir = filepath.Join(home, strings.TrimPrefix(dir, "~"))
+	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("TANDEM_DATA_DIR: %w", err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("TANDEM_DATA_DIR %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// loadOrCreateSecret returns the JWT secret persisted at path, generating a
+// 32-byte random one (hex) on first run. Mode 0600: it is a credential.
+func loadOrCreateSecret(path string) (string, error) {
+	if b, err := os.ReadFile(path); err == nil {
+		if s := strings.TrimSpace(string(b)); s != "" {
+			return s, nil
+		}
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate JWT secret: %w", err)
+	}
+	secret := hex.EncodeToString(buf)
+	if err := os.WriteFile(path, []byte(secret+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("write JWT secret to %s: %w", path, err)
+	}
+	return secret, nil
+}
+
+// envOptOut is the mirror of envOptIn: only the exact values "0" / "false"
+// count as a deliberate off.
+func envOptOut(name string) bool {
+	switch strings.TrimSpace(os.Getenv(name)) {
+	case "0", "false":
+		return true
+	default:
+		return false
+	}
+}
+
 func envOptIn(name string) bool {
 	switch strings.TrimSpace(os.Getenv(name)) {
 	case "1", "true":

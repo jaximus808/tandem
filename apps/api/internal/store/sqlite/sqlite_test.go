@@ -825,3 +825,51 @@ func TestTimestampsCompareLexically(t *testing.T) {
 		t.Fatal("round trip lost precision")
 	}
 }
+
+// Provenance (authored_by) is stamped on INSERT and comes back on every read
+// path — the store half of what api/provenance.go derives from the request.
+func TestAuthoredByRoundTrips(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	c := newCanvas(t, s)
+	author := "agent:planner-1"
+
+	a := &store.Action{Type: "task", State: "proposed", Payload: json.RawMessage(`{"title":"t"}`), ProposedBy: "p", AuthoredBy: &author}
+	if _, err := s.CreateAction(ctx, c.ID, a); err != nil {
+		t.Fatalf("CreateAction: %v", err)
+	}
+	got, err := s.GetAction(ctx, c.ID, a.ID)
+	if err != nil {
+		t.Fatalf("GetAction: %v", err)
+	}
+	if got.AuthoredBy == nil || *got.AuthoredBy != author {
+		t.Errorf("action AuthoredBy = %v, want %q", got.AuthoredBy, author)
+	}
+
+	unset := &store.Action{Type: "task", State: "proposed", Payload: json.RawMessage(`{"title":"u"}`), ProposedBy: "p"}
+	if _, err := s.CreateAction(ctx, c.ID, unset); err != nil {
+		t.Fatalf("CreateAction: %v", err)
+	}
+	if got, _ := s.GetAction(ctx, c.ID, unset.ID); got.AuthoredBy != nil {
+		t.Errorf("unset AuthoredBy came back as %q", *got.AuthoredBy)
+	}
+
+	d := &store.Document{Type: "notes", Name: "Notes", AuthoredBy: &author}
+	if _, err := s.CreateDocument(ctx, c.ID, d); err != nil {
+		t.Fatalf("CreateDocument: %v", err)
+	}
+	n := &store.Note{Body: "hello", DocumentID: &d.ID, AuthoredBy: &author}
+	if _, err := s.CreateNote(ctx, c.ID, n); err != nil {
+		t.Fatalf("CreateNote: %v", err)
+	}
+	_, state, _, err := s.GetCanvasState(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("GetCanvasState: %v", err)
+	}
+	if doc := state.Documents[d.ID.String()]; doc == nil || doc.AuthoredBy == nil || *doc.AuthoredBy != author {
+		t.Errorf("document AuthoredBy not surfaced: %+v", doc)
+	}
+	if note := state.Notes[n.ID.String()]; note == nil || note.AuthoredBy == nil || *note.AuthoredBy != author {
+		t.Errorf("note AuthoredBy not surfaced: %+v", note)
+	}
+}
