@@ -17,8 +17,10 @@
  *     }
  *   }
  *
- * Defaults to the hosted backend (https://tandemcanvas.com). Set the API_URL
- * env var only to point at a local or self-hosted instance.
+ * Defaults to the LOCAL Tandem server (http://127.0.0.1:7891). `tandem-mcp up`
+ * starts it, and the MCP server starts it itself the first time a tool call
+ * finds nothing listening (up.ts). Set the API_URL env var to point at a
+ * self-hosted instance instead.
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -34,6 +36,16 @@ import {
   type CanvasHandle,
 } from "./init.js";
 import { ListenUsageError, listenHelp, parseListenArgs, runListen } from "./listen/index.js";
+import {
+  UpUsageError,
+  autoStartLocal,
+  isLocalApiUrl,
+  nodeDeps,
+  parseUpArgs,
+  runDown,
+  runOpen,
+  runUp,
+} from "./up.js";
 
 function printHelp() {
   process.stdout.write(
@@ -41,6 +53,12 @@ function printHelp() {
       `\n` +
       `Usage:\n` +
       `  tandem-mcp                 Run as an MCP stdio server (default).\n` +
+      `  tandem-mcp up              Start the local Tandem server (downloading the\n` +
+      `                             binary on first run) and open the board.\n` +
+      `                             (\`tandem-mcp up --help\` for its options.)\n` +
+      `  tandem-mcp open [CODE]     Open the board — or one canvas — in the browser,\n` +
+      `                             starting the server first if it isn't running.\n` +
+      `  tandem-mcp down            Stop the server \`up\` started.\n` +
       `  tandem-mcp init            Set up this project: create a canvas, write\n` +
       `                             .mcp.json, print the agent snippet.\n` +
       `                             (\`tandem-mcp init --help\` for its options.)\n` +
@@ -56,15 +74,25 @@ function printHelp() {
       `  tandem-mcp --help, -h      Show this help.\n` +
       `\n` +
       `Environment:\n` +
-      `  API_URL                    Tandem API base URL.\n` +
-      `                             Default: ${DEFAULT_API_URL}\n` +
+      `  API_URL                    Tandem API base URL. Default: the local server,\n` +
+      `                             ${DEFAULT_API_URL}. Set it only for a\n` +
+      `                             self-hosted instance.\n` +
+      `  TANDEM_DATA_DIR            Where the local server keeps its database,\n` +
+      `                             images and logs. Default: ~/.tandem\n` +
+      `  TANDEM_BIN                 Path to a \`tandem\` binary to run instead of\n` +
+      `                             the downloaded one.\n` +
+      `  TANDEM_AUTOSTART           Set to 0 to stop the MCP server from starting\n` +
+      `                             the local backend itself when nothing is\n` +
+      `                             listening. Default: on.\n` +
+      `  TANDEM_AUTOSTART_OPEN      Set to 1 to also open the browser when the MCP\n` +
+      `                             server auto-starts the backend.\n` +
       `  ${CANVAS_CODE_ENV}       This project's canvas code (written by\n` +
       `                             \`init\`). Used as the default for canvas_connect.\n` +
       `  TANDEM_FULL_TOOLS          Set to 1 for the same effect as --full-tools.\n` +
-      `  TANDEM_TOKEN               Personal access token — lets Claude act as you\n` +
-      `                             on your private / shared canvases. Mint one at\n` +
-      `                             ${DEFAULT_API_URL}/me. Optional; without it the\n` +
-      `                             gateway can only reach public canvases.\n` +
+      `  TANDEM_TOKEN               Personal access token for a SELF-HOSTED Tandem\n` +
+      `                             running with sign-in (TANDEM_AUTH=google): lets\n` +
+      `                             Claude act as you on private / shared canvases.\n` +
+      `                             Mint one at <API_URL>/me. Not needed locally.\n` +
       `  MCP_TRACE                  Per-tool-call timing on stderr plus a session\n` +
       `                             summary on exit. 1 = human-readable, json =\n` +
       `                             one JSON object per line. Off by default.\n` +
@@ -76,11 +104,16 @@ function printHelp() {
 }
 
 const cliArgs = process.argv.slice(2);
-// Two subcommands — `init` and `listen`. Everything else (including no args at
-// all) keeps the stdio-MCP-server default untouched.
+// Subcommands — `up` / `open` / `down` (the local server), `init` and `listen`.
+// Everything else (including no args at all) keeps the stdio-MCP-server default
+// untouched.
 const INIT_MODE = cliArgs[0] === "init";
 const LISTEN_MODE = cliArgs[0] === "listen";
-const SUBCOMMAND = INIT_MODE || LISTEN_MODE;
+const UP_MODE = cliArgs[0] === "up";
+const OPEN_MODE = cliArgs[0] === "open";
+const DOWN_MODE = cliArgs[0] === "down";
+const LAUNCHER_MODE = UP_MODE || OPEN_MODE || DOWN_MODE;
+const SUBCOMMAND = INIT_MODE || LISTEN_MODE || LAUNCHER_MODE;
 if (!SUBCOMMAND && (cliArgs.includes("--version") || cliArgs.includes("-v"))) {
   process.stdout.write(`@jaximus/tandem-mcp ${VERSION}\n`);
   process.exit(0);
@@ -99,9 +132,9 @@ const API_URL = (apiUrlFromEnv ?? DEFAULT_API_URL).replace(/\/$/, "");
 // correct for the common stdio case (API_URL = public domain) and for local
 // dev (links point at the same local instance the canvas lives in).
 const WEB_URL = (process.env.PUBLIC_URL ?? API_URL).replace(/\/$/, "");
-// Optional personal access token. Set it to let Claude act as you on your
-// private / shared canvases — mint one at https://tandemcanvas.com/me. Without
-// it the gateway is anonymous and can only reach public canvases.
+// Optional personal access token, for a SELF-HOSTED Tandem running with sign-in.
+// Set it to let Claude act as you on your private / shared canvases — mint one
+// at <API_URL>/me. Locally there are no accounts and it is never needed.
 const USER_TOKEN = process.env.TANDEM_TOKEN?.trim() || undefined;
 // Optional per-request timeout override (ms) for calls to the Tandem API.
 // Defaults to 15000 in the Gateway when unset or unparsable.
@@ -116,7 +149,25 @@ const gateway = new Gateway({
   webUrl: WEB_URL,
   userToken: USER_TOKEN,
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  // Local-first: when the API is this machine and nothing is listening, the
+  // first tool call (or `init`) starts the server rather than failing. Only
+  // ever wired for a loopback API_URL — a self-hosted address is never spawned.
+  autoStart: isLocalApiUrl(API_URL) ? () => autoStartLocal(API_URL, nodeDeps(VERSION)) : undefined,
 });
+
+/**
+ * `up` / `open` / `down`: the local server's lifecycle. Pure CLI — shares the
+ * data-dir / port defaults with the auto-start path above so both agree on
+ * which server "the local one" is.
+ */
+async function runLauncherCommand(): Promise<number> {
+  const command = UP_MODE ? "up" : OPEN_MODE ? "open" : "down";
+  const opts = parseUpArgs(cliArgs.slice(1), process.env, command);
+  const deps = nodeDeps(VERSION);
+  if (UP_MODE) return runUp(opts, deps);
+  if (OPEN_MODE) return runOpen(opts, deps);
+  return runDown(opts, deps);
+}
 
 /**
  * `init` (TDM-33): one command from nothing to a wired-up project. Uses the
@@ -160,6 +211,9 @@ async function runListenCommand(): Promise<number> {
 }
 
 async function main() {
+  if (LAUNCHER_MODE) {
+    process.exit(await runLauncherCommand());
+  }
   if (INIT_MODE) {
     process.exit(await runInitCommand());
   }
@@ -176,6 +230,14 @@ async function main() {
 }
 
 main().catch((err) => {
+  if (LAUNCHER_MODE) {
+    const word = UP_MODE ? "up" : OPEN_MODE ? "open" : "down";
+    process.stderr.write(`\ntandem ${word}: ${err instanceof Error ? err.message : err}\n`);
+    if (err instanceof UpUsageError) {
+      process.stderr.write(`Run \`tandem-mcp up --help\` for options.\n`);
+    }
+    process.exit(1);
+  }
   if (INIT_MODE) {
     // A CLI failure: a clean one-liner, not a stack, and usage help when the
     // flags were wrong.

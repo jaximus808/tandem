@@ -1,6 +1,48 @@
 # Changelog — @jaximus/tandem-mcp
 
-## Unreleased
+## 3.0.0 — 2026-09-15
+
+### Local-first: the gateway starts Tandem on your machine (BREAKING default)
+
+- **`API_URL` now defaults to the LOCAL server, `http://127.0.0.1:7891`.** Tandem
+  is a locally run tool — one Go binary with the web bundle embedded and a
+  SQLite database in `~/.tandem` — and there is no hosted backend to default to
+  any more. Set `API_URL` only to point at a self-hosted instance. Every help
+  string, README line and error message that used to name the hosted domain now
+  names the local server.
+- **New `tandem-mcp up`** — start the local server and open the board. Finds the
+  binary via `TANDEM_BIN`, then `tandem` on `PATH`, then the cached download in
+  `<data-dir>/bin`; otherwise downloads this platform's raw binary from the
+  GitHub Release matching this package's version (falling back to `latest`),
+  verifies it against the release's `SHA256SUMS`, and installs it with mode
+  0755. A server already answering on the port is reused, never duplicated.
+  Detached by default (`stdio` → `<data-dir>/logs/tandem.log`, pid in
+  `<data-dir>/tandem.pid`); `--foreground` runs it attached. Flags: `--port`,
+  `--data-dir`, `--code CODE` (open on that canvas), `--no-open`, `-f`.
+- **New `tandem-mcp open [CODE]`** — the browser at the dashboard or one canvas,
+  starting the server first if it isn't up. **New `tandem-mcp down`** — stop the
+  server `up` started (refuses to kill something it did not start).
+- **The MCP server auto-starts the backend.** When `API_URL` is loopback and a
+  tool call finds nothing listening (`ECONNREFUSED`), the stdio server runs the
+  same `up` logic ONCE, then retries the call — so an agent's first
+  `canvas_connect` / `canvas_create` on a cold machine brings the board up rather
+  than failing, and `init` works the same way. One line on stderr says so.
+  `TANDEM_AUTOSTART=0` disables it; `TANDEM_AUTOSTART_OPEN=1` also opens the
+  browser. Never wired for a non-loopback `API_URL`.
+- New env vars: `TANDEM_DATA_DIR` (default `~/.tandem`), `TANDEM_BIN`,
+  `TANDEM_AUTOSTART`, `TANDEM_AUTOSTART_OPEN`. `TANDEM_TOKEN` is now documented
+  as a self-hosting-with-sign-in concern: locally there are no accounts.
+- A refused connection now says what to do (`Start Tandem with \`npx
+  @jaximus/tandem-mcp up\``) instead of the generic "check API_URL".
+
+### The artifact surfaces are gone from the tool surface
+
+- Maps / pins / events (itinerary), sheets, charts, forms and the itinerary /
+  sheets exports were removed from the CRUD manifest along with the server side
+  of them; the product is the board + documents/notes + roadmap. The 18-tool
+  intent facade is unchanged. `canvas_state_read`'s `fields` are now
+  `documents|notes|roadmapItems|actions|agents`; `canvas_mode_set` takes
+  `welcome|docs|roadmap`.
 
 ### `board_status` reads compact, expands one epic on demand (TDM-184)
 

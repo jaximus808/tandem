@@ -10,6 +10,26 @@ When you connect, you bind the MCP session to one canvas. From then on, every to
 
 The core loop is the **task queue**: one session proposes work as tasks (grouped into epics), a human approves it once in the web UI, and any number of parallel sessions pull the approved queue, claim tasks atomically (exactly one winner per task — losers are told who won and move on), and complete them with results. Every task carries a per-canvas ticket ID (`TDM-7`) for commit messages, and every claim shows the claimant's name on the live board.
 
+## Run it locally
+
+Tandem is a locally run tool: one binary with the web UI embedded and a SQLite database in `~/.tandem`. This package is both the MCP server your agent talks to **and** the launcher for that binary.
+
+```bash
+npx -y @jaximus/tandem-mcp up          # downloads the binary on first run, starts it, opens the board
+claude mcp add tandem -- npx -y @jaximus/tandem-mcp
+```
+
+That's the whole install. `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the [GitHub release](https://github.com/jaximus808/tandam/releases) matching this package's version and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
+
+| Command                      | Effect                                                                                  |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `tandem-mcp up`              | Start the server (detached; logs in `~/.tandem/logs/tandem.log`) and open the board.    |
+| `tandem-mcp up --code AB3XK9QZ` | Same, opening on that canvas. `--no-open` skips the browser, `-f` runs attached.     |
+| `tandem-mcp open [CODE]`     | Open the board (or one canvas), starting the server first if needed.                    |
+| `tandem-mcp down`            | Stop the server `up` started.                                                           |
+
+You don't even have to run `up` yourself: the MCP server **auto-starts the backend** the first time a tool call finds nothing listening on the local port, then retries the call — so an agent's first `canvas_connect` on a cold machine brings the board up. Set `TANDEM_AUTOSTART=0` to turn that off, `TANDEM_AUTOSTART_OPEN=1` to have it open the browser too.
+
 ## Quick start
 
 From inside your project directory:
@@ -54,7 +74,7 @@ No install. Drop this into your MCP client config:
 }
 ```
 
-This connects to the hosted backend at `https://tandemcanvas.com` out of the box — no `API_URL` needed. To point at a local or self-hosted instance, add `"env": { "API_URL": "http://localhost:7891" }`.
+This talks to the local server at `http://127.0.0.1:7891` out of the box — no `API_URL` needed, and it starts the server itself if nothing is listening (see [Run it locally](#run-it-locally)). To point at a self-hosted instance instead, add `"env": { "API_URL": "https://tandem.example.com" }`.
 
 ### Global install
 
@@ -82,14 +102,18 @@ pnpm --filter @jaximus/tandem-mcp build
 
 | Env var             | Default                    | Purpose                                                                                                                                             |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `API_URL`           | `https://tandemcanvas.com` | Tandem HTTP API base URL. Only set this to override the default.                                                                                    |
-| `TANDEM_TOKEN`      | _(unset)_                  | Personal access token — lets the agent act as **you** on your private and shared canvases. Mint one at `/me`. Without it, only public canvases work. |
+| `API_URL`           | `http://127.0.0.1:7891`    | Tandem HTTP API base URL — the local server. Only set this for a self-hosted instance.                                                            |
+| `TANDEM_DATA_DIR`   | `~/.tandem`                | Where the local server keeps its database, images, logs, the cached binary (`bin/`) and the pid file `up` writes.                                  |
+| `TANDEM_BIN`        | _(unset)_                  | Path to a `tandem` binary to run instead of the downloaded one (e.g. one you built with `scripts/build.sh`).                                      |
+| `TANDEM_AUTOSTART`  | _(unset = on)_             | Set to `0` to stop the MCP server from starting the local backend itself when a tool call finds nothing listening. Only ever applies to a loopback `API_URL`. |
+| `TANDEM_AUTOSTART_OPEN` | _(unset)_              | Set to `1` to also open the browser when the MCP server auto-starts the backend.                                                                   |
+| `TANDEM_TOKEN`      | _(unset)_                  | Personal access token, for a **self-hosted** Tandem running with sign-in (`TANDEM_AUTH=google`) — lets the agent act as **you** on private and shared canvases. Mint one at `<API_URL>/me`. Locally there are no accounts and it is never needed. |
 | `TANDEM_FULL_TOOLS` | _(unset)_                  | Set to `1` to also advertise the full CRUD surface (documents, notes, roadmap items, raw actions, …) alongside the default intent facade. Same as `--full-tools`.    |
 | `TANDEM_CANVAS_CODE` | _(unset)_                 | This project's canvas code, written by `init`. Named in the `canvas_connect` tool description so the agent knows which canvas it belongs to, and used as the default when it calls `canvas_connect` without one. |
 | `MCP_TRACE`         | _(unset)_                  | Per-tool-call timing on stderr, plus a session summary on exit. `1` for human-readable lines, `json` for one JSON object per line. See [Tracing](#tracing). |
 | `REQUEST_TIMEOUT_MS` | `15000`                   | Per-request timeout for calls to the Tandem API. `queue_wait` is exempt — its deadline is derived from the wait it asked for, so a long wait is never cut short by this budget. |
 
-To connect as yourself, mint a token under **Access tokens** at [tandemcanvas.com/me](https://tandemcanvas.com/me) and add it to your MCP client config:
+On a self-hosted instance with sign-in, mint a token under **Access tokens** at `<API_URL>/me` and add it to your MCP client config:
 
 ```json
 {
@@ -204,7 +228,7 @@ Those tools stay **callable** either way — the flag decides what's *advertised
 
 ```text
 agent: canvas_connect { "code": "AB3XK9QZ" }
-  → { connected: true, canvasName: "acme-api", url: "https://tandemcanvas.com/c/AB3XK9QZ", session: "…" }
+  → { connected: true, canvasName: "acme-api", url: "http://127.0.0.1:7891/c/AB3XK9QZ", session: "…" }
 
 agent: queue_next { "session": "…" }
   → [{ id: "…", ticketId: "TDM-7", title: "Add rate limiter", state: "approved" }, …]
@@ -238,7 +262,7 @@ The other direction: instead of an agent polling the queue, the **board launches
 tandem-mcp listen --exec 'claude -p "Connect to canvas $TANDEM_CANVAS_CODE, run queue_next, claim and complete the approved tasks"'
 ```
 
-The listener binds `127.0.0.1:8787` and never anything else, so add the webhook on your canvas (**Settings → Webhooks**) pointing at a **tunnel** in front of it — e.g. `cloudflared tunnel --url http://127.0.0.1:8787`, then use `https://<tunnel-host>/webhook`. The hosted API's SSRF guard refuses to dial private addresses, so a raw `127.0.0.1` or `host.docker.internal` URL is rejected non-retryably. (Against a *local* API you can skip the tunnel: `TANDEM_WEBHOOKS_ALLOW_PRIVATE=1` on that server relaxes the guard for local dev.) Copy the `whsec_…` secret when it's shown — it is shown once.
+The listener binds `127.0.0.1:8787` and never anything else. Against the local server that is all you need: add the webhook on your canvas (**Settings → Webhooks**) pointing at `http://127.0.0.1:8787/webhook` — in local mode the server's SSRF guard allows loopback targets. A self-hosted instance keeps the guard on, so put a **tunnel** in front of the listener there (e.g. `cloudflared tunnel --url http://127.0.0.1:8787`, then `https://<tunnel-host>/webhook`) or set `TANDEM_WEBHOOKS_ALLOW_PRIVATE=1` on that server. Copy the `whsec_…` secret when it's shown — it is shown once.
 
 ```bash
 export TANDEM_WEBHOOK_SECRET=whsec_…

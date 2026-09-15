@@ -61,17 +61,18 @@ export const SERVER_INSTRUCTIONS =
 
 // Keep in sync with package.json `version`. Surfaced via `--version` and the
 // MCP server's self-identification over both transports.
-export const VERSION = "2.3.0";
+export const VERSION = "3.0.0";
 
-// Hosted backend. Override with the API_URL env var to point at a local or
-// self-hosted instance (the HTTP sidecar sets this to the in-cluster Go API).
-export const DEFAULT_API_URL = "https://tandemcanvas.com";
+// The LOCAL Tandem server — Tandem is a locally run tool (`tandem-mcp up`
+// starts it; the stdio server auto-starts it on first use, see up.ts). Override
+// with the API_URL env var to point at a self-hosted instance instead.
+export const DEFAULT_API_URL = "http://127.0.0.1:7891";
 
-// Public origin used to build shareable canvas / claim links handed to users.
-// Override with the PUBLIC_URL env var. The HTTP sidecar must set this (or rely
-// on this default) so links use the public domain rather than the internal
-// API_URL (e.g. http://tandem:7891).
-export const DEFAULT_WEB_URL = "https://tandemcanvas.com";
+// Public origin used to build canvas / claim links handed to users. Override
+// with the PUBLIC_URL env var when the API is reached through a different
+// address than the one humans open in a browser (a self-hosted sidecar behind
+// a domain, say). Locally the two are the same.
+export const DEFAULT_WEB_URL = "http://127.0.0.1:7891";
 
 // The intent facade (facade.ts), decorated exactly like the CRUD surface.
 export const FACADE_TOOLS = decorateTools(FACADE_RAW_TOOLS);

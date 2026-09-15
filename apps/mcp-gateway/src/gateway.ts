@@ -29,9 +29,30 @@ export interface GatewayConfig {
   // Per-request timeout in ms for calls made through safeFetch, enforced via
   // AbortController. Configurable via REQUEST_TIMEOUT_MS. Defaults to 15000.
   requestTimeoutMs?: number;
+  // Local-first auto-start (see up.ts). When a request is REFUSED (nothing is
+  // listening on apiUrl) this is called ONCE per Gateway to bring the local
+  // server up; a true return means "now retry". index.ts wires it for the stdio
+  // CLI when apiUrl is the local default; the HTTP sidecar leaves it unset.
+  autoStart?: () => Promise<boolean>;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * Was this fetch failure "nothing is listening"? undici reports it as a
+ * TypeError("fetch failed") whose `cause` carries the syscall code; the
+ * wrapped error safeFetch throws keeps the verdict on a `refused` flag so the
+ * retry path doesn't have to re-parse a message.
+ */
+export function isConnectionRefused(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  if ((err as { refused?: boolean }).refused === true) return true;
+  const code = ((err as { cause?: { code?: string } }).cause?.code ?? (err as { code?: string }).code ?? "")
+    .toString();
+  if (code === "ECONNREFUSED") return true;
+  const msg = (err as { message?: string }).message ?? "";
+  return /ECONNREFUSED/.test(msg);
+}
 
 export interface CanvasSession {
   token: string;
@@ -547,6 +568,34 @@ export class Gateway {
     init?: RequestInit,
     timeoutOverrideMs?: number
   ): Promise<Response> {
+    try {
+      return await this.fetchOnce(path, init, timeoutOverrideMs);
+    } catch (err) {
+      // Nothing listening on a LOCAL apiUrl: start the server and try once
+      // more. This is the "an agent can start it" path — the first tool call
+      // on a cold machine brings the board up instead of failing. One attempt
+      // per Gateway: if the start failed, every later call reports the plain
+      // refusal rather than re-spawning on each one.
+      if (isConnectionRefused(err) && this.config.autoStart && !this.autoStartTried) {
+        this.autoStartTried = true;
+        process.stderr.write(
+          `[tandem] nothing listening at ${this.config.apiUrl} — starting the local Tandem server\n`
+        );
+        if (await this.config.autoStart()) {
+          return this.fetchOnce(path, init, timeoutOverrideMs);
+        }
+      }
+      throw err;
+    }
+  }
+
+  private autoStartTried = false;
+
+  private async fetchOnce(
+    path: string,
+    init?: RequestInit,
+    timeoutOverrideMs?: number
+  ): Promise<Response> {
     const method = init?.method ?? "GET";
     // The override exists for ONE case: a request the server deliberately holds
     // open (the queue long poll). Everything else uses the shared budget.
@@ -585,9 +634,14 @@ export class Gateway {
       }
       const reason = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[tandem] ${method} ${path} -> error (${ms}ms): ${reason}\n`);
-      throw new Error(
-        `Could not reach Tandem API at ${this.config.apiUrl} — check the API_URL env var. (${reason})`
+      const refused = isConnectionRefused(err);
+      const wrapped = new Error(
+        refused
+          ? `Nothing is listening at ${this.config.apiUrl}. Start Tandem with \`npx @jaximus/tandem-mcp up\` (or check the API_URL env var). (${reason})`
+          : `Could not reach Tandem API at ${this.config.apiUrl} — check the API_URL env var. (${reason})`
       );
+      (wrapped as Error & { refused?: boolean }).refused = refused;
+      throw wrapped;
     } finally {
       clearTimeout(timer);
     }
