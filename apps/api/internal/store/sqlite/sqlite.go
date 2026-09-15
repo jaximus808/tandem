@@ -403,3 +403,8 @@ func carryContentAudit(incoming, stored json.RawMessage, entry *store.ContentAud
 
 // Compile-time proof that *Store implements the full store.Store surface.
 var _ store.Store = (*Store)(nil)
+
+// FormatTime renders t the way every timestamp column in this schema is stored
+// (fixed-width UTC, see timeLayout) — for tools that write rows directly, such
+// as cmd/import-supabase.
+func FormatTime(t time.Time) string { return fmtTime(t) }
