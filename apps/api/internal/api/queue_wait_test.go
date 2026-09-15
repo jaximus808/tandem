@@ -143,7 +143,7 @@ func TestQueueWaitReturnsImmediatelyWhenWorkIsAlreadyApproved(t *testing.T) {
 	canvasID := uuid.New()
 	f := &queueFakeStore{}
 	f.publish(readyQueueTask("already approved", ""))
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	start := time.Now()
 	w, done := runWait(h, waitRequest(t, canvasID, ""))
@@ -180,7 +180,7 @@ func TestQueueWaitReturnsImmediatelyWhenWorkIsAlreadyApproved(t *testing.T) {
 func TestQueueWaitWakesOnApprovalWithoutPollingTheDatabase(t *testing.T) {
 	canvasID := uuid.New()
 	f := &queueFakeStore{}
-	h := NewHandler(f, nil, nil) // NOTE: no emitter wired — see below
+	h := NewHandler(f, nil) // NOTE: no emitter wired — see below
 
 	w, done := runWait(h, waitRequest(t, canvasID, "?timeout=30"))
 	awaitParked(t, h, canvasID, 1)
@@ -214,7 +214,7 @@ func TestQueueWaitWakesOnApprovalWithoutPollingTheDatabase(t *testing.T) {
 
 func TestQueueWaitTimeoutIsDistinguishableFromAnError(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	w, done := runWait(h, waitRequest(t, canvasID, "?timeout=1"))
 	mustAnswer(t, done, 3*time.Second, "empty queue")
@@ -251,7 +251,7 @@ func TestQueueWaitTimeoutIsDistinguishableFromAnError(t *testing.T) {
 
 func TestQueueWaitReleasesTheWaiterWhenTheClientDisconnects(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequest(t, canvasID, "?timeout=60")
 	ctx, cancel := context.WithCancel(r.Context())
@@ -311,7 +311,7 @@ func TestQueueWaitBoundsConcurrentWaitersPerCanvas(t *testing.T) {
 	other := uuid.New()
 	f := &queueFakeStore{}
 	f.publish(readyQueueTask("work on the other canvas", ""))
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	// Fill the canvas's cap without spawning 64 goroutines.
 	releases := make([]func(waitEnd) bool, 0, maxQueueWaitersPerCanvas)
@@ -364,7 +364,7 @@ func TestQueueWaitEpicFilterIgnoresOtherEpics(t *testing.T) {
 	canvasID := uuid.New()
 	mine, theirs := uuid.New().String(), uuid.New().String()
 	f := &queueFakeStore{}
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, done := runWait(h, waitRequest(t, canvasID, "?timeout=1&epicId="+mine))
 	awaitParked(t, h, canvasID, 1)
@@ -393,7 +393,7 @@ func TestQueueWaitParameterHandling(t *testing.T) {
 	canvasID := uuid.New()
 
 	t.Run("garbage timeout is a 400", func(t *testing.T) {
-		h := NewHandler(&queueFakeStore{}, nil, nil)
+		h := NewHandler(&queueFakeStore{}, nil)
 		w, done := runWait(h, waitRequest(t, canvasID, "?timeout=soon"))
 		mustAnswer(t, done, time.Second, "bad timeout")
 		if w.Code != http.StatusBadRequest {
@@ -405,7 +405,7 @@ func TestQueueWaitParameterHandling(t *testing.T) {
 	})
 
 	t.Run("garbage epicId is a 400", func(t *testing.T) {
-		h := NewHandler(&queueFakeStore{}, nil, nil)
+		h := NewHandler(&queueFakeStore{}, nil)
 		w, done := runWait(h, waitRequest(t, canvasID, "?epicId=not-a-uuid"))
 		mustAnswer(t, done, time.Second, "bad epicId")
 		if w.Code != http.StatusBadRequest {
@@ -416,7 +416,7 @@ func TestQueueWaitParameterHandling(t *testing.T) {
 	t.Run("an over-long timeout is clamped and reported", func(t *testing.T) {
 		f := &queueFakeStore{}
 		f.publish(readyQueueTask("ready", ""))
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w, done := runWait(h, waitRequest(t, canvasID, "?timeout=9999"))
 		mustAnswer(t, done, 2*time.Second, "clamped timeout")
 		if got := decodeWait(t, w).TimeoutSeconds; got != int(queueWaitMaxTimeout/time.Second) {
@@ -429,7 +429,7 @@ func TestQueueWaitParameterHandling(t *testing.T) {
 		human := readyQueueTask("a human todo", "")
 		human.Payload = json.RawMessage(`{"title":"a human todo","assignee":"human"}`)
 		f.publish(human)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 
 		// Default (agent): a human's todo must not wake a worker.
 		w, done := runWait(h, waitRequest(t, canvasID, "?timeout=1"))
@@ -512,7 +512,7 @@ func TestOnlyApprovalOrRejectionWakesQueueWaiters(t *testing.T) {
 		{"epic rejected", webhooks.EventTaskRejected, epic, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := NewHandler(&queueFakeStore{}, nil, nil) // no emitter wired
+			h := NewHandler(&queueFakeStore{}, nil) // no emitter wired
 			waiter, release, _, ok := h.waiters.add(canvasID, "", "")
 			if !ok {
 				t.Fatal("could not register a waiter")
@@ -539,7 +539,7 @@ func TestReleasingATaskWakesQueueWaiters(t *testing.T) {
 	canvasID := uuid.New()
 	task := humanTask("executing")
 	task.ClaimedBy = ptr("worker-that-died")
-	h := NewHandler(newMoveStore(task), nil, nil)
+	h := NewHandler(newMoveStore(task), nil)
 
 	waiter, release, _, ok := h.waiters.add(canvasID, "", "")
 	if !ok {
@@ -563,7 +563,7 @@ func TestReleasingATaskWakesQueueWaiters(t *testing.T) {
 // ── 7. The route ─────────────────────────────────────────────────────────────
 
 func TestQueueWaitRouteIsGetOnlyAndRequiresACanvasToken(t *testing.T) {
-	router := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-148", time.Hour), nil, false, nil, "", t.TempDir(), "", nil, nil)
+	router := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-148", time.Hour), nil, false, "", t.TempDir(), "", nil, nil)
 	mux, ok := router.(*chi.Mux)
 	if !ok {
 		t.Fatal("NewRouter no longer returns a *chi.Mux; this route-walk test needs updating")
@@ -603,7 +603,7 @@ func TestQueueWaitActionsMatchTheListShape(t *testing.T) {
 	task.Ticket = ptr(148)
 	f := &queueFakeStore{}
 	f.publish(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, done := runWait(h, waitRequest(t, canvasID, ""))
 	mustAnswer(t, done, 2*time.Second, "shape check")
@@ -653,7 +653,7 @@ func waitRequestAs(t *testing.T, canvasID uuid.UUID, agent, query string) *http.
 // with what it is waiting for and since when.
 func TestWaitingAgentIsVisibleOnTheRoster(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequestAs(t, canvasID, "opus-orchestrator", "?timeout=60")
 	ctx, cancel := context.WithCancel(r.Context())
@@ -698,7 +698,7 @@ func TestWaitingAgentIsVisibleOnTheRoster(t *testing.T) {
 // non-zero — including for an agent that is registered, online, and idle.
 func TestNothingWaitingImpliesNobodyWaiting(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	waiting, anon := h.waiters.waitingOn(canvasID, time.Now().UTC())
 	if len(waiting) != 0 || anon != 0 {
@@ -722,7 +722,7 @@ func TestNothingWaitingImpliesNobodyWaiting(t *testing.T) {
 // is gone, and the board would still be pointing at it.
 func TestDisconnectedWaiterStopsReadingAsWaiting(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequestAs(t, canvasID, "ghost-orchestrator", "?timeout=60")
 	ctx, cancel := context.WithCancel(r.Context())
@@ -744,7 +744,7 @@ func TestAnsweredWaitStopsReadingAsWaiting(t *testing.T) {
 	canvasID := uuid.New()
 	f := &queueFakeStore{}
 	f.publish(readyQueueTask("already approved", ""))
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	_, done := runWait(h, waitRequestAs(t, canvasID, "worker-1", "?timeout=60"))
 	mustAnswer(t, done, 2*time.Second, "ready answer")
@@ -760,7 +760,7 @@ func TestAnsweredWaitStopsReadingAsWaiting(t *testing.T) {
 // resets each time, which is the duration lie TDM-112 already fixed for claims.
 func TestWaitingSurvivesTheGapBetweenPolls(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	_, done := runWait(h, waitRequestAs(t, canvasID, "patient-planner", "?timeout=1"))
 	mustAnswer(t, done, 3*time.Second, "first poll")
@@ -793,7 +793,7 @@ func TestWaitingSurvivesTheGapBetweenPolls(t *testing.T) {
 // exists to catch) drops out of the waiting set when the grace window passes.
 func TestAWaiterThatNeverComesBackExpires(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	_, done := runWait(h, waitRequestAs(t, canvasID, "quitter", "?timeout=1"))
 	mustAnswer(t, done, 3*time.Second, "only poll")
@@ -824,7 +824,7 @@ func TestAWaiterThatNeverComesBackExpires(t *testing.T) {
 // honest way: a new registry, which is exactly what a new process gets.
 func TestWaitingDoesNotSurviveARestart(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequestAs(t, canvasID, "pre-restart", "?timeout=60")
 	ctx, cancel := context.WithCancel(r.Context())
@@ -835,7 +835,7 @@ func TestWaitingDoesNotSurviveARestart(t *testing.T) {
 		t.Fatalf("setup: expected one waiter, got %+v", waiting)
 	}
 
-	restarted := NewHandler(&queueFakeStore{}, nil, nil)
+	restarted := NewHandler(&queueFakeStore{}, nil)
 	waiting, anon := restarted.waiters.waitingOn(canvasID, time.Now().UTC())
 	if len(waiting) != 0 || anon != 0 {
 		t.Fatalf("a fresh process reported %d waiting agent(s) — waiting must not be stored", len(waiting))
@@ -856,7 +856,7 @@ func TestWaitingDoesNotSurviveARestart(t *testing.T) {
 // because a name nobody sent is the one thing worse than no name at all.
 func TestAnonymousWaitIsCountedNotInvented(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequest(t, canvasID, "?timeout=60") // no X-Tandem-Agent
 	ctx, cancel := context.WithCancel(r.Context())
@@ -888,7 +888,7 @@ func TestAnonymousWaitIsCountedNotInvented(t *testing.T) {
 func TestWaitScopedToAnEpicSaysWhatItIsWaitingFor(t *testing.T) {
 	canvasID := uuid.New()
 	epicID := uuid.New().String()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	r := waitRequestAs(t, canvasID, "epic-planner", "?timeout=60&epicId="+epicID)
 	ctx, cancel := context.WithCancel(r.Context())
@@ -969,7 +969,7 @@ func rejectOnCanvas(h *Handler, canvasID uuid.UUID, task *store.Action, by, reas
 // words verbatim and a status that cannot be mistaken for work.
 func TestQueueWaitAnswersRejectedWithTheReason(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	w, done := runWait(h, waitRequest(t, canvasID, "?timeout=30"))
 	awaitParked(t, h, canvasID, 1)
@@ -1025,7 +1025,7 @@ func TestQueueWaitAnswersRejectedWithTheReason(t *testing.T) {
 func TestQueueWaitPrefersReadyWorkOverARejection(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &queueFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w, done := runWait(h, waitRequest(t, canvasID, "?timeout=30"))
 	awaitParked(t, h, canvasID, 1)
@@ -1053,7 +1053,7 @@ func TestQueueWaitRejectionHonoursTheEpicFilter(t *testing.T) {
 
 	t.Run("another epic's rejection does not end the wait", func(t *testing.T) {
 		canvasID := uuid.New()
-		h := NewHandler(&queueFakeStore{}, nil, nil)
+		h := NewHandler(&queueFakeStore{}, nil)
 		w, done := runWait(h, waitRequest(t, canvasID, "?timeout=1&epicId="+mine))
 		awaitParked(t, h, canvasID, 1)
 
@@ -1068,7 +1068,7 @@ func TestQueueWaitRejectionHonoursTheEpicFilter(t *testing.T) {
 
 	t.Run("my epic's rejection ends it", func(t *testing.T) {
 		canvasID := uuid.New()
-		h := NewHandler(&queueFakeStore{}, nil, nil)
+		h := NewHandler(&queueFakeStore{}, nil)
 		w, done := runWait(h, waitRequest(t, canvasID, "?timeout=30&epicId="+mine))
 		awaitParked(t, h, canvasID, 1)
 
@@ -1090,7 +1090,7 @@ func TestQueueWaitRejectionHonoursTheEpicFilter(t *testing.T) {
 // reason signalRejected appends BEFORE it wakes.
 func TestQueueWaitReportsARejectionThatLandedDuringRegistration(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 
 	// Register by hand, then reject, then let the handler start: the rejection is
 	// already buffered on a waiter nobody has read yet.
@@ -1117,7 +1117,7 @@ func TestQueueWaitReportsARejectionThatLandedDuringRegistration(t *testing.T) {
 // every loop for the rest of its wait.
 func TestRejectionFansOutToEveryWaiterAndIsDrainedEvenWhenFilteredOut(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 	mine := uuid.New().String()
 
 	a, releaseA, _, _ := h.waiters.add(canvasID, "a", "")
@@ -1143,7 +1143,7 @@ func TestRejectionFansOutToEveryWaiterAndIsDrainedEvenWhenFilteredOut(t *testing
 // without limit. The answer stays "your batch was rejected" either way.
 func TestPendingRejectionsAreBounded(t *testing.T) {
 	canvasID := uuid.New()
-	h := NewHandler(&queueFakeStore{}, nil, nil)
+	h := NewHandler(&queueFakeStore{}, nil)
 	waiter, release, _, _ := h.waiters.add(canvasID, "", "")
 	defer release(waitEndGone)
 

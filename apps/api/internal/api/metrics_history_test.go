@@ -103,7 +103,7 @@ func metricsHistHarness(t *testing.T, fake *metricsHistFake) (http.Handler, stri
 	if err != nil {
 		t.Fatalf("issue stranger session: %v", err)
 	}
-	r := NewRouter(fake, nil, authSvc, nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(fake, nil, authSvc, nil, false, "", t.TempDir(), "", nil, nil)
 	return r, ownerTok, strangerTok
 }
 
@@ -193,7 +193,7 @@ func TestMetricsHistoryHiddenWhenAllowlistUnset(t *testing.T) {
 func TestLiveMetricsEndpointStaysOpen(t *testing.T) {
 	reg := metrics.NewRegistry()
 	t.Setenv(metricsOwnerEnv, testOwnerEmail)
-	r := NewRouter(&metricsHistFake{}, nil, auth.NewService("s3cret-for-tdm-94", time.Hour), nil, false, nil, "", t.TempDir(), "", reg, nil)
+	r := NewRouter(&metricsHistFake{}, nil, auth.NewService("s3cret-for-tdm-94", time.Hour), nil, false, "", t.TempDir(), "", reg, nil)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/metrics", nil)) // no credential

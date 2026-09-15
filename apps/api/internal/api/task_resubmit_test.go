@@ -231,7 +231,7 @@ func TestResubmitByAuthorLandsAtTheGate(t *testing.T) {
 	task := resubmitTask("agent:planner-a", reason)
 	task.ApprovedBy, task.ClaimedBy = ptr("human"), ptr("worker-1")
 	f := newResubmitStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	note := "split as asked: this ticket is the API endpoint only, the migration moved to its own ticket"
 	w, body := resubmitJSON(t, h, canvasID, task.ID, map[string]any{
@@ -298,7 +298,7 @@ func TestResubmitWithoutPayloadKeepsContent(t *testing.T) {
 	task := resubmitTask("agent:planner-a", "not now")
 	before := string(task.Payload)
 	f := newResubmitStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := resubmitJSON(t, h, canvasID, task.ID,
 		map[string]any{"note": "nothing changed; the blocker you named is now fixed"}, "agent:planner-a")
@@ -333,7 +333,7 @@ func TestResubmitNoteRequired(t *testing.T) {
 		canvasID := uuid.New()
 		task := resubmitTask("agent:planner-a", "too broad")
 		f := newResubmitStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 
 		w, out := resubmitJSON(t, h, canvasID, task.ID, body, "agent:planner-a")
 		if w.Code != http.StatusBadRequest {
@@ -358,7 +358,7 @@ func TestResubmitNotAuthorRefused(t *testing.T) {
 			canvasID := uuid.New()
 			task := resubmitTask("agent:planner-a", "too broad")
 			f := newResubmitStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, out := resubmitJSON(t, h, canvasID, task.ID,
 				map[string]any{"note": "I fixed it"}, caller)
@@ -387,7 +387,7 @@ func TestResubmitWrongState(t *testing.T) {
 			task := resubmitTask("agent:planner-a", "")
 			task.State = state
 			f := newResubmitStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, out := resubmitJSON(t, h, canvasID, task.ID,
 				map[string]any{"note": "asking again"}, "agent:planner-a")
@@ -411,7 +411,7 @@ func TestResubmitWrongState(t *testing.T) {
 func TestResubmitTaskNotFound(t *testing.T) {
 	canvasID := uuid.New()
 	f := newResubmitStore()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, out := resubmitJSON(t, h, canvasID, uuid.New(),
 		map[string]any{"note": "asking again"}, "agent:planner-a")
@@ -445,7 +445,7 @@ func TestResubmitIgnoresRequestBodyIdentity(t *testing.T) {
 	canvasID := uuid.New()
 	task := resubmitTask("agent:planner-a", "too broad")
 	f := newResubmitStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, out := resubmitJSON(t, h, canvasID, task.ID, map[string]any{
 		"note":       "I definitely wrote this ticket",
@@ -467,7 +467,7 @@ func TestResubmitAmendmentCannotForgeAudit(t *testing.T) {
 	canvasID := uuid.New()
 	task := resubmitTask("agent:planner-a", "too broad")
 	f := newResubmitStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := resubmitJSON(t, h, canvasID, task.ID, map[string]any{
 		"note": "amended",
@@ -504,7 +504,7 @@ func TestResubmitAmendmentMustStayValid(t *testing.T) {
 		canvasID := uuid.New()
 		task := resubmitTask("agent:planner-a", "too broad")
 		f := newResubmitStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 
 		w, _ := resubmitJSON(t, h, canvasID, task.ID,
 			map[string]any{"note": "amended", "payload": patch}, "agent:planner-a")

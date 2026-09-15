@@ -260,7 +260,7 @@ func TestProposeTaskApprovalCascade(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &policyFakeStore{policy: tc.policy, actions: epics}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ProposeAction(w, canvasRequest(t, "POST", "/api/canvas/actions", taskBody(tc.payload), canvasID, ""))
 			if w.Code != http.StatusCreated {
@@ -291,7 +291,7 @@ func TestProposeTasksBatchApprovalCascade(t *testing.T) {
 		policy:  "epic",
 		actions: map[uuid.UUID]*store.Action{approvedEpic: {ID: approvedEpic, Type: "epic", State: "approved"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	body := map[string]any{"actions": []map[string]any{
 		taskBody(map[string]any{"title": "flows", "epicId": approvedEpic.String()}),
@@ -325,7 +325,7 @@ func TestApproveEpicBatchApprovesTasks(t *testing.T) {
 		policy:  "epic",
 		actions: map[uuid.UUID]*store.Action{epicID: {ID: epicID, Type: "epic", State: "proposed"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, canvasRequest(t, "POST", "/api/canvas/actions/"+epicID.String()+"/approve",
 		map[string]any{"approvedBy": "human"}, canvasID, epicID.String()))
@@ -350,7 +350,7 @@ func TestApproveTaskDoesNotCascade(t *testing.T) {
 		policy:  "epic",
 		actions: map[uuid.UUID]*store.Action{taskID: {ID: taskID, Type: "task", State: "proposed"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, canvasRequest(t, "POST", "/api/canvas/actions/"+taskID.String()+"/approve",
 		map[string]any{}, canvasID, taskID.String()))
@@ -369,7 +369,7 @@ func TestApproveEpicStrictPolicySkipsCascade(t *testing.T) {
 		policy:  "strict",
 		actions: map[uuid.UUID]*store.Action{epicID: {ID: epicID, Type: "epic", State: "proposed"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, canvasRequest(t, "POST", "/api/canvas/actions/"+epicID.String()+"/approve",
 		map[string]any{"approvedBy": "human"}, canvasID, epicID.String()))
@@ -389,7 +389,7 @@ func TestApproveEpicRetryRefiresCascade(t *testing.T) {
 		policy:  "epic",
 		actions: map[uuid.UUID]*store.Action{epicID: {ID: epicID, Type: "epic", State: "proposed"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	for i := 1; i <= 2; i++ {
 		w := httptest.NewRecorder()
 		h.ApproveAction(w, canvasRequest(t, "POST", "/api/canvas/actions/"+epicID.String()+"/approve",
@@ -433,7 +433,7 @@ func TestApproveBatchApprovesOnlyProposed(t *testing.T) {
 			doneTask:        {ID: doneTask, Type: "task", State: "done"},
 		},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveActionsBatch(w, canvasRequest(t, "POST", "/api/canvas/actions/approve-batch",
 		map[string]any{"ids": []string{
@@ -483,7 +483,7 @@ func TestApproveBatchEpicCascadesUnderEpicPolicy(t *testing.T) {
 			taskID: {ID: taskID, Type: "task", State: "proposed"},
 		},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveActionsBatch(w, canvasRequest(t, "POST", "/api/canvas/actions/approve-batch",
 		map[string]any{"ids": []string{epicID.String(), taskID.String()}}, canvasID, ""))
@@ -518,7 +518,7 @@ func TestApproveBatchEpicStrictPolicySkipsCascade(t *testing.T) {
 		policy:  "strict",
 		actions: map[uuid.UUID]*store.Action{epicID: {ID: epicID, Type: "epic", State: "proposed"}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ApproveActionsBatch(w, canvasRequest(t, "POST", "/api/canvas/actions/approve-batch",
 		map[string]any{"ids": []string{epicID.String()}}, canvasID, ""))
@@ -540,7 +540,7 @@ func TestApproveBatchValidation(t *testing.T) {
 	canvasID := uuid.New()
 	missing := uuid.New()
 	fake := &policyFakeStore{policy: "epic", actions: map[uuid.UUID]*store.Action{}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveActionsBatch(w, canvasRequest(t, "POST", "/api/canvas/actions/approve-batch",
@@ -573,7 +573,7 @@ func TestCompleteRespectsClaim(t *testing.T) {
 			taskID: {ID: taskID, Type: "task", State: "executing", ClaimedBy: &holder},
 		},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.UpdateActionState(w, canvasRequest(t, "PATCH", "/api/canvas/actions/"+taskID.String(),
@@ -602,7 +602,7 @@ func TestEpicIdCanonicalizedOnCreate(t *testing.T) {
 	canvasID := uuid.New()
 	epicID := uuid.New()
 	fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	upper := strings.ToUpper(epicID.String())

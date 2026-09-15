@@ -170,7 +170,7 @@ func TestRegisterAgentWithParent(t *testing.T) {
 	fake := &agentFakeStore{agents: map[uuid.UUID]*store.Agent{
 		parentID: {ID: parentID, Name: "orchestrator", Role: "planner"},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	body := map[string]any{
 		"name": "executor-1", "role": "executor",
@@ -204,7 +204,7 @@ func TestRegisterAgentWithParent(t *testing.T) {
 func TestRegisterAgentUnknownParentRejected(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &agentFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	body := map[string]any{
 		"name": "executor-1", "role": "executor",
@@ -222,7 +222,7 @@ func TestRegisterAgentUnknownParentRejected(t *testing.T) {
 func TestRegisterAgentWithoutParent(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &agentFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	body := map[string]any{"name": "orchestrator", "role": "planner"}
 	h.RegisterAgent(w, canvasRequest(t, "POST", "/api/canvas/agents", body, canvasID, ""))
@@ -246,7 +246,7 @@ func TestRegisterAgentWithoutParent(t *testing.T) {
 
 func TestRegisterAgentBadParentID(t *testing.T) {
 	fake := &agentFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	body := map[string]any{"role": "executor", "parentAgentId": "not-a-uuid"}
 	h.RegisterAgent(w, canvasRequest(t, "POST", "/api/canvas/agents", body, uuid.New(), ""))
@@ -268,7 +268,7 @@ func TestClaimAndCompleteTouchAgentLiveness(t *testing.T) {
 		taskID: {ID: taskID, Type: "task", State: "approved",
 			Payload: json.RawMessage(`{"title":"t"}`)},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// task_start: approved → executing, claimed by "executor-1".
 	w := httptest.NewRecorder()
@@ -316,7 +316,7 @@ func registerResponse(t *testing.T, h *Handler, canvasID uuid.UUID, body map[str
 func TestReRegisterSameNameKeepsAgentID(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &agentFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	first := registerResponse(t, h, canvasID,
 		map[string]any{"name": "executor-1", "role": "executor", "model": "claude-opus-4-8"})
@@ -347,7 +347,7 @@ func TestReRegisterWithoutParentKeepsParent(t *testing.T) {
 	fake := &agentFakeStore{agents: map[uuid.UUID]*store.Agent{
 		parentID: {ID: parentID, Name: "orchestrator", Role: "planner"},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	registerResponse(t, h, canvasID, map[string]any{
 		"name": "executor-1", "role": "executor", "parentAgentId": parentID.String(),
@@ -366,7 +366,7 @@ func TestReRegisterWithoutParentKeepsParent(t *testing.T) {
 func TestRegisterDistinctNamesDistinctIDs(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &agentFakeStore{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	a := registerResponse(t, h, canvasID, map[string]any{"name": "executor-1", "role": "executor"})
 	b := registerResponse(t, h, canvasID, map[string]any{"name": "executor-2", "role": "executor"})
@@ -389,7 +389,7 @@ func TestClaimByUnregisteredClaimantCreatesPresence(t *testing.T) {
 		taskID: {ID: taskID, Type: "task", State: "approved",
 			Payload: json.RawMessage(`{"title":"t"}`)},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.UpdateActionState(w, canvasRequest(t, "PATCH", "/api/canvas/actions/"+taskID.String(),
@@ -417,7 +417,7 @@ func TestClaimByRegisteredClaimantOnlyRefreshes(t *testing.T) {
 		taskID: {ID: taskID, Type: "task", State: "approved",
 			Payload: json.RawMessage(`{"title":"t"}`)},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	originalID := registerResponse(t, h, canvasID,
 		map[string]any{"name": "executor-1", "role": "executor"})

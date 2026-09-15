@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// batchFakeStore backs the batch-honesty tests (TDM-138). It knows which pin ids
-// exist in "this" canvas: UpdatePin/DeletePin return rows-affected = 1 for a known
+// batchFakeStore backs the batch-honesty tests (TDM-138). It knows which note ids
+// exist in "this" canvas: UpdateNote/DeleteNote return rows-affected = 1 for a known
 // id and 0 for anything else (an absent or cross-canvas id — the silent no-op the
 // real store returns via its canvas_id predicate). A failId is made to error, to
 // exercise the partial-batch path.
@@ -39,10 +39,10 @@ func (f *batchFakeStore) affected(id uuid.UUID) (int, error) {
 	return 0, nil
 }
 
-func (f *batchFakeStore) UpdatePin(_ context.Context, _ uuid.UUID, id uuid.UUID, _ store.PinPatch) (int, error) {
+func (f *batchFakeStore) UpdateNote(_ context.Context, _ uuid.UUID, id uuid.UUID, _ store.NotePatch) (int, error) {
 	return f.affected(id)
 }
-func (f *batchFakeStore) DeletePin(_ context.Context, _ uuid.UUID, id uuid.UUID) (int, error) {
+func (f *batchFakeStore) DeleteNote(_ context.Context, _ uuid.UUID, id uuid.UUID) (int, error) {
 	return f.affected(id)
 }
 func (f *batchFakeStore) BumpCanvasVersion(_ context.Context, _ uuid.UUID) (int, error) {
@@ -68,10 +68,10 @@ func TestBatchUpdateReportsOnlyAffected(t *testing.T) {
 	canvasID := uuid.New()
 	real, absent := uuid.New(), uuid.New()
 	fake := &batchFakeStore{exists: map[uuid.UUID]bool{real: true}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
-	h.UpdatePinsBatch(w, batchReq(t, "/api/canvas/pins/batch-update", map[string]any{
+	h.UpdateNotesBatch(w, batchReq(t, "/api/canvas/notes/batch-update", map[string]any{
 		"items": []map[string]any{
 			{"id": real.String(), "label": "kept"},
 			{"id": absent.String(), "label": "ghost"},
@@ -97,10 +97,10 @@ func TestBatchDeleteReportsOnlyAffected(t *testing.T) {
 	canvasID := uuid.New()
 	real, absent := uuid.New(), uuid.New()
 	fake := &batchFakeStore{exists: map[uuid.UUID]bool{real: true}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
-	h.DeletePinsBatch(w, batchReq(t, "/api/canvas/pins/batch-delete", map[string]any{
+	h.DeleteNotesBatch(w, batchReq(t, "/api/canvas/notes/batch-delete", map[string]any{
 		"ids": []string{real.String(), absent.String()},
 	}, canvasID))
 	if w.Code != http.StatusOK {
@@ -120,10 +120,10 @@ func TestBatchDeleteReportsOnlyAffected(t *testing.T) {
 func TestBatchAllNoOpsDoesNotBump(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &batchFakeStore{exists: map[uuid.UUID]bool{}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
-	h.DeletePinsBatch(w, batchReq(t, "/api/canvas/pins/batch-delete", map[string]any{
+	h.DeleteNotesBatch(w, batchReq(t, "/api/canvas/notes/batch-delete", map[string]any{
 		"ids": []string{uuid.New().String(), uuid.New().String()},
 	}, canvasID))
 	if w.Code != http.StatusOK {
@@ -140,10 +140,10 @@ func TestPartialBatchFailureStillConverges(t *testing.T) {
 	canvasID := uuid.New()
 	good, bad := uuid.New(), uuid.New()
 	fake := &batchFakeStore{exists: map[uuid.UUID]bool{good: true, bad: true}, failID: bad}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
-	h.DeletePinsBatch(w, batchReq(t, "/api/canvas/pins/batch-delete", map[string]any{
+	h.DeleteNotesBatch(w, batchReq(t, "/api/canvas/notes/batch-delete", map[string]any{
 		"ids": []string{good.String(), bad.String()},
 	}, canvasID))
 	if w.Code != http.StatusInternalServerError {
@@ -160,14 +160,14 @@ func TestPartialBatchFailureStillConverges(t *testing.T) {
 func TestBatchRejectsTooManyItems(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &batchFakeStore{exists: map[uuid.UUID]bool{}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	ids := make([]string, maxBatchItems+1)
 	for i := range ids {
 		ids[i] = uuid.New().String()
 	}
 	w := httptest.NewRecorder()
-	h.DeletePinsBatch(w, batchReq(t, "/api/canvas/pins/batch-delete", map[string]any{"ids": ids}, canvasID))
+	h.DeleteNotesBatch(w, batchReq(t, "/api/canvas/notes/batch-delete", map[string]any{"ids": ids}, canvasID))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 for an oversize batch; body %s", w.Code, w.Body)
 	}

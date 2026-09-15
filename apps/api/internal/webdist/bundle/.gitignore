@@ -1,0 +1,5 @@
+# Build output of apps/web copied here by scripts/build.sh for //go:embed.
+# Only the placeholder is tracked so `go build` works without a web build.
+*
+!.gitignore
+!.gitkeep

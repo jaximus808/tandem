@@ -43,7 +43,7 @@ func TestGetCanvasByCodePrivateUngrantedIs404(t *testing.T) {
 		canvas: &store.Canvas{ID: uuid.New(), Name: "secret", Visibility: "private"},
 		role:   "none",
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.GetCanvasByCode(w, metaRequest(t, "ABCD1234"))
 	if w.Code != http.StatusNotFound {
@@ -60,7 +60,7 @@ func TestGetCanvasByCodePrivateGrantedOK(t *testing.T) {
 		canvas: &store.Canvas{ID: uuid.New(), Name: "secret", Visibility: "private"},
 		role:   "read",
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.GetCanvasByCode(w, metaRequest(t, "ABCD1234"))
 	if w.Code != http.StatusOK {
@@ -74,7 +74,7 @@ func TestGetCanvasByCodePublicOK(t *testing.T) {
 		canvas: &store.Canvas{ID: uuid.New(), Name: "open", Visibility: "public"},
 		role:   "read",
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.GetCanvasByCode(w, metaRequest(t, "ABCD1234"))
 	if w.Code != http.StatusOK {

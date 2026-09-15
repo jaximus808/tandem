@@ -208,7 +208,7 @@ func TestLooksLikeText(t *testing.T) {
 func TestFindNotesDocByName(t *testing.T) {
 	brief := &store.Document{ID: uuid.New(), Type: "notes", Name: "Briefing", SortOrder: 3}
 	docs := []*store.Document{
-		{ID: uuid.New(), Type: "map", Name: "Briefing", SortOrder: 0}, // wrong type
+		{ID: uuid.New(), Type: "roadmap", Name: "Briefing", SortOrder: 0}, // wrong type
 		brief,
 		{ID: uuid.New(), Type: "notes", Name: "Scratch", SortOrder: 1},
 	}
@@ -354,7 +354,7 @@ type briefingResp struct {
 
 func importBriefing(t *testing.T, f *briefingFakeStore, canvasID uuid.UUID, body any) (int, briefingResp) {
 	t.Helper()
-	h := NewHandler(f, ws.NewHub(), nil)
+	h := NewHandler(f, ws.NewHub())
 	r := canvasRequest(t, "POST", "/api/canvas/briefing/import", body, canvasID, "")
 	w := httptest.NewRecorder()
 	h.ImportBriefing(w, r)
@@ -365,7 +365,7 @@ func importBriefing(t *testing.T, f *briefingFakeStore, canvasID uuid.UUID, body
 
 func setBriefing(t *testing.T, f *briefingFakeStore, canvasID uuid.UUID, body any) int {
 	t.Helper()
-	h := NewHandler(f, ws.NewHub(), nil)
+	h := NewHandler(f, ws.NewHub())
 	r := canvasRequest(t, "PUT", "/api/canvas/briefing", body, canvasID, "")
 	w := httptest.NewRecorder()
 	h.SetBriefing(w, r)

@@ -371,7 +371,7 @@ func (f *contextFakeStore) GetLinkedEntities(context.Context, uuid.UUID, []uuid.
 func getContext(t *testing.T, fake *contextFakeStore, query string) (int, contextMsg) {
 	t.Helper()
 	fake.calls = make(chan string, 32)
-	h := NewHandler(fake, ws.NewHub(), nil)
+	h := NewHandler(fake, ws.NewHub())
 	r := httptest.NewRequest("GET", "/api/canvas/context"+query, nil)
 	r = r.WithContext(context.WithValue(r.Context(), claimsKey,
 		&auth.Claims{CanvasID: fake.canvas.ID, Role: "read"}))

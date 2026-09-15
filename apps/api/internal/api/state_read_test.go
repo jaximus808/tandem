@@ -13,15 +13,13 @@ func strptr(s string) *string { return &s }
 func sampleState() *store.CanvasState {
 	rid := uuid.New()
 	nid := uuid.New()
-	pid := uuid.New()
 	did := uuid.New()
 	aid := uuid.New()
 	return &store.CanvasState{
 		Version:      7,
 		Mode:         "roadmap",
-		EnabledModes: []string{"roadmap", "map"},
-		Documents:    map[string]*store.Document{did.String(): {ID: did, Type: "map", Name: "Japan"}},
-		Pins:         map[string]*store.Pin{pid.String(): {ID: pid, DocumentID: &did, Label: strptr("Tokyo Tower")}},
+		EnabledModes: []string{"roadmap", "docs"},
+		Documents:    map[string]*store.Document{did.String(): {ID: did, Type: "notes", Name: "Japan"}},
 		RoadmapItems: map[string]*store.RoadmapItem{rid.String(): {ID: rid, Title: "Fix the state barf"}},
 		Notes:        map[string]*store.Note{nid.String(): {ID: nid, Body: "line one\nline two"}},
 		Actions:      map[string]*store.Action{aid.String(): {ID: aid, Type: "task", State: "done"}},
@@ -56,8 +54,8 @@ func TestProjectStateKeepsOnlyRequested(t *testing.T) {
 	if len(out.RoadmapItems) != 1 {
 		t.Fatalf("requested kind should be present, got %d", len(out.RoadmapItems))
 	}
-	if out.Notes != nil || out.Pins != nil || out.Documents != nil {
-		t.Fatalf("unrequested kinds must be nil, got notes=%v pins=%v documents=%v", out.Notes, out.Pins, out.Documents)
+	if out.Notes != nil || out.Actions != nil || out.Documents != nil {
+		t.Fatalf("unrequested kinds must be nil, got notes=%v actions=%v documents=%v", out.Notes, out.Actions, out.Documents)
 	}
 
 	// documents is a projectable kind.
@@ -75,13 +73,13 @@ func TestSummarizeState(t *testing.T) {
 	if msg.Mode != "roadmap" || msg.Version != 7 {
 		t.Fatalf("summary must carry mode/version, got %q/%d", msg.Mode, msg.Version)
 	}
-	if msg.Counts["roadmapItems"] != 1 || msg.Counts["notes"] != 1 || msg.Counts["events"] != 0 {
+	if msg.Counts["roadmapItems"] != 1 || msg.Counts["notes"] != 1 || msg.Counts["agents"] != 0 {
 		t.Fatalf("counts wrong: %+v", msg.Counts)
 	}
 	if msg.Counts["documents"] != 1 {
 		t.Fatalf("documents count wrong: %+v", msg.Counts)
 	}
-	if got := msg.Names["documents"]; len(got) != 1 || got[0] != "Japan (map)" {
+	if got := msg.Names["documents"]; len(got) != 1 || got[0] != "Japan (notes)" {
 		t.Fatalf("document name should carry type, got %v", got)
 	}
 	if got := msg.Names["roadmapItems"]; len(got) != 1 || got[0] != "Fix the state barf" {
@@ -92,7 +90,7 @@ func TestSummarizeState(t *testing.T) {
 		t.Fatalf("note name should be first line, got %v", got)
 	}
 	// a kind with zero items has no names entry.
-	if _, ok := msg.Names["events"]; ok {
+	if _, ok := msg.Names["agents"]; ok {
 		t.Fatalf("empty kind should not appear in names")
 	}
 	// Actions are counted but deliberately NOT name-listed — "type:state" is
@@ -167,19 +165,17 @@ func TestSummarizeFromStore(t *testing.T) {
 // Items whose display field is blank must summarize to a self-describing
 // placeholder, not an unexplained "" — so the agent knows what the blank means.
 func TestBlankNamesGetFallbackLabels(t *testing.T) {
-	nid, pid, eid, did := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	nid, rid, did := uuid.New(), uuid.New(), uuid.New()
 	st := &store.CanvasState{
-		Documents: map[string]*store.Document{did.String(): {ID: did, Type: "map", Name: ""}},
-		Pins:      map[string]*store.Pin{pid.String(): {ID: pid, Label: nil}},
-		Events:    map[string]*store.Event{eid.String(): {ID: eid, Title: "   "}},
-		Notes:     map[string]*store.Note{nid.String(): {ID: nid, Body: ""}},
+		Documents:    map[string]*store.Document{did.String(): {ID: did, Type: "notes", Name: ""}},
+		RoadmapItems: map[string]*store.RoadmapItem{rid.String(): {ID: rid, Title: "   "}},
+		Notes:        map[string]*store.Note{nid.String(): {ID: nid, Body: ""}},
 	}
 	names := namesFromState(st)
 	cases := map[string]string{
-		"documents": "(untitled) (map)",
-		"pins":      "(unlabeled pin)",
-		"events":    "(untitled event)",
-		"notes":     "(empty note)",
+		"documents":    "(untitled) (notes)",
+		"roadmapItems": "(untitled roadmap item)",
+		"notes":        "(empty note)",
 	}
 	for kind, want := range cases {
 		got := names[kind]

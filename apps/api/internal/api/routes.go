@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/agentcanvas/api/internal/auth"
-	"github.com/agentcanvas/api/internal/maps"
 	"github.com/agentcanvas/api/internal/metrics"
 	"github.com/agentcanvas/api/internal/store"
 	"github.com/agentcanvas/api/internal/webhooks"
@@ -30,19 +29,19 @@ import (
 // the handlers is a no-op. It is created by the CALLER (cmd/server) rather than
 // here because the hub and the webhook delivery worker are built before the
 // router and need the same registry — one process, one set of numbers.
-func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier *auth.GoogleVerifier, cookieSecure bool, mapsReg *maps.Registry, webDistPath string, imageDir string, publicBaseURL string, metricsReg *metrics.Registry, emitter *webhooks.Emitter) http.Handler {
+func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier *auth.GoogleVerifier, cookieSecure bool, webDistPath string, imageDir string, publicBaseURL string, metricsReg *metrics.Registry, emitter *webhooks.Emitter) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(metricsReg.Middleware) // per-route latency, keyed by chi RoutePattern
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		// X-Tandem-Agent is how a caller asserts its agent identity for provenance
 		// (see provenance.go). Node-based agents don't preflight, but a browser-
 		// hosted one would, so it has to be allow-listed here.
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", AgentIdentityHeader},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", AgentIdentityHeader},
 		AllowCredentials: false,
 	}))
 
@@ -62,14 +61,13 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 			metricsReg.RegisterGauge(metrics.GaugeWSClients, hub.ClientCount)
 		}
 	}
-	h := NewHandler(s, hub, mapsReg, hOpts...)
+	h := NewHandler(s, hub, hOpts...)
 	if metricsReg != nil {
 		// Registered after the Handler exists (unlike ws_clients above, whose
 		// source is the hub): parked long-poll waiters live on the Handler.
 		metricsReg.RegisterGauge(metrics.GaugeQueueWaiters, h.QueueWaiterCount)
 	}
-	wsH := NewWSHandler(s, hub, authSvc, mapsReg)
-	mapsH := NewMapsHandler(mapsReg)
+	wsH := NewWSHandler(s, hub, authSvc)
 	authH := NewAuthHandler(s, authSvc, googleVerifier, cookieSecure)
 	oauthH := NewOAuthHandler(s, publicBaseURL)
 
@@ -83,8 +81,6 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 	// (public canvases only).
 	r.With(OptionalUser(authSvc, s)).Post("/api/mcp/auth", mcpAuthHandlerFunc(h, authSvc))
 	r.Get("/ws", wsH.ServeWS)
-	r.Get("/api/maps", mapsH.List)
-	r.Get("/api/maps/{id}", mapsH.Get)
 	r.Get("/api/stats", h.Stats)
 	if metricsReg != nil {
 		// Aggregates only (no canvas data) — open by design.
@@ -198,13 +194,6 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 		r.Post("/api/canvases/{code}/webhooks/{id}/rotate", h.RotateCanvasWebhookSecret)
 	})
 
-	// Sheet export — public by canvas code (matches WS auth model).
-	r.Get("/api/canvas/sheets/{id}/export", h.ExportSheet)
-
-	// Itinerary export — public by canvas code. Doubles as a calendar
-	// subscription URL (Google / Apple / Outlook poll it to stay in sync).
-	r.Get("/api/canvas/{code}/itinerary.ics", h.ExportItineraryICS)
-
 	// ── Inbound status API (TDM-38) ────────────────────────────────────────────
 	// A fleet member with no MCP client — a CI job, a Modal function, a cron
 	// script — reports task status with one curl. Canvas is addressed by CODE
@@ -268,7 +257,6 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 		// the API's numbers. See queue_wait.go.
 		r.Get("/api/canvas/queue/wait", h.WaitForQueue)
 		r.Get("/api/canvas/pending-edits", h.ListPendingEdits)
-		r.Post("/api/canvas/forms/scaffold", h.ScaffoldForm) // computes a spec; no mutation
 		r.Get("/api/canvas/actions", h.ListActions)
 		// Every action-addressing route below takes a uuid OR a ticket ref
 		// ("TDM-21", "tdm-21", "#21", "21") — ResolveTicketRef rewrites the param
@@ -324,26 +312,7 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 			r.Delete("/api/canvas/documents/{ref}", h.DeleteDocument)
 			r.Post("/api/canvas/documents/batch-delete", h.DeleteDocumentsBatch)
 			r.Post("/api/canvas/mode/enable", h.EnableMode)
-			r.Post("/api/canvas/map", h.SetMap)
 			r.Post("/api/canvas/template", h.ApplyTemplate)
-
-			r.Post("/api/canvas/pins", h.CreatePin)
-			r.Post("/api/canvas/pins/batch", h.CreatePinsBatch)
-			r.Post("/api/canvas/pins/batch-update", h.UpdatePinsBatch)
-			r.Post("/api/canvas/pins/batch-delete", h.DeletePinsBatch)
-			r.Patch("/api/canvas/pins/{id}", h.UpdatePin)
-			r.Delete("/api/canvas/pins/{id}", h.DeletePin)
-
-			r.Post("/api/canvas/events", h.CreateEvent)
-			r.Post("/api/canvas/events/batch", h.CreateEventsBatch)
-			r.Post("/api/canvas/events/batch-update", h.UpdateEventsBatch)
-			r.Post("/api/canvas/events/batch-delete", h.DeleteEventsBatch)
-			r.Patch("/api/canvas/events/{id}", h.UpdateEvent)
-			r.Delete("/api/canvas/events/{id}", h.DeleteEvent)
-
-			// Combined pins + events in one write; events reference brand-new
-			// pins by client-supplied clientId (breaks the pin-ID dependency trap).
-			r.Post("/api/canvas/map/batch", h.CreateMapBatch)
 
 			r.Post("/api/canvas/notes", h.CreateNote)
 			r.Post("/api/canvas/notes/batch", h.CreateNotesBatch)
@@ -358,37 +327,6 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 			r.Post("/api/canvas/roadmap-items/batch-delete", h.DeleteRoadmapItemsBatch)
 			r.Patch("/api/canvas/roadmap-items/{id}", h.UpdateRoadmapItem)
 			r.Delete("/api/canvas/roadmap-items/{id}", h.DeleteRoadmapItem)
-
-			r.Post("/api/canvas/sheets", h.CreateSheet)
-			r.Post("/api/canvas/sheets/batch-delete", h.DeleteSheetsBatch)
-			r.Patch("/api/canvas/sheets/{id}", h.UpdateSheet)
-			r.Delete("/api/canvas/sheets/{id}", h.DeleteSheet)
-			r.Post("/api/canvas/sheets/{id}/columns", h.AddSheetColumn)
-			r.Post("/api/canvas/sheets/{id}/columns/batch", h.CreateSheetColumnsBatch)
-			r.Post("/api/canvas/sheet-columns/batch-update", h.UpdateSheetColumnsBatch)
-			r.Post("/api/canvas/sheet-columns/batch-delete", h.DeleteSheetColumnsBatch)
-			r.Patch("/api/canvas/sheets/{id}/columns/{columnId}", h.UpdateSheetColumn)
-			r.Delete("/api/canvas/sheets/{id}/columns/{columnId}", h.DeleteSheetColumn)
-			r.Post("/api/canvas/sheets/{id}/rows/batch", h.CreateSheetRowsBatch)
-			r.Post("/api/canvas/sheet-rows", h.CreateSheetRow)
-			r.Post("/api/canvas/sheet-rows/batch-update", h.UpdateSheetRowsBatch)
-			r.Post("/api/canvas/sheet-rows/batch-delete", h.DeleteSheetRowsBatch)
-			r.Patch("/api/canvas/sheet-rows/{id}", h.UpdateSheetRow)
-			r.Delete("/api/canvas/sheet-rows/{id}", h.DeleteSheetRow)
-
-			r.Post("/api/canvas/charts", h.CreateChart)
-			r.Post("/api/canvas/charts/batch", h.CreateChartsBatch)
-			r.Post("/api/canvas/charts/batch-update", h.UpdateChartsBatch)
-			r.Post("/api/canvas/charts/batch-delete", h.DeleteChartsBatch)
-			r.Patch("/api/canvas/charts/{id}", h.UpdateChart)
-			r.Delete("/api/canvas/charts/{id}", h.DeleteChart)
-
-			// Forms (direct-input layer). submit is the human write path.
-			r.Post("/api/canvas/forms", h.DefineForm)
-			r.Patch("/api/canvas/forms/{id}", h.UpdateForm)
-			r.Delete("/api/canvas/forms/{id}", h.DeleteForm)
-			r.Post("/api/canvas/forms/batch-delete", h.DeleteFormsBatch)
-			r.Post("/api/canvas/forms/{id}/submit", h.SubmitForm)
 
 			// Agents + actions (v1 execution primitive) — proposing mutates.
 			r.Post("/api/canvas/agents", h.RegisterAgent)

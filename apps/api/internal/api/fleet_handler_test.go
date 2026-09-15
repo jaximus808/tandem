@@ -188,7 +188,7 @@ func TestAgentRosterJoinsClaimsAndUnregisteredClaimants(t *testing.T) {
 		},
 	}
 
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ListAgentRoster(w, canvasRequest(t, "GET", "/api/canvas/agents", nil, canvasID, ""))
 	if w.Code != http.StatusOK {
@@ -271,7 +271,7 @@ func TestAgentRosterMatchesClaimantByID(t *testing.T) {
 		actions: []*store.Action{{ID: uuid.New(), Type: "task", State: "executing",
 			Payload: taskPayload("t"), ClaimedBy: ptr(agentID.String()), ClaimedAt: ptr(time.Now().UTC())}},
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ListAgentRoster(w, canvasRequest(t, "GET", "/api/canvas/agents", nil, canvasID, ""))
 	var got rosterMsg
@@ -316,7 +316,7 @@ func TestActivityFeedDerivationAndOrdering(t *testing.T) {
 			CreatedAt: base.Add(2 * time.Minute), UpdatedAt: base.Add(40 * time.Minute)},
 	}}
 
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ListActivity(w, canvasRequest(t, "GET", "/api/canvas/activity", nil, canvasID, ""))
 	if w.Code != http.StatusOK {
@@ -392,7 +392,7 @@ func TestActivityFeedCannotSeeReleasedClaims(t *testing.T) {
 			ProposedBy: "planner-1", ApprovedBy: ptr("human"),
 			CreatedAt: base, UpdatedAt: base.Add(time.Hour)},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ListActivity(w, canvasRequest(t, "GET", "/api/canvas/activity", nil, canvasID, ""))
 	var got activityMsgList
@@ -420,7 +420,7 @@ func TestActivityFeedLimit(t *testing.T) {
 			UpdatedAt: base.Add(time.Duration(i) * time.Minute),
 		})
 	}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ListActivity(w, canvasRequest(t, "GET", "/api/canvas/activity?limit=2", nil, canvasID, ""))
 	var got activityMsgList
@@ -521,7 +521,7 @@ func TestTransitionsBroadcastActivity(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hub := ws.NewHub() // deliberately not Run() — see DrainBroadcasts
-			h := NewHandler(newFake(), hub, nil)
+			h := NewHandler(newFake(), hub)
 			w := httptest.NewRecorder()
 			tc.call(h, w, canvasRequest(t, "PATCH", "/api/canvas/actions", tc.body, canvasID, tc.id.String()))
 			if w.Code != http.StatusOK {
@@ -554,7 +554,7 @@ func TestTransitionsBroadcastActivity(t *testing.T) {
 func TestProposeBroadcastsProposedAndBornApproved(t *testing.T) {
 	canvasID := uuid.New()
 	hub := ws.NewHub()
-	h := NewHandler(&fleetFakeStore{}, hub, nil)
+	h := NewHandler(&fleetFakeStore{}, hub)
 	w := httptest.NewRecorder()
 	body := map[string]any{
 		"type": "task", "state": "approved", "proposedBy": "jaxon",
@@ -580,7 +580,7 @@ func TestProposeBroadcastsProposedAndBornApproved(t *testing.T) {
 func TestProposeGatedBroadcastsOnce(t *testing.T) {
 	canvasID := uuid.New()
 	hub := ws.NewHub()
-	h := NewHandler(&fleetFakeStore{}, hub, nil)
+	h := NewHandler(&fleetFakeStore{}, hub)
 	w := httptest.NewRecorder()
 	body := map[string]any{
 		"type": "task", "proposedBy": "planner-1",
@@ -607,7 +607,7 @@ func TestIdempotentTransitionDoesNotBroadcastActivity(t *testing.T) {
 			Payload: taskPayload("already approved"), ProposedBy: "planner-1",
 			ApprovedBy: ptr("jaxon")},
 	}}
-	h := NewHandler(fake, hub, nil)
+	h := NewHandler(fake, hub)
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, canvasRequest(t, "POST", "/api/canvas/actions/approve",
 		map[string]any{"approvedBy": "jaxon"}, canvasID, id.String()))
@@ -633,7 +633,7 @@ func TestFleetReadsReachableWithReadOnlyToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}
-	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, "", t.TempDir(), "", nil, nil)
 
 	for _, path := range []string{"/api/canvas/agents", "/api/canvas/activity"} {
 		req := httptest.NewRequest("GET", path, nil)

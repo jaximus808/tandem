@@ -199,7 +199,7 @@ func TestCrossModelApprovalSameModelRefused(t *testing.T) {
 	fake, taskID := crossModelApproveStore(policyPeer, true, map[string]string{
 		"proposer-a": "claude-opus-5", "reviewer-b": "claude-opus-5[1m]",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -224,7 +224,7 @@ func TestCrossModelApprovalDifferentModelSucceeds(t *testing.T) {
 	fake, taskID := crossModelApproveStore(policyPeer, true, map[string]string{
 		"proposer-a": "claude-opus-5", "reviewer-b": "gpt-5-codex",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -253,7 +253,7 @@ func TestCrossModelApprovalUnknownModelFailsOpen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			canvasID := uuid.New()
 			fake, taskID := crossModelApproveStore(policyPeer, true, models)
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			w := httptest.NewRecorder()
 			h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -275,7 +275,7 @@ func TestCrossModelFlagOffIsANoOp(t *testing.T) {
 	fake, taskID := crossModelApproveStore(policyPeer, false, map[string]string{
 		"proposer-a": "claude-opus-5", "reviewer-b": "claude-opus-5",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -295,7 +295,7 @@ func TestCrossModelDoesNotMaskSelfApproval(t *testing.T) {
 	fake, taskID := crossModelApproveStore(policyPeer, true, map[string]string{
 		"proposer-a": "claude-opus-5", "reviewer-b": "claude-opus-5",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:proposer-a"))
@@ -311,7 +311,7 @@ func TestCrossModelHumanApprovalUnaffected(t *testing.T) {
 	fake, taskID := crossModelApproveStore(policyPeer, true, map[string]string{
 		"proposer-a": "claude-opus-5", "reviewer-b": "claude-opus-5",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// canvasRequest stamps a human author, as the board does.
 	w := httptest.NewRecorder()
@@ -350,7 +350,7 @@ func TestCrossModelReworkSameModelRefused(t *testing.T) {
 	fake, taskID := crossModelReworkFake(true, map[string]string{
 		"worker-a": "claude-opus-5", "reviewer-b": "claude-opus-5",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -374,7 +374,7 @@ func TestCrossModelReworkDifferentModelSucceeds(t *testing.T) {
 	fake, taskID := crossModelReworkFake(true, map[string]string{
 		"worker-a": "claude-opus-5", "reviewer-b": "gpt-5-codex",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -393,7 +393,7 @@ func TestCrossModelReworkFlagOffIsANoOp(t *testing.T) {
 	fake, taskID := crossModelReworkFake(false, map[string]string{
 		"worker-a": "claude-opus-5", "reviewer-b": "claude-opus-5",
 	})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -410,7 +410,7 @@ func TestCrossModelReworkFlagOffIsANoOp(t *testing.T) {
 func TestCrossModelReworkUnknownModelFailsOpen(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := crossModelReworkFake(true, map[string]string{"reviewer-b": "claude-opus-5"})
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -433,7 +433,7 @@ func TestAgentModelIndex(t *testing.T) {
 
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{})
 	fake.agents = []*store.Agent{withModel, noModel, blankModel, nil}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	index, err := h.agentModelIndex(context.Background(), uuid.New())
 	if err != nil {
@@ -495,7 +495,7 @@ func TestSetCanvasCrossModelReviewFlag(t *testing.T) {
 				policySetterFakeStore: &policySetterFakeStore{owner: owner},
 				current:               tc.current,
 			}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			body := map[string]any{"approvalPolicy": policyPeer}
 			if tc.send != nil {
 				body["requireCrossModelReview"] = *tc.send

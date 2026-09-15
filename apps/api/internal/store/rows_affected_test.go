@@ -43,15 +43,15 @@ func newRowsStore(t *testing.T, affected string) (Store, func()) {
 	return st, srv.Close
 }
 
-func TestDeletePinReturnsRowsAffected(t *testing.T) {
+func TestDeleteNoteReturnsRowsAffected(t *testing.T) {
 	canvasID, id := uuid.New(), uuid.New()
 
 	t.Run("hit → 1", func(t *testing.T) {
 		st, done := newRowsStore(t, "1")
 		defer done()
-		n, err := st.DeletePin(context.Background(), canvasID, id)
+		n, err := st.DeleteNote(context.Background(), canvasID, id)
 		if err != nil {
-			t.Fatalf("DeletePin: %v", err)
+			t.Fatalf("DeleteNote: %v", err)
 		}
 		if n != 1 {
 			t.Fatalf("rows-affected = %d, want 1", n)
@@ -61,9 +61,9 @@ func TestDeletePinReturnsRowsAffected(t *testing.T) {
 	t.Run("miss (absent / cross-canvas) → 0", func(t *testing.T) {
 		st, done := newRowsStore(t, "0")
 		defer done()
-		n, err := st.DeletePin(context.Background(), canvasID, id)
+		n, err := st.DeleteNote(context.Background(), canvasID, id)
 		if err != nil {
-			t.Fatalf("DeletePin: %v", err)
+			t.Fatalf("DeleteNote: %v", err)
 		}
 		if n != 0 {
 			t.Fatalf("rows-affected = %d, want 0 — a no-op/cross-canvas delete must report 0", n)
@@ -71,14 +71,14 @@ func TestDeletePinReturnsRowsAffected(t *testing.T) {
 	})
 }
 
-func TestUpdatePinReturnsRowsAffected(t *testing.T) {
+func TestUpdateNoteReturnsRowsAffected(t *testing.T) {
 	canvasID, id := uuid.New(), uuid.New()
 	st, done := newRowsStore(t, "1")
 	defer done()
-	label := "x"
-	n, err := st.UpdatePin(context.Background(), canvasID, id, PinPatch{Label: &label})
+	body := "x"
+	n, err := st.UpdateNote(context.Background(), canvasID, id, NotePatch{Body: &body})
 	if err != nil {
-		t.Fatalf("UpdatePin: %v", err)
+		t.Fatalf("UpdateNote: %v", err)
 	}
 	if n != 1 {
 		t.Fatalf("rows-affected = %d, want 1", n)

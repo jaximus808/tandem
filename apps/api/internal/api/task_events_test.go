@@ -348,7 +348,7 @@ func newEventHarness(t *testing.T, policy string, actions ...*store.Action) (*Ha
 		fake.actions[a.ID] = a
 	}
 	em := &recordingEmitter{}
-	return NewHandler(fake, nil, nil, WithTaskEvents(em)), fake, em
+	return NewHandler(fake, nil, WithTaskEvents(em)), fake, em
 }
 
 func proposedTask(title string) *store.Action {
@@ -869,7 +869,7 @@ func TestNilEmitterIsANoOp(t *testing.T) {
 	canvasID := uuid.New()
 	task := proposedTask("no webhooks here")
 	fake := &eventFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{task.ID: task}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, canvasRequest(t, "POST", "/approve",
@@ -907,7 +907,7 @@ func TestRejectEmitsTheVerdictWithItsReason(t *testing.T) {
 	task := proposedTask("rewrite the auth layer")
 	fake := &eventFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{task.ID: task}}
 	em := &recordingEmitter{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	h.events = em
 
 	w := httptest.NewRecorder()
@@ -957,7 +957,7 @@ func TestRejectWithoutAReasonStillFires(t *testing.T) {
 	task := proposedTask("no reason given")
 	fake := &eventFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{task.ID: task}}
 	em := &recordingEmitter{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	h.events = em
 
 	w := httptest.NewRecorder()
@@ -980,7 +980,7 @@ func TestRejectWritesAnAuditEntry(t *testing.T) {
 	canvasID := uuid.New()
 	task := proposedTask("audit me")
 	fake := &eventFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{task.ID: task}}
-	h := NewHandler(fake, nil, nil) // no emitter: the trail is not a webhook feature
+	h := NewHandler(fake, nil) // no emitter: the trail is not a webhook feature
 
 	w := httptest.NewRecorder()
 	h.RejectAction(w, canvasRequest(t, "POST", "/reject",
@@ -1021,7 +1021,7 @@ func TestRefusedRejectEmitsNothingAndWritesNoAudit(t *testing.T) {
 	task := proposedTask("not yours to kill")
 	fake := &eventFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{task.ID: task}}
 	em := &recordingEmitter{}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	h.events = em
 
 	w := httptest.NewRecorder()

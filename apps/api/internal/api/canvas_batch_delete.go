@@ -15,12 +15,9 @@ import (
 // agents blowing the per-turn tool-call limit when they had to call
 // canvas_X_delete once per element.
 //
-// Each request body is {ids:[...]} of the type's id, EXCEPT:
-//   - sheet columns, which are addressed by (sheetId, columnId) — a column id
-//     is local to its sheet — so the body is {items:[{sheetId, columnId}]},
-//     mirroring UpdateSheetColumnsBatch.
-//   - documents, which are addressed by ref (id OR name, matching the single
-//     DELETE /documents/{ref} route), so the body is {refs:[...]}.
+// Each request body is {ids:[...]} of the type's id, EXCEPT documents, which
+// are addressed by ref (id OR name, matching the single DELETE /documents/{ref}
+// route), so the body is {refs:[...]}.
 //
 // Zero/empty ids are skipped, not errors (mirrors the batch-update skip of a
 // missing id). A document ref that doesn't resolve IS an error (404) and
@@ -34,10 +31,9 @@ import (
 // batch partially fails.
 //
 // Execution: the id-keyed deletes run concurrently via runBatch (each row is
-// independent), with the trailing broadcast async (broadcastBatchDelete). Two
-// types stay serial: sheet columns (a read-modify-write of the sheet's JSON
-// array — concurrent removals would clobber) and documents (ref resolution needs
-// the request goroutine to surface a 404). See each handler's note.
+// independent), with the trailing broadcast async (broadcastBatchDelete).
+// Documents stay serial (ref resolution needs the request goroutine to surface
+// a 404). See each handler's note.
 
 // broadcastBatchDelete fires the single trailing state broadcast and writes
 // the list of deleted ids. Callers do all the per-item work first, then hand
@@ -46,69 +42,9 @@ import (
 // moment later off the request goroutine.
 func (h *Handler) broadcastBatchDelete(w http.ResponseWriter, r *http.Request, deleted []string) {
 	// Thin wrapper over finishBatch (no batch error) for the serial handlers that
-	// build their deleted list directly (sheet columns, documents). The parallel
+	// build their deleted list directly (documents). The parallel
 	// handlers call finishBatch themselves so they can surface a partial-batch error.
 	h.finishBatch(w, r, deleted, nil, "deleted")
-}
-
-// POST /api/canvas/pins/batch-delete
-func (h *Handler) DeletePinsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeletePin(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
-}
-
-// POST /api/canvas/events/batch-delete
-func (h *Handler) DeleteEventsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeleteEvent(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
 }
 
 // POST /api/canvas/notes/batch-delete
@@ -171,140 +107,6 @@ func (h *Handler) DeleteRoadmapItemsBatch(w http.ResponseWriter, r *http.Request
 	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
 }
 
-// POST /api/canvas/charts/batch-delete
-func (h *Handler) DeleteChartsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeleteChart(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
-}
-
-// POST /api/canvas/sheets/batch-delete
-func (h *Handler) DeleteSheetsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeleteSheet(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
-}
-
-// POST /api/canvas/sheet-rows/batch-delete
-func (h *Handler) DeleteSheetRowsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeleteSheetRow(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
-}
-
-// POST /api/canvas/sheet-columns/batch-delete
-//
-// Columns are addressed by (sheetId, columnId) — a column id is a string
-// local to its sheet, so unlike the other element types each item must carry
-// its owning sheetId (mirrors UpdateSheetColumnsBatch). Can span multiple
-// sheets in one call.
-//
-// Serial (not parallelized like the id-keyed deletes): a column lives inside its
-// sheet's JSON array, so DeleteSheetColumn is a read-modify-write of that array;
-// two columns of the same sheet removed concurrently would clobber each other.
-func (h *Handler) DeleteSheetColumnsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	type columnItem struct {
-		SheetID  uuid.UUID `json:"sheetId"`
-		ColumnID string    `json:"columnId"`
-	}
-	var body struct {
-		Items []columnItem `json:"items"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.Items) == 0 {
-		writeError(w, http.StatusBadRequest, "items: at least one entry is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.Items)) {
-		return
-	}
-	deleted := make([]string, 0, len(body.Items))
-	for _, item := range body.Items {
-		if item.SheetID == uuid.Nil || item.ColumnID == "" {
-			continue
-		}
-		if _, err := h.store.DeleteSheetColumn(store.WithoutVersionBump(r.Context()), canvasID, item.SheetID, item.ColumnID); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		deleted = append(deleted, item.ColumnID)
-	}
-	h.broadcastBatchDelete(w, r, deleted)
-}
-
 // POST /api/canvas/documents/batch-delete
 //
 // Documents are addressed by ref (id or name), matching the single
@@ -350,36 +152,6 @@ func (h *Handler) DeleteDocumentsBatch(w http.ResponseWriter, r *http.Request) {
 		deleted = append(deleted, doc.ID.String())
 	}
 	h.broadcastBatchDelete(w, r, deleted)
-}
-
-// POST /api/canvas/forms/batch-delete
-func (h *Handler) DeleteFormsBatch(w http.ResponseWriter, r *http.Request) {
-	canvasID := CanvasIDFromCtx(r.Context())
-	var body struct {
-		IDs []uuid.UUID `json:"ids"`
-	}
-	if err := decode(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body.IDs) == 0 {
-		writeError(w, http.StatusBadRequest, "ids: at least one id is required")
-		return
-	}
-	if tooManyBatchItems(w, len(body.IDs)) {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(body.IDs))
-	for _, id := range body.IDs {
-		if id == uuid.Nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	applied, batchErr := runBatchAffected(len(ids), func(i int) (int, error) {
-		return h.store.DeleteForm(store.WithoutVersionBump(r.Context()), canvasID, ids[i])
-	})
-	h.finishBatch(w, r, appliedIDs(applied, func(i int) string { return ids[i].String() }), batchErr, "deleted")
 }
 
 // POST /api/canvas/actions/batch-delete

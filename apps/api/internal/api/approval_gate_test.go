@@ -43,7 +43,7 @@ func TestBornApprovedRefusedForNonHumans(t *testing.T) {
 	for _, tc := range nonHumanAuthors {
 		t.Run("single/"+tc.name, func(t *testing.T) {
 			fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{}}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ProposeAction(w, authoredRequest(t, "POST", "/api/canvas/actions",
 				map[string]any{"type": "task", "state": "approved", "proposedBy": "evil",
@@ -57,7 +57,7 @@ func TestBornApprovedRefusedForNonHumans(t *testing.T) {
 		})
 		t.Run("batch/"+tc.name, func(t *testing.T) {
 			fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{}}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ProposeActionsBatch(w, authoredRequest(t, "POST", "/api/canvas/actions/batch",
 				map[string]any{"actions": []map[string]any{
@@ -83,7 +83,7 @@ func TestApproveRefusedForNonHumans(t *testing.T) {
 			fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{
 				taskID: {ID: taskID, Type: "task", State: "proposed"},
 			}}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ApproveAction(w, authoredRequest(t, "POST", "/api/canvas/actions/"+taskID.String()+"/approve",
 				map[string]any{"approvedBy": "human"}, canvasID, taskID.String(), tc.author))
@@ -105,7 +105,7 @@ func TestApproveBatchRefusedForNonHumans(t *testing.T) {
 			fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{
 				taskID: {ID: taskID, Type: "task", State: "proposed"},
 			}}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ApproveActionsBatch(w, authoredRequest(t, "POST", "/api/canvas/actions/approve-batch",
 				map[string]any{"ids": []string{taskID.String()}}, canvasID, "", tc.author))
@@ -127,7 +127,7 @@ func TestRejectRefusedForNonHumans(t *testing.T) {
 			fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{
 				taskID: {ID: taskID, Type: "task", State: "proposed"},
 			}}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.RejectAction(w, authoredRequest(t, "POST", "/api/canvas/actions/"+taskID.String()+"/reject",
 				map[string]any{"reason": "no"}, canvasID, taskID.String(), tc.author))
@@ -147,7 +147,7 @@ func TestRejectRefusedForNonHumans(t *testing.T) {
 func TestAgentCanStillPropose(t *testing.T) {
 	canvasID := uuid.New()
 	fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	h.ProposeAction(w, authoredRequest(t, "POST", "/api/canvas/actions",
 		map[string]any{"type": "task", "payload": map[string]any{"title": "normal work"}},
@@ -171,7 +171,7 @@ func TestHumanApproveStampsProvenance(t *testing.T) {
 	fake := &policyFakeStore{policy: "strict", actions: map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed"},
 	}}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 	w := httptest.NewRecorder()
 	// Body tries to forge a different approver; it must be ignored.
 	h.ApproveAction(w, authoredRequest(t, "POST", "/api/canvas/actions/"+taskID.String()+"/approve",

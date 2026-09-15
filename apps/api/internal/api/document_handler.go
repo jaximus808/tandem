@@ -14,22 +14,21 @@ import (
 
 // Documents are the named, multi-instance tabs of a canvas (migration 0024).
 // This file is the "MCP document targeting" surface (roadmap item 7): agents
-// list / create / address documents by id OR name ("the budget sheet"), and
-// content-creating tools can target which document a new pin/note/event/roadmap
-// item lands in.
+// list / create / address documents by id OR name ("the design notes"), and
+// content-creating tools can target which document a new note/roadmap item
+// lands in.
 
-// docTypesCreatable are the types canvas_document_add can mint directly. Charts
-// are excluded: a chart needs a source sheet, so it's born from canvas_chart_add.
-// A "folder" is creatable — it holds no content, only nests other documents
+// docTypesCreatable are the types canvas_document_add can mint directly. A
+// "folder" is creatable — it holds no content, only nests other documents
 // (item 8.5).
 var docTypesCreatable = map[string]bool{
-	"map": true, "notes": true, "itinerary": true, "roadmap": true, "sheet": true, "folder": true,
+	"notes": true, "roadmap": true, "folder": true,
 }
 
 // defaultDocNames names an auto-created singleton document when content is added
-// without targeting one (e.g. first pin on a fresh canvas → a "Map" document).
+// without targeting one (e.g. first note on a fresh canvas → a "Notes" document).
 var defaultDocNames = map[string]string{
-	"map": "Map", "notes": "Notes", "itinerary": "Itinerary", "roadmap": "Roadmap", "folder": "Folder",
+	"notes": "Notes", "roadmap": "Roadmap", "folder": "Folder",
 }
 
 // resolveDocumentRef finds a document on the canvas by a ref that may be a UUID
@@ -124,7 +123,7 @@ func ensureDefaultDocInList(ctx context.Context, st store.Store, canvasID uuid.U
 		name = docType
 	}
 	// Provenance (TDM-40) rides the ctx rather than a parameter: this helper sits
-	// under half a dozen create paths (notes, pins, events, roadmap, the WS ops)
+	// under several create paths (notes, roadmap, the WS ops)
 	// and threading an argument through all of them would touch far more code
 	// than the feature is worth. AuthorFromCtx is nil when the caller's route has
 	// no Provenance middleware, which stores as NULL = unknown.
@@ -184,7 +183,7 @@ func typeOrDoc(typeFilter string) string {
 // resolveParentFolder turns a parent-folder ref (id or name) into a *uuid.UUID.
 // An empty ref — or the sentinels "root"/"none" — means the root (nil). A
 // non-empty ref must resolve to a `folder` document; anything else errors so a
-// caller can't accidentally nest a document under, say, a sheet.
+// caller can't accidentally nest a document under, say, a notes doc.
 func (h *Handler) resolveParentFolder(ctx context.Context, canvasID uuid.UUID, ref string) (*uuid.UUID, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" || strings.EqualFold(ref, "root") || strings.EqualFold(ref, "none") {
@@ -200,7 +199,7 @@ func (h *Handler) resolveParentFolder(ctx context.Context, canvasID uuid.UUID, r
 // attachDocument resolves which document a new child of docType belongs to and
 // returns its id, or writes a 400 and returns ok=false. ref may be a document id
 // or name; empty ref falls back to (or creates) the canvas's default doc of that
-// type. Used by the content-add handlers to implement "add X to the budget sheet".
+// type. Used by the content-add handlers to implement "add X to the design notes".
 func (h *Handler) attachDocument(w http.ResponseWriter, r *http.Request, canvasID uuid.UUID, docType, ref string) (*uuid.UUID, bool) {
 	docID, err := h.documentForContent(r.Context(), canvasID, docType, ref)
 	if err != nil {
@@ -222,8 +221,7 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"documents": docs})
 }
 
-// POST /api/canvas/documents — create a document (a new tab). For type "sheet"
-// this also mints the empty backing sheet; charts must go through canvas_chart_add.
+// POST /api/canvas/documents — create a document (a new tab).
 func (h *Handler) CreateDocument(w http.ResponseWriter, r *http.Request) {
 	canvasID := CanvasIDFromCtx(r.Context())
 	var body struct {
@@ -239,12 +237,8 @@ func (h *Handler) CreateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Type = strings.TrimSpace(body.Type)
-	if body.Type == "chart" {
-		writeError(w, http.StatusBadRequest, "create charts with canvas_chart_add — a chart needs a source sheet")
-		return
-	}
 	if !docTypesCreatable[body.Type] {
-		writeError(w, http.StatusBadRequest, "invalid document type: "+body.Type+" (map, notes, itinerary, roadmap, sheet, folder)")
+		writeError(w, http.StatusBadRequest, "invalid document type: "+body.Type+" (notes, roadmap, folder)")
 		return
 	}
 	// Optionally nest the new document under a folder (item 8.5).
@@ -274,31 +268,6 @@ func (h *Handler) CreateDocument(w http.ResponseWriter, r *http.Request) {
 		sortOrder = nextDocSortOrder(docs)
 	}
 
-	// A sheet document is 1:1 with a sheet row — create the sheet and let the
-	// store mint the matching document (keeps the pairing in one place).
-	//
-	// KNOWN GAP (TDM-40): that store-minted document gets authored_by NULL,
-	// because store.CreateSheet builds it from the Sheet and has no request
-	// context. Sheets aren't in the provenance-chip surface, and NULL is the
-	// vocabulary's honest "unknown" — better than stamping the sheet's freeform
-	// createdBy and pretending it was derived.
-	if body.Type == "sheet" {
-		sh := &store.Sheet{ID: uuid.New(), Kind: "sheet", Name: body.Name,
-			Columns: []store.SheetColumn{}, SortOrder: sortOrder, CreatedBy: body.CreatedBy}
-		if _, err := h.store.CreateSheet(r.Context(), canvasID, sh); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if parentID != nil {
-			_, _ = h.store.UpdateDocument(r.Context(), canvasID, *sh.DocumentID,
-				store.DocumentPatch{ParentID: parentID, SetParent: true})
-		}
-		broadcastStateAsync(r.Context(), h.store, h.hub, canvasID)
-		doc, _ := h.store.GetDocument(r.Context(), canvasID, *sh.DocumentID)
-		writeJSON(w, http.StatusCreated, map[string]any{"document": doc, "sheetId": sh.ID})
-		return
-	}
-
 	doc := &store.Document{ID: uuid.New(), Kind: "document", Type: body.Type,
 		Name: body.Name, Config: body.Config, ParentID: parentID, SortOrder: sortOrder,
 		// Provenance (TDM-40): derived from the auth context, never from the body.
@@ -314,10 +283,7 @@ func (h *Handler) CreateDocument(w http.ResponseWriter, r *http.Request) {
 // POST /api/canvas/documents/batch — create many documents (new tabs) in one
 // shot. The whole array persists via a single bulk INSERT and fires ONE state
 // broadcast, so an N-document batch costs one full-canvas reload instead of N.
-// Documents ARE the doc — there's no target-doc resolution the way pins/events
-// need. Unlike CreateDocument, this does not special-case type "sheet" (which
-// mints a paired sheet + document via CreateSheet, not a plain document row) —
-// route sheet creation through the single canvas_document_add instead.
+// Documents ARE the doc — there's no target-doc resolution the way notes need.
 func (h *Handler) CreateDocumentsBatch(w http.ResponseWriter, r *http.Request) {
 	canvasID := CanvasIDFromCtx(r.Context())
 	var body struct {
@@ -363,16 +329,8 @@ func (h *Handler) CreateDocumentsBatch(w http.ResponseWriter, r *http.Request) {
 	for i := range body.Documents {
 		item := body.Documents[i]
 		item.Type = strings.TrimSpace(item.Type)
-		if item.Type == "chart" {
-			writeError(w, http.StatusBadRequest, "create charts with canvas_chart_add_batch — a chart needs a source sheet")
-			return
-		}
-		if item.Type == "sheet" {
-			writeError(w, http.StatusBadRequest, "sheet documents can't be batched (each needs a paired sheet) — create them individually with canvas_document_add")
-			return
-		}
 		if !docTypesCreatable[item.Type] {
-			writeError(w, http.StatusBadRequest, "invalid document type: "+item.Type+" (map, notes, itinerary, roadmap, folder)")
+			writeError(w, http.StatusBadRequest, "invalid document type: "+item.Type+" (notes, roadmap, folder)")
 			return
 		}
 		var parentID *uuid.UUID

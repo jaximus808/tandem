@@ -461,7 +461,7 @@ func TestGetGitHubStatusHandler(t *testing.T) {
 	gh := newFakeGitHub(t, map[string]fakeGitHubResponse{
 		"/repos/o/r/pulls/12": {http.StatusOK, fixtureMergedPR},
 	})
-	h := NewHandler(nil, nil, nil)
+	h := NewHandler(nil, nil)
 	h.github = gh.clientFor(time.Now)
 
 	w := httptest.NewRecorder()
@@ -484,7 +484,7 @@ func TestGetGitHubStatusHandler(t *testing.T) {
 // A URL this endpoint cannot address is the ONLY 400 — everything else degrades
 // to a 200 unknown so a card never sprouts an error because GitHub blinked.
 func TestGetGitHubStatusRejectsUnaddressableURLs(t *testing.T) {
-	h := NewHandler(nil, nil, nil)
+	h := NewHandler(nil, nil)
 	h.github = newFakeGitHub(t, nil).clientFor(time.Now)
 
 	for _, raw := range []string{
@@ -509,7 +509,7 @@ func TestGetGitHubStatusRejectsUnaddressableURLs(t *testing.T) {
 
 func TestGetGitHubStatusUpstreamDownIsATwoHundred(t *testing.T) {
 	gh := newFakeGitHub(t, nil) // every path 404s
-	h := NewHandler(nil, nil, nil)
+	h := NewHandler(nil, nil)
 	h.github = gh.clientFor(time.Now)
 
 	w := httptest.NewRecorder()
@@ -530,7 +530,7 @@ func TestGetGitHubStatusUpstreamDownIsATwoHundred(t *testing.T) {
 // ever registers a POST/PATCH/DELETE under it — a "sync back", a webhook
 // registration — this fails, which is the whole point of pinning it.
 func TestGitHubStatusRouteIsGetOnly(t *testing.T) {
-	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-45", time.Hour), nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-45", time.Hour), nil, false, "", t.TempDir(), "", nil, nil)
 	mux, ok := r.(*chi.Mux)
 	if !ok {
 		t.Fatal("NewRouter no longer returns a *chi.Mux; this route-walk test needs updating")

@@ -240,7 +240,7 @@ func TestEpicMoveCannotLeaveProposed(t *testing.T) {
 			canvasID := uuid.New()
 			epic := epicIn("proposed")
 			f := newEpicMoveStore(epic)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": to})
 			if w.Code != http.StatusBadRequest {
@@ -317,7 +317,7 @@ func TestEpicMoveDoneToApprovedRefused(t *testing.T) {
 	epic := epicIn("done")
 	task := epicTask(epic.ID, "approved", epicApprovalStamp, 1)
 	f := newEpicMoveStore(epic, task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": "approved"})
 	if w.Code != http.StatusBadRequest {
@@ -360,7 +360,7 @@ func TestEpicMoveTransitions(t *testing.T) {
 			canvasID := uuid.New()
 			epic := epicIn(tc.from)
 			f := newEpicMoveStore(epic)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": tc.to})
 			if w.Code != http.StatusOK {
@@ -392,7 +392,7 @@ func TestEpicRetireStoresReasonAndReviveClearsIt(t *testing.T) {
 	canvasID := uuid.New()
 	epic := epicIn("done")
 	f := newEpicMoveStore(epic)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := moveEpicJSON(t, h, canvasID, epic.ID,
 		map[string]any{"to": "rejected", "reason": "shipped behind a flag we then deleted"})
@@ -428,7 +428,7 @@ func TestEpicMoveIsIdempotent(t *testing.T) {
 	canvasID := uuid.New()
 	epic := epicIn("proposed")
 	f := newEpicMoveStore(epic)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusOK {
@@ -461,7 +461,7 @@ func TestEpicUnapproveCascadeBoundary(t *testing.T) {
 	claimedApproved.ClaimedBy = ptr("worker-9")
 
 	f := newEpicMoveStore(epic, other, ready, executing, finished, byHuman, stillProposed, elsewhere, claimedApproved)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveEpicJSON(t, h, canvasID, epic.ID,
 		map[string]any{"to": "proposed", "reason": "the plan changed"})
@@ -517,7 +517,7 @@ func TestEpicCascadeRunsOnEveryMoveAndNeverRejects(t *testing.T) {
 			epic := epicIn("done")
 			ready := epicTask(epic.ID, "approved", epicApprovalStamp, 1)
 			f := newEpicMoveStore(epic, ready)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, _ := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": to})
 			if w.Code != http.StatusOK {
@@ -537,7 +537,7 @@ func TestEpicMoveSurvivesACascadeFailure(t *testing.T) {
 	epic := epicIn("approved")
 	f := newEpicMoveStore(epic)
 	f.cascadeErr = fmt.Errorf("supabase said no")
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusOK {
@@ -562,7 +562,7 @@ func TestEpicMoveIsHumanOnly(t *testing.T) {
 			epic := epicIn("approved")
 			task := epicTask(epic.ID, "approved", epicApprovalStamp, 1)
 			f := newEpicMoveStore(epic, task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			r := epicMoveRequest(t, canvasID, epic.ID, map[string]any{"to": "proposed"})
 			r = r.WithContext(WithAuthor(r.Context(), author))
@@ -594,7 +594,7 @@ func TestEpicMoveRefusals(t *testing.T) {
 	epic := epicIn("approved")
 	task := epicTask(epic.ID, "approved", epicApprovalStamp, 1)
 	f := newEpicMoveStore(epic, task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	t.Run("target required", func(t *testing.T) {
 		w, body := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{})
@@ -659,7 +659,7 @@ func TestEpicMoveRefusals(t *testing.T) {
 		}
 		raced.moveErr = fmt.Errorf("%w: cannot move epic from %q to %q (it is %q now)",
 			store.ErrIllegalActionState, "approved", "proposed", "done")
-		rh := NewHandler(raced, nil, nil)
+		rh := NewHandler(raced, nil)
 		w, body := moveEpicJSON(t, rh, canvasID, id, map[string]any{"to": "proposed"})
 		if w.Code != http.StatusBadRequest || body["error"] != "epic_move_illegal" {
 			t.Fatalf("status %d body %v, want 400 epic_move_illegal", w.Code, body)
@@ -676,7 +676,7 @@ func TestEpicMoveRecordsTheAudit(t *testing.T) {
 	canvasID := uuid.New()
 	epic := epicIn("approved")
 	f := newEpicMoveStore(epic)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	reason := "the messaging half is a separate service — see the note on the batch"
 	w, _ := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": "proposed", "reason": reason})
@@ -716,7 +716,7 @@ func TestEpicMoveWithoutAReasonStillAudits(t *testing.T) {
 	canvasID := uuid.New()
 	epic := epicIn("rejected")
 	f := newEpicMoveStore(epic)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := moveEpicJSON(t, h, canvasID, epic.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusOK {

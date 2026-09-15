@@ -158,7 +158,7 @@ func spoof(body map[string]any) map[string]any {
 
 func TestCreateTaskIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/actions",
 		spoof(map[string]any{"type": "task", "proposedBy": "human", "payload": map[string]any{"title": "spoofed"}}),
 		asAgent("rogue-agent"))
@@ -170,7 +170,7 @@ func TestCreateTaskIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 
 func TestProposeActionsBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/actions/batch", map[string]any{
 		"actions": []map[string]any{
 			spoof(map[string]any{"type": "task", "payload": map[string]any{"title": "one"}}),
@@ -189,7 +189,7 @@ func TestProposeActionsBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 
 func TestCreateNoteIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/notes",
 		spoof(map[string]any{"body": "spoofed note", "createdBy": "human"}),
 		asAgent("rogue-agent"))
@@ -204,7 +204,7 @@ func TestCreateNoteIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 
 func TestCreateNotesBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/notes/batch", map[string]any{
 		"notes": []map[string]any{
 			spoof(map[string]any{"body": "one"}),
@@ -223,7 +223,7 @@ func TestCreateNotesBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 
 func TestCreateDocumentIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/documents",
 		spoof(map[string]any{"type": "notes", "name": "Spoofed", "createdBy": "human"}),
 		asAgent("rogue-agent"))
@@ -235,7 +235,7 @@ func TestCreateDocumentIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 
 func TestCreateDocumentsBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/documents/batch", map[string]any{
 		"documents": []map[string]any{
 			spoof(map[string]any{"type": "notes", "name": "A"}),
@@ -257,7 +257,7 @@ func TestCreateDocumentsBatchIgnoresClientSuppliedAuthoredBy(t *testing.T) {
 // value a caller can never talk its way into.
 func TestAnonymousCallerCannotClaimHuman(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	r := provRequest(t, "POST", "/api/canvas/actions",
 		spoof(map[string]any{"type": "task", "proposedBy": AuthorHuman, "payload": map[string]any{"title": "trust me"}}),
 		func(*http.Request) {})
@@ -276,7 +276,7 @@ func TestAnonymousCallerCannotClaimHuman(t *testing.T) {
 // produces "human".
 func TestSignedInSessionStampsHuman(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	authSvc := auth.NewService(testSecret, time.Hour)
 	token, err := authSvc.IssueSession(uuid.New(), time.Hour)
 	if err != nil {
@@ -295,7 +295,7 @@ func TestSignedInSessionStampsHuman(t *testing.T) {
 
 func TestCreateResponseSurfacesAuthoredByCamelCase(t *testing.T) {
 	f := newProvFake()
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	w := httptest.NewRecorder()
 	r := provRequest(t, "POST", "/api/canvas/actions",
 		map[string]any{"type": "task", "payload": map[string]any{"title": "readable"}},

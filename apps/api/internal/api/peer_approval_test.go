@@ -161,7 +161,7 @@ func TestPeerApprovalCrossAgentSucceeds(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "proposer-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -188,7 +188,7 @@ func TestPeerApprovalSelfRefused(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "proposer-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:proposer-a"))
@@ -212,7 +212,7 @@ func TestPeerApprovalIgnoresRequestBodyIdentity(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "proposer-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	body := map[string]any{
 		"approvedBy": "human", "authoredBy": "human", "proposedBy": "agent:reviewer-b",
@@ -251,7 +251,7 @@ func TestPeerApprovalIdentityRequirements(t *testing.T) {
 			fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 				taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: proposer},
 			}, tc.roster...)
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			w := httptest.NewRecorder()
 			h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), tc.author))
 			if tc.wantCode == "" {
@@ -280,7 +280,7 @@ func TestPeerApprovalRosterErrorFailsClosed(t *testing.T) {
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "reviewer-b")
 	fake.agentsErr = fmt.Errorf("supabase down")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -299,7 +299,7 @@ func TestPeerApprovalUnknownProposerRefused(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed"}, // legacy row, AuthoredBy nil
 	}, "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -318,7 +318,7 @@ func TestPeerApprovalEpicRefusedAndDoesNotCascade(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		epicID: {ID: epicID, Type: "epic", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "proposer-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, epicID, nil), "agent:reviewer-b"))
@@ -341,7 +341,7 @@ func TestPeerCanvasHumanApprovalUnchanged(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "proposer-a")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// canvasRequest stamps a human author, as the board does.
 	w := httptest.NewRecorder()
@@ -365,7 +365,7 @@ func TestPeerCanvasEpicApprovalDoesNotCascade(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		epicID: {ID: epicID, Type: "epic", State: "proposed"},
 	}, "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, approveRequest(t, canvasID, epicID, nil))
@@ -385,7 +385,7 @@ func TestLegacyPoliciesUnchangedByPeerApproval(t *testing.T) {
 			fake := peerStore(policy, map[uuid.UUID]*store.Action{
 				taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 			}, "proposer-a", "reviewer-b")
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			// A registered, non-self agent — the case 'peer' would allow — is still
 			// refused here, because the canvas never opted in.
@@ -427,7 +427,7 @@ func TestPeerApprovalUnreadablePolicyFailsClosed(t *testing.T) {
 	fake := &peerCanvasErrStore{peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		taskID: {ID: taskID, Type: "task", State: "proposed", AuthoredBy: agentAuthor("proposer-a")},
 	}, "reviewer-b")}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ApproveAction(w, withAgentAuthor(approveRequest(t, canvasID, taskID, nil), "agent:reviewer-b"))
@@ -460,7 +460,7 @@ func TestPeerPolicyDoesNotRelaxTheOtherDoors(t *testing.T) {
 
 	t.Run("born approved", func(t *testing.T) {
 		fake := newFake()
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		w := httptest.NewRecorder()
 		body := map[string]any{"type": "task", "state": "approved", "payload": map[string]any{"title": "self-served"}}
 		h.ProposeAction(w, withAgentAuthor(canvasRequest(t, "POST", "/api/canvas/actions", body, canvasID, ""), "agent:reviewer-b"))
@@ -471,7 +471,7 @@ func TestPeerPolicyDoesNotRelaxTheOtherDoors(t *testing.T) {
 
 	t.Run("reject", func(t *testing.T) {
 		fake := newFake()
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		w := httptest.NewRecorder()
 		h.RejectAction(w, withAgentAuthor(canvasRequest(t, "POST", "/api/canvas/actions/"+taskID.String()+"/reject",
 			map[string]any{"reason": "not mine to kill"}, canvasID, taskID.String()), "agent:reviewer-b"))
@@ -485,7 +485,7 @@ func TestPeerPolicyDoesNotRelaxTheOtherDoors(t *testing.T) {
 
 	t.Run("bulk approve", func(t *testing.T) {
 		fake := newFake()
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		w := httptest.NewRecorder()
 		h.ApproveActionsBatch(w, withAgentAuthor(canvasRequest(t, "POST", "/api/canvas/actions/approve-batch",
 			map[string]any{"ids": []string{taskID.String()}}, canvasID, ""), "agent:reviewer-b"))
@@ -505,7 +505,7 @@ func TestProposeUnderPeerPolicyLandsProposed(t *testing.T) {
 	fake := peerStore(policyPeer, map[uuid.UUID]*store.Action{
 		epicID: {ID: epicID, Type: "epic", State: "approved"},
 	}, "proposer-a")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ProposeAction(w, withAgentAuthor(canvasRequest(t, "POST", "/api/canvas/actions",
@@ -560,7 +560,7 @@ func TestSetCanvasApprovalPolicyAcceptsPeer(t *testing.T) {
 		t.Run("policy="+tc.policy, func(t *testing.T) {
 			owner := uuid.New()
 			fake := &policySetterFakeStore{owner: owner}
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 			r := canvasRequest(t, "PATCH", "/api/canvases/ABCD1234/approval-policy",
 				map[string]any{"approvalPolicy": tc.policy}, uuid.New(), "")
 			r = r.WithContext(context.WithValue(r.Context(), userIDKey, owner))

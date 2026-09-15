@@ -13,13 +13,12 @@ import (
 
 	// Embed Go's tzdata so time.LoadLocation works in any container, regardless
 	// of whether the base image ships system tzdata. Needed for per-event IANA
-	// timezones in the .ics export.
+	// timezones anywhere a location-aware time is rendered.
 	_ "time/tzdata"
 
 	"github.com/agentcanvas/api/internal/api"
 	"github.com/agentcanvas/api/internal/auth"
 	"github.com/agentcanvas/api/internal/config"
-	"github.com/agentcanvas/api/internal/maps"
 	"github.com/agentcanvas/api/internal/metrics"
 	"github.com/agentcanvas/api/internal/store"
 	"github.com/agentcanvas/api/internal/webhooks"
@@ -129,23 +128,12 @@ func main() {
 		log.Printf("WEBHOOKS_ENABLED=false — outbound webhook delivery worker disabled")
 	}
 
-	var mapsReg *maps.Registry
-	if dir := os.Getenv("MAPS_DIR"); dir != "" {
-		mapsReg, err = maps.LoadFromDir(dir)
-	} else {
-		mapsReg, err = maps.LoadEmbedded()
-	}
-	if err != nil {
-		log.Fatalf("maps registry: %v", err)
-	}
-	log.Printf("loaded %d map presets: %v", len(mapsReg.IDs()), mapsReg.IDs())
-
 	// Confidentiality gate for the GitHub status proxy (TDM-140): drop a
 	// GH_STATUS_TOKEN that can read PRIVATE repos BEFORE the (lazily-built) client
 	// reads the env, so the proxy can never surface private-repo state cross-canvas.
 	api.VetGitHubTokenEnv()
 
-	router := api.NewRouter(db, hub, authSvc, googleVerifier, cfg.CookieSecure, mapsReg, cfg.WebDistPath, cfg.ImageDir, cfg.PublicBaseURL, metricsReg, emitter)
+	router := api.NewRouter(db, hub, authSvc, googleVerifier, cfg.CookieSecure, cfg.WebDistPath, cfg.ImageDir, cfg.PublicBaseURL, metricsReg, emitter)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

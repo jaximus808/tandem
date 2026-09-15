@@ -94,7 +94,7 @@ func TestTaskGateMoveCannotLeaveProposed(t *testing.T) {
 			canvasID := uuid.New()
 			task := ownerGateTask("proposed")
 			f := newMoveStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, body := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": to})
 			if w.Code != http.StatusBadRequest {
@@ -199,7 +199,7 @@ func TestTaskGateMoveTransitions(t *testing.T) {
 			canvasID := uuid.New()
 			task := ownerGateTask(tc.from)
 			f := newMoveStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w, body := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed"})
 			if w.Code != http.StatusOK {
@@ -237,7 +237,7 @@ func TestTaskGateReopenClearsClaimAndResult(t *testing.T) {
 		t.Fatalf("fixture is not finished work: %+v", task)
 	}
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := moveTaskJSON(t, h, canvasID, task.ID,
 		map[string]any{"to": "proposed", "reason": "the migration is missing"})
@@ -264,7 +264,7 @@ func TestTaskGateMoveWillNotTouchExecutingWork(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("executing")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusBadRequest || body["error"] != "task_move_illegal" {
@@ -289,7 +289,7 @@ func TestTaskGateMoveIsIdempotent(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("proposed")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, body := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusOK {
@@ -317,7 +317,7 @@ func TestTaskGateMoveIsHumanOnly(t *testing.T) {
 			canvasID := uuid.New()
 			task := ownerGateTask("approved")
 			f := newMoveStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			r := taskGateRequest(t, canvasID, task.ID, map[string]any{"to": "proposed"})
 			r = r.WithContext(WithAuthor(r.Context(), author))
@@ -345,7 +345,7 @@ func TestTaskGateMoveFailsClosedWithoutProvenance(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("approved")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	// canvasRequest stamps a human author; strip it back off.
 	r := taskGateRequest(t, canvasID, task.ID, map[string]any{"to": "proposed"})
@@ -371,7 +371,7 @@ func TestTaskGateMoveRefusals(t *testing.T) {
 		Payload: json.RawMessage(`{"title":"Reversible board states"}`),
 	}
 	f := newMoveStore(task, epic)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	t.Run("target required", func(t *testing.T) {
 		w, body := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{})
@@ -431,7 +431,7 @@ func TestTaskGateMoveRefusals(t *testing.T) {
 	t.Run("failed has no move here", func(t *testing.T) {
 		failed := ownerGateTask("failed")
 		ff := newMoveStore(failed)
-		fh := NewHandler(ff, nil, nil)
+		fh := NewHandler(ff, nil)
 		w, body := moveTaskJSON(t, fh, canvasID, failed.ID, map[string]any{"to": "proposed"})
 		if w.Code != http.StatusBadRequest || body["error"] != "task_move_illegal" {
 			t.Fatalf("status %d body %v, want 400 task_move_illegal", w.Code, body)
@@ -451,7 +451,7 @@ func TestTaskGateMoveRefusals(t *testing.T) {
 		}
 		raced.err = fmt.Errorf("%w: cannot move task from %q to %q (it is %q now)",
 			store.ErrIllegalActionState, "approved", "proposed", "executing")
-		rh := NewHandler(raced, nil, nil)
+		rh := NewHandler(raced, nil)
 		w, body := moveTaskJSON(t, rh, canvasID, id, map[string]any{"to": "proposed"})
 		if w.Code != http.StatusBadRequest || body["error"] != "task_move_illegal" {
 			t.Fatalf("status %d body %v, want 400 task_move_illegal", w.Code, body)
@@ -479,7 +479,7 @@ func (f *racingGateStore) ReopenAction(_ context.Context, _ uuid.UUID, _ uuid.UU
 // static-vs-param resolution chi makes quietly, and a handler nobody can reach
 // passes every test above.
 func TestTaskGateMoveRouteIsRegistered(t *testing.T) {
-	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-190", time.Hour), nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-190", time.Hour), nil, false, "", t.TempDir(), "", nil, nil)
 	mux, ok := r.(*chi.Mux)
 	if !ok {
 		t.Fatal("NewRouter no longer returns a *chi.Mux; this route-walk test needs updating")
@@ -514,7 +514,7 @@ func TestTaskGateMoveRecordsTheAudit(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("approved")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	reason := "the API half landed but the migration is still unwritten — not ready to start"
 	w, _ := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed", "reason": reason})
@@ -554,7 +554,7 @@ func TestTaskGateMoveWithoutAReasonStillAudits(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("rejected")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w, _ := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed"})
 	if w.Code != http.StatusOK {
@@ -576,7 +576,7 @@ func TestTaskGateReopenReasonReachesTheAuthor(t *testing.T) {
 	canvasID := uuid.New()
 	task := ownerGateTask("done")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	reason := "the endpoint works but nothing clears the claim — see TDM-190's brief"
 	w, _ := moveTaskJSON(t, h, canvasID, task.ID, map[string]any{"to": "proposed", "reason": reason})
@@ -612,7 +612,7 @@ func TestTaskGateReviveClearsTheRejection(t *testing.T) {
 	task := ownerGateTask("rejected")
 	task.Error = ptr("out of scope for this batch")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	// It reads back as a rejection before the move…
 	if fb := deriveReviewFeedback(f.get(t, task.ID)); fb == nil || fb.Outcome != reviewRejected {

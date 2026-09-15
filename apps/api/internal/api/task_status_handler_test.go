@@ -234,7 +234,7 @@ func newStatusHarness(t *testing.T, tasks ...*store.Action) (*Handler, *statusFa
 		fake.actions[a.ID] = a
 	}
 	em := &recordingEmitter{}
-	return NewHandler(fake, nil, nil, WithTaskEvents(em)), fake, em, canvasID
+	return NewHandler(fake, nil, WithTaskEvents(em)), fake, em, canvasID
 }
 
 // statusRequest builds a direct-to-handler request: claims in context (as the
@@ -754,7 +754,7 @@ func newStatusRouter(t *testing.T, task *store.Action) (http.Handler, *statusFak
 		patUsers: map[string]uuid.UUID{},
 	}
 	authSvc := auth.NewService("test-secret-for-tdm-38", time.Hour)
-	r := NewRouter(fake, nil, authSvc, nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(fake, nil, authSvc, nil, false, "", t.TempDir(), "", nil, nil)
 	return r, fake, authSvc, canvasID
 }
 

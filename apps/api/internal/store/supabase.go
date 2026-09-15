@@ -90,7 +90,6 @@ type dbCanvas struct {
 	Code        string  `json:"code"`
 	Name        string  `json:"name"`
 	Mode        string  `json:"mode"`
-	MapID       *string `json:"map_id"`
 	OwnerUserID *string `json:"owner_user_id"`
 	ClaimToken  *string `json:"claim_token"`
 	Visibility  string  `json:"visibility"`
@@ -107,37 +106,6 @@ type dbCanvas struct {
 	Version       int             `json:"version"`
 	CreatedAt     string          `json:"created_at"`
 	UpdatedAt     string          `json:"updated_at"`
-}
-
-type dbPin struct {
-	ID         string  `json:"id"`
-	DocumentID *string `json:"document_id"`
-	PinType    string  `json:"pin_type"`
-	Lat        float64 `json:"lat"`
-	Lng        float64 `json:"lng"`
-	Label      *string `json:"label"`
-	Body       *string `json:"body"`
-	Color      *string `json:"color"`
-	CreatedBy  string  `json:"created_by"`
-	UpdatedAt  string  `json:"updated_at"`
-}
-
-type dbEvent struct {
-	ID         string   `json:"id"`
-	DocumentID *string  `json:"document_id"`
-	Title      string   `json:"title"`
-	StartTime  string   `json:"start_time"`
-	EndTime    *string  `json:"end_time"`
-	Timezone   *string  `json:"timezone"`
-	PinIDs     []string `json:"pin_ids"`
-	PinID      *string  `json:"pin_id"`
-	FromPinID  *string  `json:"from_pin_id"`
-	ToPinID    *string  `json:"to_pin_id"`
-	TravelMode *string  `json:"travel_mode"`
-	DayTag     *string  `json:"day_tag"`
-	Cost       *float64 `json:"cost"`
-	CreatedBy  string   `json:"created_by"`
-	UpdatedAt  string   `json:"updated_at"`
 }
 
 type dbNote struct {
@@ -173,68 +141,21 @@ type dbRoadmapItem struct {
 	StaleAfterSeconds *int    `json:"stale_after_seconds"`
 }
 
-type dbSheet struct {
-	ID         string          `json:"id"`
-	DocumentID *string         `json:"document_id"`
-	Name       string          `json:"name"`
-	Columns    json.RawMessage `json:"columns"`
-	SortOrder  int             `json:"sort_order"`
-	CreatedBy  string          `json:"created_by"`
-	UpdatedAt  string          `json:"updated_at"`
-	// sheet_rows is FK'd to sheets (no canvas_id), so PostgREST embeds rows
-	// nested here under each sheet — NOT as a top-level table on the canvas.
-	SheetRows []dbSheetRow `json:"sheet_rows"`
-}
-
-type dbSheetRow struct {
-	ID        string          `json:"id"`
-	SheetID   string          `json:"sheet_id"`
-	Data      json.RawMessage `json:"data"`
-	SortOrder int             `json:"sort_order"`
-	CreatedBy string          `json:"created_by"`
-	UpdatedAt string          `json:"updated_at"`
-}
-
-type dbChart struct {
-	ID         string          `json:"id"`
-	DocumentID *string         `json:"document_id"`
-	Name       string          `json:"name"`
-	SheetID    string          `json:"sheet_id"`
-	ChartType  string          `json:"chart_type"`
-	XColumn    string          `json:"x_column"`
-	YColumns   json.RawMessage `json:"y_columns"`
-	SortOrder  int             `json:"sort_order"`
-	CreatedBy  string          `json:"created_by"`
-	UpdatedAt  string          `json:"updated_at"`
-}
-
-type dbForm struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Fields      json.RawMessage `json:"fields"`
-	Actions     json.RawMessage `json:"actions"`
-	SortOrder   int             `json:"sort_order"`
-	CreatedBy   string          `json:"created_by"`
-	UpdatedAt   string          `json:"updated_at"`
-}
-
 type dbAction struct {
-	ID           string          `json:"id"`
-	Type         string          `json:"type"`
-	State        string          `json:"state"`
-	Payload      json.RawMessage `json:"payload"`
-	ProposedBy   string          `json:"proposed_by"`
-	ApprovedBy   *string         `json:"approved_by"`
-	ClaimedBy    *string         `json:"claimed_by"`
-	ClaimedAt    *string         `json:"claimed_at"`
-	Result       *string         `json:"result"`
-	Error        *string         `json:"error"`
-	LinkedPinIDs json.RawMessage `json:"linked_pin_ids"`
-	Ticket       *int            `json:"ticket"`
-	AuthoredBy   *string         `json:"authored_by"`
-	CreatedAt    string          `json:"created_at"`
-	UpdatedAt    string          `json:"updated_at"`
+	ID         string          `json:"id"`
+	Type       string          `json:"type"`
+	State      string          `json:"state"`
+	Payload    json.RawMessage `json:"payload"`
+	ProposedBy string          `json:"proposed_by"`
+	ApprovedBy *string         `json:"approved_by"`
+	ClaimedBy  *string         `json:"claimed_by"`
+	ClaimedAt  *string         `json:"claimed_at"`
+	Result     *string         `json:"result"`
+	Error      *string         `json:"error"`
+	Ticket     *int            `json:"ticket"`
+	AuthoredBy *string         `json:"authored_by"`
+	CreatedAt  string          `json:"created_at"`
+	UpdatedAt  string          `json:"updated_at"`
 }
 
 type dbAgent struct {
@@ -296,15 +217,8 @@ type dbDocument struct {
 type dbCanvasWithChildren struct {
 	dbCanvas
 	Documents    []dbDocument    `json:"documents"`
-	Pins         []dbPin         `json:"pins"`
-	Events       []dbEvent       `json:"events"`
 	Notes        []dbNote        `json:"notes"`
 	RoadmapItems []dbRoadmapItem `json:"roadmap_items"`
-	Sheets       []dbSheet       `json:"sheets"`
-	// NOTE: sheet rows are NOT a top-level embed — they ride nested inside each
-	// dbSheet.SheetRows (sheet_rows is FK'd to sheets, not canvases).
-	Charts       []dbChart       `json:"charts"`
-	Forms        []dbForm        `json:"forms"`
 	Actions      []dbAction      `json:"actions"`
 	Agents       []dbAgent       `json:"agents"`
 	PendingEdits []dbPendingEdit `json:"pending_edits"`
@@ -426,12 +340,12 @@ func toCanvas(d dbCanvas) *Canvas {
 		}
 	}
 	return &Canvas{ID: id, Code: d.Code, Name: d.Name, Mode: d.Mode,
-		EnabledModes: parseEnabledModes(d.EnabledModes), MapID: d.MapID, OwnerUserID: owner,
+		EnabledModes: parseEnabledModes(d.EnabledModes), OwnerUserID: owner,
 		Visibility: d.Visibility, PublicRole: d.PublicRole,
 		ApprovalPolicy: d.ApprovalPolicy, RequireCrossModelReview: d.RequireCrossModelReview,
 		BriefingDocID: parseUUIDPtr(d.BriefingDocID),
 		Version:       d.Version,
-		CreatedAt: parseTime(d.CreatedAt), UpdatedAt: parseTime(d.UpdatedAt)}
+		CreatedAt:     parseTime(d.CreatedAt), UpdatedAt: parseTime(d.UpdatedAt)}
 }
 
 // parseEnabledModes decodes the enabled_modes jsonb column, which is null on
@@ -443,58 +357,6 @@ func parseEnabledModes(raw json.RawMessage) []string {
 		_ = json.Unmarshal(raw, &modes)
 	}
 	return modes
-}
-
-func toPin(d dbPin) *Pin {
-	id, _ := uuid.Parse(d.ID)
-	return &Pin{ID: id, Kind: "pin", DocumentID: parseUUIDPtr(d.DocumentID),
-		PinType: d.PinType, Lat: d.Lat, Lng: d.Lng,
-		Label: d.Label, Body: d.Body, Color: d.Color,
-		CreatedBy: d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt)}
-}
-
-func toEvent(d dbEvent) *Event {
-	id, _ := uuid.Parse(d.ID)
-	ev := &Event{ID: id, Kind: "event", DocumentID: parseUUIDPtr(d.DocumentID),
-		Title: d.Title, Start: parseTime(d.StartTime),
-		Timezone:   d.Timezone,
-		TravelMode: d.TravelMode,
-		DayTag:     d.DayTag,
-		Cost:       d.Cost,
-		CreatedBy:  d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt)}
-	if d.EndTime != nil {
-		t := parseTime(*d.EndTime)
-		ev.End = &t
-	}
-	if d.PinID != nil {
-		pinID, err := uuid.Parse(*d.PinID)
-		if err == nil {
-			ev.PinID = &pinID
-		}
-	}
-	for _, s := range d.PinIDs {
-		if id, err := uuid.Parse(s); err == nil {
-			ev.PinIDs = append(ev.PinIDs, id)
-		}
-	}
-	// Canonicalize: legacy single-pin events have pin_id but no pin_ids — surface
-	// them through pinIds too so readers only need to look at one field.
-	if len(ev.PinIDs) == 0 && ev.PinID != nil {
-		ev.PinIDs = []uuid.UUID{*ev.PinID}
-	}
-	if d.FromPinID != nil {
-		pinID, err := uuid.Parse(*d.FromPinID)
-		if err == nil {
-			ev.FromPinID = &pinID
-		}
-	}
-	if d.ToPinID != nil {
-		pinID, err := uuid.Parse(*d.ToPinID)
-		if err == nil {
-			ev.ToPinID = &pinID
-		}
-	}
-	return ev
 }
 
 func toNote(d dbNote) *Note {
@@ -539,50 +401,6 @@ func toRoadmapItem(d dbRoadmapItem) *RoadmapItem {
 	return r
 }
 
-func toSheet(d dbSheet) *Sheet {
-	id, _ := uuid.Parse(d.ID)
-	s := &Sheet{ID: id, Kind: "sheet", DocumentID: parseUUIDPtr(d.DocumentID),
-		Name: d.Name, SortOrder: d.SortOrder,
-		CreatedBy: d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt),
-		Columns: []SheetColumn{},
-	}
-	if len(d.Columns) > 0 {
-		_ = json.Unmarshal(d.Columns, &s.Columns)
-	}
-	return s
-}
-
-func toChart(d dbChart) *Chart {
-	id, _ := uuid.Parse(d.ID)
-	sheetID, _ := uuid.Parse(d.SheetID)
-	c := &Chart{ID: id, Kind: "chart", DocumentID: parseUUIDPtr(d.DocumentID),
-		Name: d.Name, SheetID: sheetID, ChartType: d.ChartType,
-		XColumn: d.XColumn, SortOrder: d.SortOrder,
-		CreatedBy: d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt),
-		YColumns: []string{},
-	}
-	if len(d.YColumns) > 0 {
-		_ = json.Unmarshal(d.YColumns, &c.YColumns)
-	}
-	return c
-}
-
-func toForm(d dbForm) *Form {
-	id, _ := uuid.Parse(d.ID)
-	f := &Form{ID: id, Kind: "form",
-		Name: d.Name, Description: d.Description, SortOrder: d.SortOrder,
-		CreatedBy: d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt),
-		Fields: []FormField{}, Actions: []FormAction{},
-	}
-	if len(d.Fields) > 0 {
-		_ = json.Unmarshal(d.Fields, &f.Fields)
-	}
-	if len(d.Actions) > 0 {
-		_ = json.Unmarshal(d.Actions, &f.Actions)
-	}
-	return f
-}
-
 func toAction(d dbAction) *Action {
 	id, _ := uuid.Parse(d.ID)
 	a := &Action{ID: id, Kind: "action",
@@ -591,10 +409,9 @@ func toAction(d dbAction) *Action {
 		ProposedBy: d.ProposedBy, ApprovedBy: d.ApprovedBy,
 		ClaimedBy: d.ClaimedBy,
 		Result:    d.Result, Error: d.Error,
-		LinkedPinIDs: []uuid.UUID{},
-		Ticket:       d.Ticket,
-		AuthoredBy:   d.AuthoredBy,
-		CreatedAt:    parseTime(d.CreatedAt), UpdatedAt: parseTime(d.UpdatedAt),
+		Ticket:     d.Ticket,
+		AuthoredBy: d.AuthoredBy,
+		CreatedAt:  parseTime(d.CreatedAt), UpdatedAt: parseTime(d.UpdatedAt),
 	}
 	if d.ClaimedAt != nil && *d.ClaimedAt != "" {
 		t := parseTime(*d.ClaimedAt)
@@ -602,16 +419,6 @@ func toAction(d dbAction) *Action {
 	}
 	if len(a.Payload) == 0 {
 		a.Payload = json.RawMessage("{}")
-	}
-	if len(d.LinkedPinIDs) > 0 {
-		var ids []string
-		if err := json.Unmarshal(d.LinkedPinIDs, &ids); err == nil {
-			for _, s := range ids {
-				if pid, err := uuid.Parse(s); err == nil {
-					a.LinkedPinIDs = append(a.LinkedPinIDs, pid)
-				}
-			}
-		}
 	}
 	return a
 }
@@ -627,20 +434,6 @@ func toAgent(d dbAgent) *Agent {
 		}
 	}
 	return a
-}
-
-func toSheetRow(d dbSheetRow) *SheetRow {
-	id, _ := uuid.Parse(d.ID)
-	sheetID, _ := uuid.Parse(d.SheetID)
-	r := &SheetRow{ID: id, Kind: "sheetRow", SheetID: sheetID,
-		SortOrder: d.SortOrder,
-		CreatedBy: d.CreatedBy, UpdatedAt: parseTime(d.UpdatedAt),
-		Data: map[string]any{},
-	}
-	if len(d.Data) > 0 {
-		_ = json.Unmarshal(d.Data, &r.Data)
-	}
-	return r
 }
 
 func toUser(d dbUser) *User {
@@ -972,8 +765,8 @@ func (s *supabaseStore) ClaimCanvas(ctx context.Context, code, claimToken string
 }
 
 // DeleteCanvas removes the canvas row; every table that FKs canvases does so with
-// ON DELETE CASCADE, so all content (pins/events/notes/sheets/rows/charts/roadmap/
-// forms/actions/agents/documents/pending_edits), canvas_access rows, and
+// ON DELETE CASCADE, so all content (documents/notes/roadmap/actions/agents/
+// pending_edits), canvas_access rows, and
 // notifications are cleaned up by the DB in the same statement. Owner-only checks
 // live in the handler.
 func (s *supabaseStore) DeleteCanvas(_ context.Context, canvasID uuid.UUID) error {
@@ -982,9 +775,6 @@ func (s *supabaseStore) DeleteCanvas(_ context.Context, canvasID uuid.UUID) erro
 		Eq("id", canvasID.String()))
 }
 
-// CanvasCount returns the total number of canvases. Uses a count=exact HEAD
-// request (Select count="exact", head=true) so no rows are transferred — the
-// total comes back in the Content-Range header, surfaced as Execute's int64.
 func (s *supabaseStore) CanvasCount(_ context.Context) (int, error) {
 	_, count, err := s.client.From("canvases").
 		Select("id", "exact", true).
@@ -1362,7 +1152,7 @@ func (s *supabaseStore) GetCanvasState(_ context.Context, canvasID uuid.UUID) (*
 		// since 0037 added canvases.briefing_doc_id → documents(id), and a bare
 		// documents(*) embed makes PostgREST return a relationship-ambiguity
 		// error object instead of rows.
-		Select("*,documents!documents_canvas_id_fkey(*),pins(*),events(*),notes(*),roadmap_items(*),sheets(*, sheet_rows(*)),charts(*),forms(*),actions(*),agents(*),pending_edits(*)", "", false).
+		Select("*,documents!documents_canvas_id_fkey(*),notes(*),roadmap_items(*),actions(*),agents(*),pending_edits(*)", "", false).
 		Eq("id", canvasID.String()).
 		ExecuteTo(&rows)
 	if err != nil {
@@ -1380,28 +1170,14 @@ func (s *supabaseStore) GetCanvasState(_ context.Context, canvasID uuid.UUID) (*
 		Mode:         canvas.Mode,
 		EnabledModes: canvas.EnabledModes,
 		Documents:    make(map[string]*Document, len(row.Documents)),
-		Pins:         make(map[string]*Pin, len(row.Pins)),
-		Events:       make(map[string]*Event, len(row.Events)),
 		Notes:        make(map[string]*Note, len(row.Notes)),
 		RoadmapItems: make(map[string]*RoadmapItem, len(row.RoadmapItems)),
-		Sheets:       make(map[string]*Sheet, len(row.Sheets)),
-		SheetRows:    make(map[string]*SheetRow),
-		Charts:       make(map[string]*Chart, len(row.Charts)),
-		Forms:        make(map[string]*Form, len(row.Forms)),
 		Actions:      make(map[string]*Action, len(row.Actions)),
 		Agents:       make(map[string]*Agent, len(row.Agents)),
 	}
 	for _, d := range row.Documents {
 		doc := toDocument(d)
 		state.Documents[doc.ID.String()] = doc
-	}
-	for _, d := range row.Pins {
-		p := toPin(d)
-		state.Pins[p.ID.String()] = p
-	}
-	for _, d := range row.Events {
-		e := toEvent(d)
-		state.Events[e.ID.String()] = e
 	}
 	for _, d := range row.Notes {
 		n := toNote(d)
@@ -1410,24 +1186,6 @@ func (s *supabaseStore) GetCanvasState(_ context.Context, canvasID uuid.UUID) (*
 	for _, d := range row.RoadmapItems {
 		r := toRoadmapItem(d)
 		state.RoadmapItems[r.ID.String()] = r
-	}
-	for _, d := range row.Sheets {
-		sh := toSheet(d)
-		state.Sheets[sh.ID.String()] = sh
-		// Rows arrive nested under their sheet (see dbSheet.SheetRows); flatten
-		// them into the canvas-level SheetRows map the frontend expects.
-		for _, rd := range d.SheetRows {
-			sr := toSheetRow(rd)
-			state.SheetRows[sr.ID.String()] = sr
-		}
-	}
-	for _, d := range row.Charts {
-		ch := toChart(d)
-		state.Charts[ch.ID.String()] = ch
-	}
-	for _, d := range row.Forms {
-		f := toForm(d)
-		state.Forms[f.ID.String()] = f
 	}
 	for _, d := range row.Actions {
 		a := toAction(d)
@@ -1474,14 +1232,8 @@ func emptyCanvasState(version int, mode string, enabledModes []string) *CanvasSt
 		Mode:         mode,
 		EnabledModes: enabledModes,
 		Documents:    map[string]*Document{},
-		Pins:         map[string]*Pin{},
-		Events:       map[string]*Event{},
 		Notes:        map[string]*Note{},
 		RoadmapItems: map[string]*RoadmapItem{},
-		Sheets:       map[string]*Sheet{},
-		SheetRows:    map[string]*SheetRow{},
-		Charts:       map[string]*Chart{},
-		Forms:        map[string]*Form{},
 		Actions:      map[string]*Action{},
 		Agents:       map[string]*Agent{},
 	}
@@ -1507,29 +1259,11 @@ func (s *supabaseStore) GetCanvasKinds(_ context.Context, canvasID uuid.UUID, ki
 	if !want["documents"] {
 		state.Documents = nil
 	}
-	if !want["pins"] {
-		state.Pins = nil
-	}
-	if !want["events"] {
-		state.Events = nil
-	}
 	if !want["notes"] {
 		state.Notes = nil
 	}
 	if !want["roadmapItems"] {
 		state.RoadmapItems = nil
-	}
-	if !want["sheets"] {
-		state.Sheets = nil
-	}
-	if !want["sheetRows"] {
-		state.SheetRows = nil
-	}
-	if !want["charts"] {
-		state.Charts = nil
-	}
-	if !want["forms"] {
-		state.Forms = nil
 	}
 	if !want["actions"] {
 		state.Actions = nil
@@ -1566,24 +1300,6 @@ func (s *supabaseStore) loadKind(canvasID uuid.UUID, kind string, state *CanvasS
 			doc := toDocument(d)
 			state.Documents[doc.ID.String()] = doc
 		}
-	case "pins":
-		var rows []dbPin
-		if _, err := s.client.From("pins").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, d := range rows {
-			p := toPin(d)
-			state.Pins[p.ID.String()] = p
-		}
-	case "events":
-		var rows []dbEvent
-		if _, err := s.client.From("events").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, d := range rows {
-			e := toEvent(d)
-			state.Events[e.ID.String()] = e
-		}
 	case "notes":
 		var rows []dbNote
 		if _, err := s.client.From("notes").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
@@ -1601,47 +1317,6 @@ func (s *supabaseStore) loadKind(canvasID uuid.UUID, kind string, state *CanvasS
 		for _, d := range rows {
 			r := toRoadmapItem(d)
 			state.RoadmapItems[r.ID.String()] = r
-		}
-	case "sheets":
-		var rows []dbSheet
-		if _, err := s.client.From("sheets").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, d := range rows {
-			sh := toSheet(d)
-			state.Sheets[sh.ID.String()] = sh
-		}
-	case "sheetRows":
-		// sheet_rows has no canvas_id (it's FK'd to sheets), so pull the rows nested
-		// under this canvas's sheets and flatten them into the canvas-level map —
-		// same shape GetCanvasState produces.
-		var rows []dbSheet
-		if _, err := s.client.From("sheets").Select("id,sheet_rows(*)", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, sh := range rows {
-			for _, rd := range sh.SheetRows {
-				sr := toSheetRow(rd)
-				state.SheetRows[sr.ID.String()] = sr
-			}
-		}
-	case "charts":
-		var rows []dbChart
-		if _, err := s.client.From("charts").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, d := range rows {
-			ch := toChart(d)
-			state.Charts[ch.ID.String()] = ch
-		}
-	case "forms":
-		var rows []dbForm
-		if _, err := s.client.From("forms").Select("*", "", false).Eq("canvas_id", id).ExecuteTo(&rows); err != nil {
-			return err
-		}
-		for _, d := range rows {
-			f := toForm(d)
-			state.Forms[f.ID.String()] = f
 		}
 	case "actions":
 		var rows []dbAction
@@ -1717,36 +1392,6 @@ func (s *supabaseStore) GetCanvasSummary(_ context.Context, canvasID uuid.UUID, 
 			return nil
 		},
 		func() error {
-			var rows []dbPin
-			n, err := s.client.From("pins").Select("id,label", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["pins"] = int(n)
-			for _, d := range rows {
-				p := toPin(d)
-				sum.Sample.Pins[p.ID.String()] = p
-			}
-			return nil
-		},
-		func() error {
-			var rows []dbEvent
-			n, err := s.client.From("events").Select("id,title", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["events"] = int(n)
-			for _, d := range rows {
-				e := toEvent(d)
-				sum.Sample.Events[e.ID.String()] = e
-			}
-			return nil
-		},
-		func() error {
 			var rows []dbNote
 			n, err := s.client.From("notes").Select("id,body", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
 			if err != nil {
@@ -1777,51 +1422,6 @@ func (s *supabaseStore) GetCanvasSummary(_ context.Context, canvasID uuid.UUID, 
 			return nil
 		},
 		func() error {
-			var rows []dbSheet
-			n, err := s.client.From("sheets").Select("id,name", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["sheets"] = int(n)
-			for _, d := range rows {
-				sh := toSheet(d)
-				sum.Sample.Sheets[sh.ID.String()] = sh
-			}
-			return nil
-		},
-		func() error {
-			var rows []dbChart
-			n, err := s.client.From("charts").Select("id,name", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["charts"] = int(n)
-			for _, d := range rows {
-				ch := toChart(d)
-				sum.Sample.Charts[ch.ID.String()] = ch
-			}
-			return nil
-		},
-		func() error {
-			var rows []dbForm
-			n, err := s.client.From("forms").Select("id,name", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["forms"] = int(n)
-			for _, d := range rows {
-				f := toForm(d)
-				sum.Sample.Forms[f.ID.String()] = f
-			}
-			return nil
-		},
-		func() error {
 			var rows []dbAgent
 			n, err := s.client.From("agents").Select("id,name", "exact", false).Eq("canvas_id", id).Order("id", nil).Limit(sampleLimit, "").ExecuteTo(&rows)
 			if err != nil {
@@ -1836,9 +1436,8 @@ func (s *supabaseStore) GetCanvasSummary(_ context.Context, canvasID uuid.UUID, 
 			}
 			return nil
 		},
-		// Count-only kinds: actions are deliberately never name-listed, and sheet_rows
-		// has no name to list — a HEAD count (head=true → no rows transferred) is all
-		// the summary needs.
+		// Count-only kind: actions are deliberately never name-listed — a HEAD
+		// count (head=true → no rows transferred) is all the summary needs.
 		func() error {
 			_, n, err := s.client.From("actions").Select("id", "exact", true).Eq("canvas_id", id).Execute()
 			if err != nil {
@@ -1847,18 +1446,6 @@ func (s *supabaseStore) GetCanvasSummary(_ context.Context, canvasID uuid.UUID, 
 			sumMu.Lock()
 			defer sumMu.Unlock()
 			sum.Counts["actions"] = int(n)
-			return nil
-		},
-		func() error {
-			// sheet_rows is FK'd to sheets (no canvas_id), so scope the count through an
-			// inner join on the parent sheet's canvas_id.
-			_, n, err := s.client.From("sheet_rows").Select("id,sheets!inner(canvas_id)", "exact", true).Eq("sheets.canvas_id", id).Execute()
-			if err != nil {
-				return err
-			}
-			sumMu.Lock()
-			defer sumMu.Unlock()
-			sum.Counts["sheetRows"] = int(n)
 			return nil
 		},
 		func() error {
@@ -1924,23 +1511,9 @@ func (s *supabaseStore) EnableMode(ctx context.Context, canvasID uuid.UUID, mode
 	return s.bumpVersion(ctx, canvasID)
 }
 
-func (s *supabaseStore) SetMapID(ctx context.Context, canvasID uuid.UUID, mapID string) (int, error) {
+func (s *supabaseStore) ApplyTemplate(ctx context.Context, canvasID uuid.UUID, mode string) (int, error) {
 	err := s.exec(s.client.From("canvases").
-		Update(map[string]string{"map_id": mapID}, "minimal", "").
-		Eq("id", canvasID.String()))
-	if err != nil {
-		return 0, err
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) ApplyTemplate(ctx context.Context, canvasID uuid.UUID, mode string, mapID *string) (int, error) {
-	update := map[string]any{"mode": mode}
-	if mapID != nil {
-		update["map_id"] = *mapID
-	}
-	err := s.exec(s.client.From("canvases").
-		Update(update, "minimal", "").
+		Update(map[string]any{"mode": mode}, "minimal", "").
 		Eq("id", canvasID.String()))
 	if err != nil {
 		return 0, err
@@ -1949,8 +1522,8 @@ func (s *supabaseStore) ApplyTemplate(ctx context.Context, canvasID uuid.UUID, m
 }
 
 // LeaveWelcomeIfNeeded transitions a canvas out of `welcome` mode after an entity
-// write (pin/event/note). Idempotent — no-op if the canvas is already in a non-welcome
-// mode. fallbackMode is the mode to transition to (typically map/itinerary/docs based
+// write (note/roadmap item). Idempotent — no-op if the canvas is already in a
+// non-welcome mode. fallbackMode is the mode to transition to (docs/roadmap based
 // on which entity was written).
 func (s *supabaseStore) LeaveWelcomeIfNeeded(ctx context.Context, canvasID uuid.UUID, fallbackMode string) error {
 	c, err := s.GetCanvasByID(ctx, canvasID)
@@ -1960,19 +1533,12 @@ func (s *supabaseStore) LeaveWelcomeIfNeeded(ctx context.Context, canvasID uuid.
 	if c.Mode != "welcome" {
 		return nil
 	}
-	update := map[string]any{"mode": fallbackMode}
-	// If transitioning to map and no preset yet chosen, drop a sensible default
-	if fallbackMode == "map" && c.MapID == nil {
-		update["map_id"] = "us"
-	}
 	err = s.exec(s.client.From("canvases").
-		Update(update, "minimal", "").
+		Update(map[string]any{"mode": fallbackMode}, "minimal", "").
 		Eq("id", canvasID.String()).
 		Eq("mode", "welcome"))
 	return err
 }
-
-// ── Pins ──────────────────────────────────────────────────────────────────────
 
 // ── Documents (migration 0024) ────────────────────────────────────────────────
 
@@ -2001,9 +1567,7 @@ func backfillNullKey(rows []map[string]any, key string) {
 }
 
 // documentRow shapes a Document into its DB row. Shared by the single- and
-// bulk-insert paths (and by CreateCharts, which mints each chart's backing
-// 'chart' document in one bulk documents INSERT rather than one CreateDocument
-// round trip per chart).
+// bulk-insert paths so both stay in lockstep on column mapping.
 func documentRow(canvasID uuid.UUID, d *Document, now time.Time) (map[string]any, error) {
 	cfg := d.Config
 	if cfg == nil {
@@ -2158,238 +1722,6 @@ func (s *supabaseStore) GetDocument(_ context.Context, canvasID, id uuid.UUID) (
 		return nil, fmt.Errorf("document %s not found in canvas %s", id, canvasID)
 	}
 	return toDocument(rows[0]), nil
-}
-
-// pinRow shapes a Pin into its DB row. Shared by the single- and bulk-insert
-// paths so both stay in lockstep on column mapping.
-func pinRow(canvasID uuid.UUID, pin *Pin, now time.Time) map[string]any {
-	return map[string]any{
-		"id": pin.ID.String(), "canvas_id": canvasID.String(),
-		"document_id": uuidPtrStr(pin.DocumentID),
-		"pin_type":    pin.PinType, "lat": pin.Lat, "lng": pin.Lng,
-		"label": pin.Label, "body": pin.Body, "color": pin.Color,
-		"created_by": pin.CreatedBy,
-		"updated_at": now.Format(time.RFC3339),
-	}
-}
-
-func (s *supabaseStore) CreatePin(ctx context.Context, canvasID uuid.UUID, pin *Pin) (int, error) {
-	now := time.Now().UTC()
-	pin.UpdatedAt = now
-	err := s.exec(s.client.From("pins").Insert(pinRow(canvasID, pin, now), false, "", "minimal", ""))
-	if err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "map")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// CreatePins inserts many pins in a SINGLE round trip — one bulk INSERT, one
-// welcome-transition check, one version bump — instead of N of each. The caller
-// (the batch handler) broadcasts once after this returns, so an N-pin itinerary
-// costs one full-canvas reload instead of N. Returns the new canvas version.
-func (s *supabaseStore) CreatePins(ctx context.Context, canvasID uuid.UUID, pins []*Pin) (int, error) {
-	if len(pins) == 0 {
-		return 0, nil
-	}
-	now := time.Now().UTC()
-	rows := make([]map[string]any, 0, len(pins))
-	for _, pin := range pins {
-		pin.UpdatedAt = now
-		rows = append(rows, pinRow(canvasID, pin, now))
-	}
-	if err := s.exec(s.client.From("pins").Insert(rows, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "map")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) UpdatePin(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch PinPatch) (int, error) {
-	m := map[string]any{}
-	if patch.PinType != nil {
-		m["pin_type"] = *patch.PinType
-	}
-	if patch.Lat != nil {
-		m["lat"] = *patch.Lat
-	}
-	if patch.Lng != nil {
-		m["lng"] = *patch.Lng
-	}
-	if patch.Label != nil {
-		m["label"] = *patch.Label
-	}
-	if patch.Body != nil {
-		m["body"] = *patch.Body
-	}
-	if patch.Color != nil {
-		m["color"] = *patch.Color
-	}
-	if len(m) == 0 {
-		return 0, nil
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("pins").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) DeletePin(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	return s.affectedThenBump(ctx, canvasID, s.client.From("pins").
-		Delete("minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-// ── Events ────────────────────────────────────────────────────────────────────
-
-// eventRow shapes an Event into its DB row, canonicalizing the pin list.
-// Shared by the single- and bulk-insert paths. Every key is always present
-// (nil when unset) so that a batch INSERT's rows all share identical key
-// sets — PostgREST's bulk insert (PGRST102) rejects a JSON array whose
-// objects don't all have matching keys.
-func eventRow(canvasID uuid.UUID, ev *Event, now time.Time) map[string]any {
-	// Canonicalize the pin list: prefer PinIDs, fall back to a single PinID.
-	if len(ev.PinIDs) == 0 && ev.PinID != nil {
-		ev.PinIDs = []uuid.UUID{*ev.PinID}
-	}
-	var endTime any
-	if ev.End != nil {
-		endTime = ev.End.Format(time.RFC3339)
-	}
-	var timezone any
-	if ev.Timezone != nil {
-		timezone = *ev.Timezone
-	}
-	var pinID any
-	if ev.PinID != nil {
-		pinID = ev.PinID.String()
-	}
-	var fromPinID any
-	if ev.FromPinID != nil {
-		fromPinID = ev.FromPinID.String()
-	}
-	var toPinID any
-	if ev.ToPinID != nil {
-		toPinID = ev.ToPinID.String()
-	}
-	var travelMode any
-	if ev.TravelMode != nil {
-		travelMode = *ev.TravelMode
-	}
-	var dayTag any
-	if ev.DayTag != nil {
-		dayTag = *ev.DayTag
-	}
-	var cost any
-	if ev.Cost != nil {
-		cost = *ev.Cost
-	}
-	return map[string]any{
-		"id": ev.ID.String(), "canvas_id": canvasID.String(),
-		"document_id": uuidPtrStr(ev.DocumentID),
-		"title":       ev.Title, "start_time": ev.Start.Format(time.RFC3339),
-		"end_time":    endTime,
-		"timezone":    timezone,
-		"pin_ids":     uuidStrings(ev.PinIDs),
-		"pin_id":      pinID,
-		"from_pin_id": fromPinID,
-		"to_pin_id":   toPinID,
-		"travel_mode": travelMode,
-		"day_tag":     dayTag,
-		"cost":        cost,
-		"created_by":  ev.CreatedBy,
-		"updated_at":  now.Format(time.RFC3339),
-	}
-}
-
-func (s *supabaseStore) CreateEvent(ctx context.Context, canvasID uuid.UUID, ev *Event) (int, error) {
-	now := time.Now().UTC()
-	ev.UpdatedAt = now
-	err := s.exec(s.client.From("events").Insert(eventRow(canvasID, ev, now), false, "", "minimal", ""))
-	if err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "itinerary")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// CreateEvents inserts many itinerary entries in a SINGLE round trip — one bulk
-// INSERT, one welcome-transition check, one version bump. The batch handler
-// broadcasts once after this returns. Returns the new canvas version.
-func (s *supabaseStore) CreateEvents(ctx context.Context, canvasID uuid.UUID, events []*Event) (int, error) {
-	if len(events) == 0 {
-		return 0, nil
-	}
-	now := time.Now().UTC()
-	rows := make([]map[string]any, 0, len(events))
-	for _, ev := range events {
-		ev.UpdatedAt = now
-		rows = append(rows, eventRow(canvasID, ev, now))
-	}
-	if err := s.exec(s.client.From("events").Insert(rows, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "itinerary")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) UpdateEvent(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch EventPatch) (int, error) {
-	m := map[string]any{}
-	if patch.Title != nil {
-		m["title"] = *patch.Title
-	}
-	if patch.Start != nil {
-		m["start_time"] = patch.Start.Format(time.RFC3339)
-	}
-	if patch.End != nil {
-		m["end_time"] = patch.End.Format(time.RFC3339)
-	}
-	if patch.Timezone != nil {
-		m["timezone"] = *patch.Timezone
-	}
-	if patch.PinIDs != nil {
-		m["pin_ids"] = uuidStrings(*patch.PinIDs)
-	}
-	if patch.PinID != nil {
-		m["pin_id"] = patch.PinID.String()
-	}
-	if patch.FromPinID != nil {
-		m["from_pin_id"] = patch.FromPinID.String()
-	}
-	if patch.ToPinID != nil {
-		m["to_pin_id"] = patch.ToPinID.String()
-	}
-	if patch.TravelMode != nil {
-		m["travel_mode"] = *patch.TravelMode
-	}
-	if patch.DayTag != nil {
-		m["day_tag"] = *patch.DayTag
-	}
-	if patch.Cost != nil {
-		m["cost"] = *patch.Cost
-	}
-	// Clears win over sets and write a SQL NULL (nil map value → JSON null).
-	if patch.ClearEnd {
-		m["end_time"] = nil
-	}
-	if patch.ClearCost {
-		m["cost"] = nil
-	}
-	if len(m) == 0 {
-		return 0, nil
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("events").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) DeleteEvent(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	return s.affectedThenBump(ctx, canvasID, s.client.From("events").
-		Delete("minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
 }
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
@@ -2928,10 +2260,6 @@ func actionRow(canvasID uuid.UUID, a *Action, now time.Time) (map[string]any, er
 	if len(a.Payload) == 0 {
 		a.Payload = json.RawMessage("{}")
 	}
-	linkedJSON, err := json.Marshal(uuidStrings(a.LinkedPinIDs))
-	if err != nil {
-		return nil, err
-	}
 	var approvedBy any
 	if a.ApprovedBy != nil {
 		approvedBy = *a.ApprovedBy
@@ -2939,11 +2267,10 @@ func actionRow(canvasID uuid.UUID, a *Action, now time.Time) (map[string]any, er
 	row := map[string]any{
 		"id": a.ID.String(), "canvas_id": canvasID.String(),
 		"type": a.Type, "state": a.State,
-		"payload":        json.RawMessage(a.Payload),
-		"proposed_by":    a.ProposedBy,
-		"approved_by":    approvedBy,
-		"linked_pin_ids": json.RawMessage(linkedJSON),
-		"updated_at":     now.Format(time.RFC3339),
+		"payload":     json.RawMessage(a.Payload),
+		"proposed_by": a.ProposedBy,
+		"approved_by": approvedBy,
+		"updated_at":  now.Format(time.RFC3339),
 	}
 	// The ticket key is added only when a ticket was actually reserved, so an
 	// API deployed ahead of migration 0034 (which adds the column) still inserts
@@ -2998,8 +2325,8 @@ func (s *supabaseStore) CreateAction(ctx context.Context, canvasID uuid.UUID, a 
 // CreateActions inserts many actions (e.g. a whole task plan) in a SINGLE
 // round trip — one bulk INSERT, one version bump — instead of N of each. The
 // caller (the batch handler) broadcasts once after this returns. Actions have
-// no `document` target (unlike pins/events), so there's no doc-cache
-// resolution here. Returns the new canvas version.
+// no `document` target, so there is no doc-cache resolution here. Returns the
+// new canvas version.
 func (s *supabaseStore) CreateActions(ctx context.Context, canvasID uuid.UUID, actions []*Action) (int, error) {
 	if len(actions) == 0 {
 		return 0, nil
@@ -3916,774 +3243,6 @@ func (s *supabaseStore) GetLinkedEntities(_ context.Context, canvasID uuid.UUID,
 			VerifiedAt: parseTimePtr(n.VerifiedAt), StaleAfterSeconds: n.StaleAfterSeconds})
 	}
 	return links, nil
-}
-
-// ── Sheets ────────────────────────────────────────────────────────────────────
-
-// sheetBelongsToCanvas verifies a sheet's canvas_id before allowing column/row
-// mutations against it. PostgREST won't filter through embedded selects, so we
-// must check explicitly to prevent cross-canvas writes.
-func (s *supabaseStore) sheetBelongsToCanvas(canvasID, sheetID uuid.UUID) error {
-	var rows []dbSheet
-	_, err := s.client.From("sheets").
-		Select("id", "", false).
-		Eq("id", sheetID.String()).
-		Eq("canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return fmt.Errorf("sheet %s not found in canvas %s", sheetID, canvasID)
-	}
-	return nil
-}
-
-func (s *supabaseStore) getSheet(canvasID, sheetID uuid.UUID) (*Sheet, error) {
-	var rows []dbSheet
-	_, err := s.client.From("sheets").
-		Select("*", "", false).
-		Eq("id", sheetID.String()).
-		Eq("canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("sheet %s not found in canvas %s", sheetID, canvasID)
-	}
-	return toSheet(rows[0]), nil
-}
-
-func (s *supabaseStore) CreateSheet(ctx context.Context, canvasID uuid.UUID, sh *Sheet) (int, error) {
-	cols := sh.Columns
-	if cols == nil {
-		cols = []SheetColumn{}
-	}
-	colsJSON, err := json.Marshal(cols)
-	if err != nil {
-		return 0, err
-	}
-	now := time.Now().UTC()
-	sh.UpdatedAt = now
-	// A sheet is 1:1 with a 'sheet' document (migration 0024) — it's a tab. Mint
-	// the backing document if the caller didn't supply one, so every sheet shows
-	// up in the tab strip / explorer regardless of which entry point created it.
-	if sh.DocumentID == nil {
-		doc := &Document{ID: uuid.New(), Kind: "document", Type: "sheet",
-			Name: sh.Name, SortOrder: sh.SortOrder, CreatedBy: sh.CreatedBy}
-		if _, err := s.CreateDocument(ctx, canvasID, doc); err != nil {
-			return 0, err
-		}
-		sh.DocumentID = &doc.ID
-	}
-	row := map[string]any{
-		"id":          sh.ID.String(),
-		"canvas_id":   canvasID.String(),
-		"document_id": uuidPtrStr(sh.DocumentID),
-		"name":        sh.Name,
-		"columns":     json.RawMessage(colsJSON),
-		"sort_order":  sh.SortOrder,
-		"created_by":  sh.CreatedBy,
-		"updated_at":  now.Format(time.RFC3339),
-	}
-	if err := s.exec(s.client.From("sheets").Insert(row, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "sheets")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) UpdateSheet(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch SheetPatch) (int, error) {
-	m := map[string]any{}
-	if patch.Name != nil {
-		m["name"] = *patch.Name
-	}
-	if patch.SortOrder != nil {
-		m["sort_order"] = *patch.SortOrder
-	}
-	if len(m) == 0 {
-		return 0, nil
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("sheets").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) DeleteSheet(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	// The document is the canonical parent (migration 0024): if this sheet backs a
-	// tab, delete the document so the tab disappears too — the FK cascade takes the
-	// sheet (and its rows) with it. Fall back to a direct delete for any pre-0024
-	// sheet that has no document.
-	if sh, err := s.getSheet(canvasID, id); err == nil && sh.DocumentID != nil {
-		return s.DeleteDocument(ctx, canvasID, *sh.DocumentID)
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("sheets").
-		Delete("minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) AddSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, col SheetColumn) (int, error) {
-	sh, err := s.getSheet(canvasID, sheetID)
-	if err != nil {
-		return 0, err
-	}
-	if col.ID == "" {
-		col.ID = uuid.New().String()
-	}
-	sh.Columns = append(sh.Columns, col)
-	return s.writeSheetColumns(ctx, canvasID, sheetID, sh.Columns)
-}
-
-// CreateSheetColumns appends many columns to a sheet in a SINGLE round trip —
-// one sheet lookup, one columns write, one version bump — instead of N of
-// each. Columns are stored inline in the sheet's `columns` JSONB (there is no
-// separate table to bulk-INSERT into, unlike rows/pins/events), so the win
-// here is collapsing N getSheet+write round trips into one. The caller (the
-// batch handler) broadcasts once after this returns. Returns the new canvas
-// version.
-func (s *supabaseStore) CreateSheetColumns(ctx context.Context, canvasID, sheetID uuid.UUID, cols []SheetColumn) (int, error) {
-	if len(cols) == 0 {
-		return 0, nil
-	}
-	sh, err := s.getSheet(canvasID, sheetID)
-	if err != nil {
-		return 0, err
-	}
-	for i := range cols {
-		if cols[i].ID == "" {
-			cols[i].ID = uuid.New().String()
-		}
-	}
-	sh.Columns = append(sh.Columns, cols...)
-	return s.writeSheetColumns(ctx, canvasID, sheetID, sh.Columns)
-}
-
-func (s *supabaseStore) UpdateSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, columnID string, patch SheetColumnPatch) (int, error) {
-	sh, err := s.getSheet(canvasID, sheetID)
-	if err != nil {
-		return 0, err
-	}
-	found := false
-	for i := range sh.Columns {
-		if sh.Columns[i].ID == columnID {
-			if patch.Name != nil {
-				sh.Columns[i].Name = *patch.Name
-			}
-			if patch.Type != nil {
-				sh.Columns[i].Type = *patch.Type
-			}
-			if patch.SortOrder != nil {
-				sh.Columns[i].SortOrder = *patch.SortOrder
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
-		return 0, fmt.Errorf("column %s not found in sheet %s", columnID, sheetID)
-	}
-	return s.writeSheetColumns(ctx, canvasID, sheetID, sh.Columns)
-}
-
-// DeleteSheetColumn removes the column from the sheet's columns JSONB AND strips
-// the same key from every row's data JSONB. Two writes per affected row.
-func (s *supabaseStore) DeleteSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, columnID string) (int, error) {
-	sh, err := s.getSheet(canvasID, sheetID)
-	if err != nil {
-		return 0, err
-	}
-	filtered := make([]SheetColumn, 0, len(sh.Columns))
-	for _, c := range sh.Columns {
-		if c.ID != columnID {
-			filtered = append(filtered, c)
-		}
-	}
-	if _, err := s.writeSheetColumns(ctx, canvasID, sheetID, filtered); err != nil {
-		return 0, err
-	}
-	// Strip the column from each row's JSONB. Cheap-and-clear approach: fetch
-	// all rows for this sheet, mutate, write back. For sheets with <10k rows
-	// this is fine; if a sheet outgrows that we'd switch to a Postgres function.
-	var rows []dbSheetRow
-	_, err = s.client.From("sheet_rows").
-		Select("*", "", false).
-		Eq("sheet_id", sheetID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return 0, err
-	}
-	for _, r := range rows {
-		var data map[string]any
-		_ = json.Unmarshal(r.Data, &data)
-		if _, ok := data[columnID]; !ok {
-			continue
-		}
-		delete(data, columnID)
-		newJSON, _ := json.Marshal(data)
-		err := s.exec(s.client.From("sheet_rows").
-			Update(map[string]any{"data": json.RawMessage(newJSON)}, "minimal", "").
-			Eq("id", r.ID))
-		if err != nil {
-			return 0, err
-		}
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) writeSheetColumns(ctx context.Context, canvasID, sheetID uuid.UUID, cols []SheetColumn) (int, error) {
-	colsJSON, err := json.Marshal(cols)
-	if err != nil {
-		return 0, err
-	}
-	err = s.exec(s.client.From("sheets").
-		Update(map[string]any{"columns": json.RawMessage(colsJSON)}, "minimal", "").
-		Eq("id", sheetID.String()).
-		Eq("canvas_id", canvasID.String()))
-	if err != nil {
-		return 0, err
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// resolveRowData remaps human-friendly column-name keys in row data to the
-// canonical column.id keys storage uses (the JSONB is keyed by id so renames
-// stay free — see migration 0007). Keys already matching a column id pass
-// through; keys matching a column name (case-insensitive) are rewritten to that
-// column's id; anything unrecognized is left untouched. This lets agents write
-// rows keyed by column name without first looking up the column uuids.
-func resolveRowData(cols []SheetColumn, data map[string]any) map[string]any {
-	if len(data) == 0 || len(cols) == 0 {
-		return data
-	}
-	ids := make(map[string]bool, len(cols))
-	byName := make(map[string]string, len(cols))
-	for _, c := range cols {
-		ids[c.ID] = true
-		byName[strings.ToLower(strings.TrimSpace(c.Name))] = c.ID
-	}
-	out := make(map[string]any, len(data))
-	for k, v := range data {
-		if ids[k] {
-			out[k] = v
-		} else if id, ok := byName[strings.ToLower(strings.TrimSpace(k))]; ok {
-			out[id] = v
-		} else {
-			out[k] = v
-		}
-	}
-	return out
-}
-
-// sheetRowRow shapes a SheetRow into its DB row. Shared by the single- and
-// bulk-insert paths so both stay in lockstep on column mapping. Caller must
-// have already resolved r.Data through resolveRowData.
-func sheetRowRow(r *SheetRow, now time.Time) (map[string]any, error) {
-	dataJSON, err := json.Marshal(r.Data)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"id":         r.ID.String(),
-		"sheet_id":   r.SheetID.String(),
-		"data":       json.RawMessage(dataJSON),
-		"sort_order": r.SortOrder,
-		"created_by": r.CreatedBy,
-		"updated_at": now.Format(time.RFC3339),
-	}, nil
-}
-
-func (s *supabaseStore) CreateSheetRow(ctx context.Context, canvasID uuid.UUID, r *SheetRow) (int, error) {
-	// getSheet both scope-checks the sheet against the canvas and gives us the
-	// column schema needed to resolve name-keyed cell data.
-	sh, err := s.getSheet(canvasID, r.SheetID)
-	if err != nil {
-		return 0, err
-	}
-	now := time.Now().UTC()
-	r.UpdatedAt = now
-	data := resolveRowData(sh.Columns, r.Data)
-	if data == nil {
-		data = map[string]any{}
-	}
-	r.Data = data
-	row, err := sheetRowRow(r, now)
-	if err != nil {
-		return 0, err
-	}
-	if err := s.exec(s.client.From("sheet_rows").Insert(row, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// CreateSheetRows inserts many rows into the SAME sheet in a SINGLE round trip
-// — one sheet lookup (for column-name resolution), one bulk INSERT, one
-// version bump — instead of N of each. The caller (the batch handler) sets
-// every row's SheetID to the one target sheet and broadcasts once after this
-// returns. Returns the new canvas version.
-func (s *supabaseStore) CreateSheetRows(ctx context.Context, canvasID uuid.UUID, rows []*SheetRow) (int, error) {
-	if len(rows) == 0 {
-		return 0, nil
-	}
-	sh, err := s.getSheet(canvasID, rows[0].SheetID)
-	if err != nil {
-		return 0, err
-	}
-	now := time.Now().UTC()
-	dbRows := make([]map[string]any, 0, len(rows))
-	for _, r := range rows {
-		r.UpdatedAt = now
-		data := resolveRowData(sh.Columns, r.Data)
-		if data == nil {
-			data = map[string]any{}
-		}
-		r.Data = data
-		dbRow, err := sheetRowRow(r, now)
-		if err != nil {
-			return 0, err
-		}
-		dbRows = append(dbRows, dbRow)
-	}
-	if err := s.exec(s.client.From("sheet_rows").Insert(dbRows, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// UpdateSheetRow merges patch.Data into the existing row data (rather than
-// replacing wholesale) so partial cell updates don't clobber other cells.
-func (s *supabaseStore) UpdateSheetRow(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch SheetRowPatch) (int, error) {
-	if patch.Data == nil && patch.SortOrder == nil {
-		return 0, nil
-	}
-	// Fetch existing row to scope by canvas and to merge data.
-	var rows []dbSheetRow
-	_, err := s.client.From("sheet_rows").
-		Select("*,sheets!inner(canvas_id)", "", false).
-		Eq("id", id.String()).
-		Eq("sheets.canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return 0, err
-	}
-	if len(rows) == 0 {
-		return 0, fmt.Errorf("sheet row %s not found in canvas %s", id, canvasID)
-	}
-	m := map[string]any{}
-	if patch.Data != nil {
-		// Resolve name-keyed cells to column ids before merging (best-effort:
-		// if the sheet lookup fails we merge the keys as given).
-		if sheetID, perr := uuid.Parse(rows[0].SheetID); perr == nil {
-			if sh, serr := s.getSheet(canvasID, sheetID); serr == nil {
-				patch.Data = resolveRowData(sh.Columns, patch.Data)
-			}
-		}
-		var existing map[string]any
-		_ = json.Unmarshal(rows[0].Data, &existing)
-		if existing == nil {
-			existing = map[string]any{}
-		}
-		for k, v := range patch.Data {
-			if v == nil {
-				delete(existing, k)
-			} else {
-				existing[k] = v
-			}
-		}
-		merged, _ := json.Marshal(existing)
-		m["data"] = json.RawMessage(merged)
-	}
-	if patch.SortOrder != nil {
-		m["sort_order"] = *patch.SortOrder
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("sheet_rows").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()))
-}
-
-func (s *supabaseStore) DeleteSheetRow(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	// Scope-check: use embedded join filter to ensure the row's sheet belongs to canvas.
-	var rows []dbSheetRow
-	_, err := s.client.From("sheet_rows").
-		Select("id,sheets!inner(canvas_id)", "", false).
-		Eq("id", id.String()).
-		Eq("sheets.canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return 0, err
-	}
-	if len(rows) == 0 {
-		return 0, fmt.Errorf("sheet row %s not found in canvas %s", id, canvasID)
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("sheet_rows").
-		Delete("minimal", "exact").
-		Eq("id", id.String()))
-}
-
-func (s *supabaseStore) ReorderSheetRows(ctx context.Context, canvasID, sheetID uuid.UUID, updates []SheetRowReorder) (int, error) {
-	if err := s.sheetBelongsToCanvas(canvasID, sheetID); err != nil {
-		return 0, err
-	}
-	for _, u := range updates {
-		err := s.exec(s.client.From("sheet_rows").
-			Update(map[string]any{"sort_order": u.SortOrder}, "minimal", "").
-			Eq("id", u.ID.String()).
-			Eq("sheet_id", sheetID.String()))
-		if err != nil {
-			return 0, err
-		}
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// ── Charts ────────────────────────────────────────────────────────────────────
-
-func (s *supabaseStore) getChart(canvasID, id uuid.UUID) (*Chart, error) {
-	var rows []dbChart
-	_, err := s.client.From("charts").
-		Select("*", "", false).
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("chart %s not found in canvas %s", id, canvasID)
-	}
-	return toChart(rows[0]), nil
-}
-
-// resolveChartCols maps human-readable column NAMES to SheetColumn ids so agents
-// can pass either. An exact id match wins; otherwise a case-insensitive name
-// match; otherwise the ref is left as-is. Empty x is passed through (used by
-// UpdateChart when only y columns change).
-func (s *supabaseStore) resolveChartCols(canvasID, sheetID uuid.UUID, x string, ys []string) (string, []string) {
-	sh, err := s.getSheet(canvasID, sheetID)
-	if err != nil {
-		return x, ys
-	}
-	resolve := func(ref string) string {
-		ref = strings.TrimSpace(ref)
-		for _, c := range sh.Columns {
-			if c.ID == ref {
-				return ref
-			}
-		}
-		for _, c := range sh.Columns {
-			if strings.EqualFold(strings.TrimSpace(c.Name), ref) {
-				return c.ID
-			}
-		}
-		return ref
-	}
-	rx := x
-	if x != "" {
-		rx = resolve(x)
-	}
-	rys := make([]string, 0, len(ys))
-	for _, y := range ys {
-		if strings.TrimSpace(y) != "" {
-			rys = append(rys, resolve(y))
-		}
-	}
-	return rx, rys
-}
-
-// chartRow shapes a Chart into its DB row. Shared by the single- and
-// bulk-insert paths. Caller must have already resolved ch.XColumn/YColumns
-// (via resolveChartCols) and ch.DocumentID.
-func chartRow(canvasID uuid.UUID, ch *Chart, ysJSON []byte, now time.Time) map[string]any {
-	return map[string]any{
-		"id":          ch.ID.String(),
-		"canvas_id":   canvasID.String(),
-		"document_id": uuidPtrStr(ch.DocumentID),
-		"sheet_id":    ch.SheetID.String(),
-		"name":        ch.Name,
-		"chart_type":  ch.ChartType,
-		"x_column":    ch.XColumn,
-		"y_columns":   json.RawMessage(ysJSON),
-		"sort_order":  ch.SortOrder,
-		"created_by":  ch.CreatedBy,
-		"updated_at":  now.Format(time.RFC3339),
-	}
-}
-
-func (s *supabaseStore) CreateChart(ctx context.Context, canvasID uuid.UUID, ch *Chart) (int, error) {
-	if err := s.sheetBelongsToCanvas(canvasID, ch.SheetID); err != nil {
-		return 0, err
-	}
-	ch.XColumn, ch.YColumns = s.resolveChartCols(canvasID, ch.SheetID, ch.XColumn, ch.YColumns)
-	if ch.YColumns == nil {
-		ch.YColumns = []string{}
-	}
-	ysJSON, err := json.Marshal(ch.YColumns)
-	if err != nil {
-		return 0, err
-	}
-	now := time.Now().UTC()
-	ch.UpdatedAt = now
-	// A chart is 1:1 with a 'chart' document (its tab) — mint one if absent.
-	if ch.DocumentID == nil {
-		doc := &Document{ID: uuid.New(), Kind: "document", Type: "chart",
-			Name: ch.Name, SortOrder: ch.SortOrder, CreatedBy: ch.CreatedBy}
-		if _, err := s.CreateDocument(ctx, canvasID, doc); err != nil {
-			return 0, err
-		}
-		ch.DocumentID = &doc.ID
-	}
-	if err := s.exec(s.client.From("charts").Insert(chartRow(canvasID, ch, ysJSON, now), false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "charts")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-// CreateCharts inserts many charts in a SINGLE round trip for the chart rows —
-// one bulk INSERT, one welcome-transition check, one version bump — instead of
-// N of each. Each chart still needs its own 1:1 backing 'chart' document
-// (mirrors how the single CreateChart mints one when absent), so any charts
-// without a DocumentID have their docs minted together in one bulk documents
-// INSERT first (reusing documentRow) rather than N individual CreateDocument
-// round trips. The caller (the batch handler) broadcasts once after this
-// returns. Returns the new canvas version.
-func (s *supabaseStore) CreateCharts(ctx context.Context, canvasID uuid.UUID, charts []*Chart) (int, error) {
-	if len(charts) == 0 {
-		return 0, nil
-	}
-	now := time.Now().UTC()
-
-	var docRows []map[string]any
-	for _, ch := range charts {
-		if ch.DocumentID != nil {
-			continue
-		}
-		doc := &Document{ID: uuid.New(), Kind: "document", Type: "chart",
-			Name: ch.Name, SortOrder: ch.SortOrder, CreatedBy: ch.CreatedBy, UpdatedAt: now}
-		row, err := documentRow(canvasID, doc, now)
-		if err != nil {
-			return 0, err
-		}
-		docRows = append(docRows, row)
-		ch.DocumentID = &doc.ID
-	}
-	if len(docRows) > 0 {
-		if err := s.exec(s.client.From("documents").Insert(docRows, false, "", "minimal", "")); err != nil {
-			return 0, err
-		}
-	}
-
-	rows := make([]map[string]any, 0, len(charts))
-	for _, ch := range charts {
-		if err := s.sheetBelongsToCanvas(canvasID, ch.SheetID); err != nil {
-			return 0, err
-		}
-		ch.XColumn, ch.YColumns = s.resolveChartCols(canvasID, ch.SheetID, ch.XColumn, ch.YColumns)
-		if ch.YColumns == nil {
-			ch.YColumns = []string{}
-		}
-		ysJSON, err := json.Marshal(ch.YColumns)
-		if err != nil {
-			return 0, err
-		}
-		ch.UpdatedAt = now
-		rows = append(rows, chartRow(canvasID, ch, ysJSON, now))
-	}
-	if err := s.exec(s.client.From("charts").Insert(rows, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	_ = s.LeaveWelcomeIfNeeded(ctx, canvasID, "charts")
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) UpdateChart(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch ChartPatch) (int, error) {
-	m := map[string]any{}
-	if patch.Name != nil {
-		m["name"] = *patch.Name
-	}
-	if patch.ChartType != nil {
-		m["chart_type"] = *patch.ChartType
-	}
-	if patch.SortOrder != nil {
-		m["sort_order"] = *patch.SortOrder
-	}
-
-	// Column refs are resolved against the chart's (possibly new) sheet.
-	if patch.XColumn != nil || patch.YColumns != nil || patch.SheetID != nil {
-		var sheetID uuid.UUID
-		if patch.SheetID != nil {
-			sheetID = *patch.SheetID
-			if err := s.sheetBelongsToCanvas(canvasID, sheetID); err != nil {
-				return 0, err
-			}
-			m["sheet_id"] = sheetID.String()
-		} else {
-			cur, err := s.getChart(canvasID, id)
-			if err != nil {
-				return 0, err
-			}
-			sheetID = cur.SheetID
-		}
-		if patch.XColumn != nil {
-			x, _ := s.resolveChartCols(canvasID, sheetID, *patch.XColumn, nil)
-			m["x_column"] = x
-		}
-		if patch.YColumns != nil {
-			_, ys := s.resolveChartCols(canvasID, sheetID, "", *patch.YColumns)
-			if ys == nil {
-				ys = []string{}
-			}
-			yj, err := json.Marshal(ys)
-			if err != nil {
-				return 0, err
-			}
-			m["y_columns"] = json.RawMessage(yj)
-		}
-	}
-
-	if len(m) == 0 {
-		return 0, nil
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("charts").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) DeleteChart(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	// Canonical delete via the backing 'chart' document (its tab); see DeleteSheet.
-	if ch, err := s.getChart(canvasID, id); err == nil && ch.DocumentID != nil {
-		return s.DeleteDocument(ctx, canvasID, *ch.DocumentID)
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("charts").
-		Delete("minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-// ── Forms (direct-input layer) ──────────────────────────────────────────────
-
-func (s *supabaseStore) CreateForm(ctx context.Context, canvasID uuid.UUID, f *Form) (int, error) {
-	if f.Fields == nil {
-		f.Fields = []FormField{}
-	}
-	if f.Actions == nil {
-		f.Actions = []FormAction{}
-	}
-	fieldsJSON, err := json.Marshal(f.Fields)
-	if err != nil {
-		return 0, err
-	}
-	actionsJSON, err := json.Marshal(f.Actions)
-	if err != nil {
-		return 0, err
-	}
-	now := time.Now().UTC()
-	f.UpdatedAt = now
-	row := map[string]any{
-		"id":          f.ID.String(),
-		"canvas_id":   canvasID.String(),
-		"name":        f.Name,
-		"description": f.Description,
-		"fields":      json.RawMessage(fieldsJSON),
-		"actions":     json.RawMessage(actionsJSON),
-		"sort_order":  f.SortOrder,
-		"created_by":  f.CreatedBy,
-		"updated_at":  now.Format(time.RFC3339),
-	}
-	if err := s.exec(s.client.From("forms").Insert(row, false, "", "minimal", "")); err != nil {
-		return 0, err
-	}
-	return s.bumpVersion(ctx, canvasID)
-}
-
-func (s *supabaseStore) GetForm(_ context.Context, canvasID, id uuid.UUID) (*Form, error) {
-	var rows []dbForm
-	_, err := s.client.From("forms").
-		Select("*", "", false).
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()).
-		ExecuteTo(&rows)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("form %s not found in canvas %s", id, canvasID)
-	}
-	return toForm(rows[0]), nil
-}
-
-func (s *supabaseStore) UpdateForm(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch FormPatch) (int, error) {
-	m := map[string]any{}
-	if patch.Name != nil {
-		m["name"] = *patch.Name
-	}
-	if patch.Description != nil {
-		m["description"] = *patch.Description
-	}
-	if patch.Fields != nil {
-		j, err := json.Marshal(*patch.Fields)
-		if err != nil {
-			return 0, err
-		}
-		m["fields"] = json.RawMessage(j)
-	}
-	if patch.Actions != nil {
-		j, err := json.Marshal(*patch.Actions)
-		if err != nil {
-			return 0, err
-		}
-		m["actions"] = json.RawMessage(j)
-	}
-	if patch.SortOrder != nil {
-		m["sort_order"] = *patch.SortOrder
-	}
-	if len(m) == 0 {
-		return 0, nil
-	}
-	return s.affectedThenBump(ctx, canvasID, s.client.From("forms").
-		Update(m, "minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-func (s *supabaseStore) DeleteForm(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error) {
-	return s.affectedThenBump(ctx, canvasID, s.client.From("forms").
-		Delete("minimal", "exact").
-		Eq("id", id.String()).
-		Eq("canvas_id", canvasID.String()))
-}
-
-// SubmitForm applies a resolved batch via the submit_canvas_form RPC, which
-// re-validates every target's canvas_id, dedupes by submissionID, applies the
-// fan-out, and bumps the version — all in one transaction. Returns the version.
-func (s *supabaseStore) SubmitForm(_ context.Context, canvasID uuid.UUID, batch Batch, submissionID string) (int, error) {
-	batchJSON, err := json.Marshal(batch)
-	if err != nil {
-		return 0, err
-	}
-	params := map[string]any{
-		"p_canvas_id": canvasID.String(),
-		"p_batch":     json.RawMessage(batchJSON),
-	}
-	if submissionID != "" {
-		params["p_submission_id"] = submissionID
-	}
-	result := s.client.Rpc("submit_canvas_form", "", params)
-	if result == "" {
-		return 0, fmt.Errorf("submitForm: empty response — verify migration 0019 is applied")
-	}
-	if isRpcError(result) {
-		return 0, fmt.Errorf("submitForm RPC error: %s", result)
-	}
-	var v int
-	if err := json.Unmarshal([]byte(result), &v); err != nil {
-		return 0, fmt.Errorf("submitForm parse: %w (response: %s)", err, result)
-	}
-	return v, nil
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ func TestContentionHarnessScenario2LeaseExpiry(t *testing.T) {
 	task := fenceTask()
 	fake := newFenceStore(task)
 	reg := metrics.NewRegistry()
-	h := NewHandler(fake, nil, nil, WithMetrics(reg))
+	h := NewHandler(fake, nil, WithMetrics(reg))
 
 	// ── The winner claims, and works. ────────────────────────────────────────
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
@@ -135,7 +135,7 @@ func TestGatewayWithoutAFencingTokenIsNotFencedOnSelfTakeover(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// worker-a → (lapse) → worker-b → (lapse) → worker-a again. The name has come
 	// full circle; the generation has not.

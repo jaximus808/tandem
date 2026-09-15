@@ -61,7 +61,7 @@ type docNotesResp struct {
 // context and {ref} as a chi URL param.
 func readDocNotes(t *testing.T, f *docNotesFakeStore, canvasID uuid.UUID, ref string) (int, docNotesResp) {
 	t.Helper()
-	h := NewHandler(f, ws.NewHub(), nil)
+	h := NewHandler(f, ws.NewHub())
 
 	r := httptest.NewRequest("GET", "/api/canvas/documents/"+ref+"/notes", nil)
 	ctx := context.WithValue(r.Context(), claimsKey, &auth.Claims{CanvasID: canvasID, Role: "read"})
@@ -210,7 +210,7 @@ func TestListDocumentNotes_EmptyTabIsEmptyArray(t *testing.T) {
 // at that position is the kind of thing chi resolves quietly, and a handler
 // nobody can reach passes every test above.
 func TestDocumentNotesRouteIsRegistered(t *testing.T) {
-	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-179", time.Hour), nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(nil, nil, auth.NewService("test-secret-for-tdm-179", time.Hour), nil, false, "", t.TempDir(), "", nil, nil)
 	mux, ok := r.(*chi.Mux)
 	if !ok {
 		t.Fatal("NewRouter no longer returns a *chi.Mux; this route-walk test needs updating")

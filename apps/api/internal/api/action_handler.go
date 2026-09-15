@@ -77,9 +77,10 @@ func (h *Handler) RegisterAgent(w http.ResponseWriter, r *http.Request) {
 
 // validActionStates is the legal state machine, enforced before every write so
 // an out-of-order client can't drive an action into a bad state.
-//   proposed  → approved | rejected
-//   approved  → executing
-//   executing → done | failed
+//
+//	proposed  → approved | rejected
+//	approved  → executing
+//	executing → done | failed
 var validActionStates = map[string]map[string]bool{
 	"proposed":  {"approved": true, "rejected": true},
 	"approved":  {"executing": true},
@@ -230,11 +231,10 @@ func (pr *policyResolver) stamp(payload json.RawMessage) string {
 func (h *Handler) ProposeAction(w http.ResponseWriter, r *http.Request) {
 	canvasID := CanvasIDFromCtx(r.Context())
 	var body struct {
-		Type         string          `json:"type"`
-		State        string          `json:"state"`
-		Payload      json.RawMessage `json:"payload"`
-		ProposedBy   string          `json:"proposedBy"`
-		LinkedPinIDs []uuid.UUID     `json:"linkedPinIds"`
+		Type       string          `json:"type"`
+		State      string          `json:"state"`
+		Payload    json.RawMessage `json:"payload"`
+		ProposedBy string          `json:"proposedBy"`
 	}
 	if err := decode(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -297,8 +297,7 @@ func (h *Handler) ProposeAction(w http.ResponseWriter, r *http.Request) {
 		// Provenance (TDM-40): derived from the auth context by the Provenance
 		// middleware, NOT from the body — note there is no authoredBy field on
 		// the struct above, so a client that sends one is silently ignored.
-		AuthoredBy:   AuthorFromCtx(r.Context()),
-		LinkedPinIDs: body.LinkedPinIDs,
+		AuthoredBy: AuthorFromCtx(r.Context()),
 	}
 	if body.State == "approved" {
 		// Gated to a human above, so stamp the approver from server-derived
@@ -347,11 +346,10 @@ func (h *Handler) ProposeAction(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ProposeActionsBatch(w http.ResponseWriter, r *http.Request) {
 	canvasID := CanvasIDFromCtx(r.Context())
 	type actionItem struct {
-		Type         string          `json:"type"`
-		State        string          `json:"state"`
-		Payload      json.RawMessage `json:"payload"`
-		ProposedBy   string          `json:"proposedBy"`
-		LinkedPinIDs []uuid.UUID     `json:"linkedPinIds"`
+		Type       string          `json:"type"`
+		State      string          `json:"state"`
+		Payload    json.RawMessage `json:"payload"`
+		ProposedBy string          `json:"proposedBy"`
 	}
 	var body struct {
 		Actions []actionItem `json:"actions"`
@@ -420,10 +418,9 @@ func (h *Handler) ProposeActionsBatch(w http.ResponseWriter, r *http.Request) {
 		action := &store.Action{
 			ID: uuid.New(), Kind: "action",
 			Type: item.Type, State: item.State,
-			Payload:      item.Payload,
-			ProposedBy:   item.ProposedBy,
-			AuthoredBy:   author,
-			LinkedPinIDs: item.LinkedPinIDs,
+			Payload:    item.Payload,
+			ProposedBy: item.ProposedBy,
+			AuthoredBy: author,
 		}
 		if item.State == "approved" {
 			// Stamp from server-derived provenance, not the client's proposedBy —

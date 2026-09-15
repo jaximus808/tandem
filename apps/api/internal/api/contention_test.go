@@ -88,7 +88,7 @@ func TestLostClaimIsRecordedOnTheTask(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
 
@@ -133,7 +133,7 @@ func TestLostClaimCounterAndTrailAgree(t *testing.T) {
 	task := fenceTask()
 	fake := newFenceStore(task)
 	reg := metrics.NewRegistry()
-	h := NewHandler(fake, nil, nil, WithMetrics(reg))
+	h := NewHandler(fake, nil, WithMetrics(reg))
 
 	claimVia(t, h, canvasID, task.ID, "worker-a")
 	for _, loser := range []string{"worker-b", "worker-c", "worker-d"} {
@@ -174,7 +174,7 @@ func TestFencedWriteIsRecordedWithBothGenerations(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
 	fake.expireClaim(task.ID)
@@ -224,7 +224,7 @@ func TestStaleGenerationWriteIsRecorded(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA1 := claimVia(t, h, canvasID, task.ID, "worker-a")
 	fake.expireClaim(task.ID)
@@ -257,7 +257,7 @@ func TestRepeatedFencedWritesCoalesceIntoOneEntry(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
 	fake.expireClaim(task.ID)
@@ -293,7 +293,7 @@ func TestHumanControlsRecordNoContention(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	claimVia(t, h, canvasID, task.ID, "worker-a")
 
@@ -312,7 +312,7 @@ func TestSuccessfulAndIdempotentClaimsRecordNothing(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	claimVia(t, h, canvasID, task.ID, "worker-a")
 	claimVia(t, h, canvasID, task.ID, "worker-a") // the retry
@@ -326,7 +326,7 @@ func TestHolderWritesRecordNothing(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 	w := patchTask(t, h, canvasID, task.ID, map[string]any{
@@ -347,7 +347,7 @@ func TestRefusalsStillWorkWithoutAContentionStore(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := &noContentionStore{fenceFakeStore: newFenceStore(task)}
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
 

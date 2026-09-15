@@ -195,7 +195,7 @@ func reworkRequest(t *testing.T, canvasID, id uuid.UUID, body map[string]any) *h
 func TestReworkCrossAgentSucceeds(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	reason := "the migration is missing and the guard fails open on an unreadable policy — " +
 		"redo it with the fail-closed branch and a test that proves it, then re-submit"
@@ -242,7 +242,7 @@ func TestReworkCrossAgentSucceeds(t *testing.T) {
 func TestReworkSelfReviewRefused(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -267,7 +267,7 @@ func TestReworkSelfReviewRefused(t *testing.T) {
 func TestReworkIgnoresRequestBodyIdentity(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	body := map[string]any{
 		"reason": "needs another pass",
@@ -302,7 +302,7 @@ func TestReworkReasonRequired(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			canvasID := uuid.New()
 			fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			w := httptest.NewRecorder()
 			h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID, tc.body), "agent:reviewer-b"))
@@ -326,7 +326,7 @@ func TestReworkRefusedOffPeerPolicy(t *testing.T) {
 		t.Run("policy="+policy, func(t *testing.T) {
 			canvasID := uuid.New()
 			fake, taskID := reworkStore(policy, "worker-a", "worker-a", "reviewer-b")
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			w := httptest.NewRecorder()
 			h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -353,7 +353,7 @@ func TestReworkUnknownCompleterFailsClosed(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "", "worker-a", "reviewer-b")
 	fake.actions[taskID].ClaimedBy = nil
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -374,7 +374,7 @@ func TestReworkUnknownCompleterFailsClosed(t *testing.T) {
 func TestReworkUnregisteredReviewerRefused(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -395,7 +395,7 @@ func TestReworkOnlyFinishedWork(t *testing.T) {
 			canvasID := uuid.New()
 			fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
 			fake.actions[taskID].State = state
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			w := httptest.NewRecorder()
 			h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,
@@ -419,7 +419,7 @@ func TestReworkOnlyFinishedWork(t *testing.T) {
 func TestReworkHumanBypassesPeerRuleButNotTheReason(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore("strict", "worker-a", "worker-a")
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// canvasRequest stamps a human author by default.
 	w := httptest.NewRecorder()
@@ -436,7 +436,7 @@ func TestReworkHumanBypassesPeerRuleButNotTheReason(t *testing.T) {
 
 	// …and with no reason, even a human gets the 400.
 	fake2, taskID2 := reworkStore("strict", "worker-a", "worker-a")
-	h2 := NewHandler(fake2, nil, nil)
+	h2 := NewHandler(fake2, nil)
 	w2 := httptest.NewRecorder()
 	h2.ReworkAction(w2, reworkRequest(t, canvasID, taskID2, map[string]any{}))
 	if w2.Code != http.StatusBadRequest {
@@ -454,7 +454,7 @@ func TestReworkFiresTaskReturned(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a", "reviewer-b")
 	em := &recordingEmitter{}
-	h := NewHandler(fake, nil, nil, WithTaskEvents(em))
+	h := NewHandler(fake, nil, WithTaskEvents(em))
 
 	reason := "the fail-open branch is still there — redo it with a test that proves the closed path"
 	w := httptest.NewRecorder()
@@ -506,7 +506,7 @@ func TestRefusedReworkFiresNothing(t *testing.T) {
 	canvasID := uuid.New()
 	fake, taskID := reworkStore(policyPeer, "worker-a", "worker-a")
 	em := &recordingEmitter{}
-	h := NewHandler(fake, nil, nil, WithTaskEvents(em))
+	h := NewHandler(fake, nil, WithTaskEvents(em))
 
 	w := httptest.NewRecorder()
 	h.ReworkAction(w, withAgentAuthor(reworkRequest(t, canvasID, taskID,

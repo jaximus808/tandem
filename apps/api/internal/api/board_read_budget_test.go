@@ -109,7 +109,7 @@ func boardRead(t *testing.T, epics, tasks []*store.Action, query string) []byte 
 	t.Helper()
 	st := &boardBudgetStore{epics: epics, tasks: tasks}
 	w := httptest.NewRecorder()
-	NewHandler(st, nil, nil).ListEpics(w, canvasRequest(t, "GET", "/api/canvas/epics"+query, nil, uuid.New(), ""))
+	NewHandler(st, nil).ListEpics(w, canvasRequest(t, "GET", "/api/canvas/epics"+query, nil, uuid.New(), ""))
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET /api/canvas/epics%s = %d; body %s", query, w.Code, w.Body)
 	}

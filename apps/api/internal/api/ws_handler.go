@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/agentcanvas/api/internal/auth"
-	"github.com/agentcanvas/api/internal/maps"
 	"github.com/agentcanvas/api/internal/store"
 	"github.com/agentcanvas/api/internal/ws"
 	"github.com/google/uuid"
@@ -29,11 +28,10 @@ type WSHandler struct {
 	store   store.Store
 	hub     *ws.Hub
 	authSvc *auth.Service
-	maps    *maps.Registry
 }
 
-func NewWSHandler(s store.Store, hub *ws.Hub, authSvc *auth.Service, mapsReg *maps.Registry) *WSHandler {
-	return &WSHandler{store: s, hub: hub, authSvc: authSvc, maps: mapsReg}
+func NewWSHandler(s store.Store, hub *ws.Hub, authSvc *auth.Service) *WSHandler {
+	return &WSHandler{store: s, hub: hub, authSvc: authSvc}
 }
 
 // GET /ws?code=CANVAS_CODE
@@ -131,10 +129,8 @@ func (wh *WSHandler) handleOp(canvasID uuid.UUID, raw []byte, canWrite bool, aut
 	}
 
 	if probe.Op == "batch" {
-		// Batch envelope: apply every sub-op, then broadcast exactly ONCE. This
-		// is the hot path for grid paste — a 10x20 paste is ~30 column/row ops
-		// that would otherwise each trigger a full-canvas broadcast (see
-		// SheetsMode.handlePasteGrid).
+		// Batch envelope: apply every sub-op, then broadcast exactly ONCE, so a
+		// multi-op edit costs one full-canvas broadcast instead of one per op.
 		wh.applyBatch(ctx, canvasID, probe.Ops)
 		broadcastStateBy(ctx, wh.store, wh.hub, canvasID, "user")
 		return
@@ -152,21 +148,11 @@ func (wh *WSHandler) handleOp(canvasID uuid.UUID, raw []byte, canWrite bool, aut
 }
 
 // applyBatch executes every sub-op inside a "batch" envelope, one store call
-// per sub-op via applyOp (this worktree's store.Store has no bulk
-// CreateSheetColumns/CreateSheetRows — see the "loop-insert fallback" note on
-// this function). What batching buys here is NOT fewer store round trips,
-// it's fewer broadcasts: the caller (handleOp) fires exactly ONE
-// broadcastStateBy after this returns, instead of one per sub-op — that's the
-// hot-path fix for grid paste (SheetsMode.handlePasteGrid), which used to
-// send one WS op per pasted column/row and so triggered one full-canvas
-// broadcast each. A failing/malformed sub-op is logged and skipped; the rest
-// still apply and we still broadcast once for whatever succeeded.
-//
-// LOOP-INSERT FALLBACK: if a future merge brings in bulk store methods
-// (CreateSheetColumns(ctx, canvasID, sheetID, cols) / CreateSheetRows(ctx,
-// canvasID, rows)), this is the place to coalesce consecutive
-// sheet.column.add / sheet.row.add sub-ops targeting the same sheet into one
-// call each, cutting store round trips too, not just broadcasts.
+// per sub-op via applyOp. What batching buys here is NOT fewer store round
+// trips, it's fewer broadcasts: the caller (handleOp) fires exactly ONE
+// broadcastStateBy after this returns, instead of one per sub-op. A
+// failing/malformed sub-op is logged and skipped; the rest still apply and we
+// still broadcast once for whatever succeeded.
 func (wh *WSHandler) applyBatch(ctx context.Context, canvasID uuid.UUID, ops []json.RawMessage) {
 	for _, sub := range ops {
 		if err := wh.applyOp(ctx, canvasID, sub); err != nil && err != errOpSkipped {
@@ -192,7 +178,6 @@ func (wh *WSHandler) applyOp(ctx context.Context, canvasID uuid.UUID, raw []byte
 		EntityID    *uuid.UUID      `json:"entityId"`
 		Instruction string          `json:"instruction"`
 		Mode        string          `json:"mode"`
-		MapID       string          `json:"mapId"`
 		TemplateID  string          `json:"templateId"`
 		Partial     json.RawMessage `json:"partial"`
 		Data        json.RawMessage `json:"data"`
@@ -218,60 +203,12 @@ func (wh *WSHandler) applyOp(ctx context.Context, canvasID uuid.UUID, raw []byte
 		}
 		_, mutErr = wh.store.EnableMode(ctx, canvasID, msg.Mode)
 
-	case "map.set":
-		if msg.MapID == "" || wh.maps == nil || !wh.maps.Has(msg.MapID) {
-			log.Printf("ws op map.set: unknown mapId %q", msg.MapID)
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.SetMapID(ctx, canvasID, msg.MapID)
-
 	case "template.apply":
 		if !isValidMode(msg.Mode) {
 			log.Printf("ws op template.apply: invalid mode %q", msg.Mode)
 			return errOpSkipped
 		}
-		var mapPtr *string
-		if msg.MapID != "" {
-			if wh.maps == nil || !wh.maps.Has(msg.MapID) {
-				log.Printf("ws op template.apply: unknown mapId %q", msg.MapID)
-				return errOpSkipped
-			}
-			id := msg.MapID
-			mapPtr = &id
-		}
-		_, mutErr = wh.store.ApplyTemplate(ctx, canvasID, msg.Mode, mapPtr)
-
-	case "pin.update":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		var patch store.PinPatch
-		if err := json.Unmarshal(msg.Partial, &patch); err != nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdatePin(ctx, canvasID, *msg.ID, patch)
-
-	case "pin.delete":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeletePin(ctx, canvasID, *msg.ID)
-
-	case "event.update":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		var patch store.EventPatch
-		if err := json.Unmarshal(msg.Partial, &patch); err != nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdateEvent(ctx, canvasID, *msg.ID, patch)
-
-	case "event.delete":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeleteEvent(ctx, canvasID, *msg.ID)
+		_, mutErr = wh.store.ApplyTemplate(ctx, canvasID, msg.Mode)
 
 	case "note.add":
 		var data struct {
@@ -407,28 +344,17 @@ func (wh *WSHandler) applyOp(ctx context.Context, canvasID uuid.UUID, raw []byte
 				return errOpSkipped
 			}
 		}
-		if !docTypesCreatable[data.Type] { // excludes "chart" (needs a source sheet) + unknowns
+		if !docTypesCreatable[data.Type] {
 			log.Printf("ws op document.add: invalid type %q", data.Type)
 			return errOpSkipped
 		}
 		if data.Name == "" {
 			data.Name = defaultDocNames[data.Type]
 		}
-		// A sheet document is 1:1 with a sheet row; the store mints the doc for us.
-		if data.Type == "sheet" {
-			sh := &store.Sheet{ID: uuid.New(), Kind: "sheet", Name: data.Name,
-				Columns: []store.SheetColumn{}, SortOrder: data.SortOrder, CreatedBy: "user"}
-			_, mutErr = wh.store.CreateSheet(ctx, canvasID, sh)
-			if mutErr == nil && data.ParentID != nil && sh.DocumentID != nil {
-				_, mutErr = wh.store.UpdateDocument(ctx, canvasID, *sh.DocumentID,
-					store.DocumentPatch{ParentID: data.ParentID, SetParent: true})
-			}
-		} else {
-			doc := &store.Document{ID: uuid.New(), Kind: "document", Type: data.Type,
-				Name: data.Name, Config: data.Config, ParentID: data.ParentID, SortOrder: data.SortOrder,
-				CreatedBy: "user", AuthoredBy: AuthorFromCtx(ctx)} // TDM-40
-			_, mutErr = wh.store.CreateDocument(ctx, canvasID, doc)
-		}
+		doc := &store.Document{ID: uuid.New(), Kind: "document", Type: data.Type,
+			Name: data.Name, Config: data.Config, ParentID: data.ParentID, SortOrder: data.SortOrder,
+			CreatedBy: "user", AuthoredBy: AuthorFromCtx(ctx)} // TDM-40
+		_, mutErr = wh.store.CreateDocument(ctx, canvasID, doc)
 
 	case "document.update":
 		if msg.ID == nil {
@@ -458,205 +384,6 @@ func (wh *WSHandler) applyOp(ctx context.Context, canvasID uuid.UUID, raw []byte
 			return errOpSkipped
 		}
 		_, mutErr = wh.store.ReorderDocuments(ctx, canvasID, payload.Updates)
-
-	case "sheet.add":
-		var data struct {
-			Name      string              `json:"name"`
-			Columns   []store.SheetColumn `json:"columns"`
-			SortOrder int                 `json:"sortOrder"`
-		}
-		if len(msg.Data) > 0 {
-			if err := json.Unmarshal(msg.Data, &data); err != nil {
-				log.Printf("ws op sheet.add: bad data: %v", err)
-				return errOpSkipped
-			}
-		}
-		if data.Name == "" {
-			data.Name = "Untitled sheet"
-		}
-		cols := make([]store.SheetColumn, 0, len(data.Columns))
-		for _, c := range data.Columns {
-			if c.Type == "" {
-				c.Type = "text"
-			}
-			if !isValidSheetColumnType(c.Type) {
-				log.Printf("ws op sheet.add: invalid column type %q", c.Type)
-				return errOpSkipped
-			}
-			if c.ID == "" {
-				c.ID = uuid.New().String()
-			}
-			cols = append(cols, c)
-		}
-		sh := &store.Sheet{
-			ID: uuid.New(), Kind: "sheet",
-			Name: data.Name, Columns: cols, SortOrder: data.SortOrder,
-			CreatedBy: "user",
-		}
-		_, mutErr = wh.store.CreateSheet(ctx, canvasID, sh)
-
-	case "sheet.update":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		var patch store.SheetPatch
-		if err := json.Unmarshal(msg.Partial, &patch); err != nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdateSheet(ctx, canvasID, *msg.ID, patch)
-
-	case "sheet.delete":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeleteSheet(ctx, canvasID, *msg.ID)
-
-	case "sheet.column.add":
-		var payload struct {
-			SheetID uuid.UUID         `json:"sheetId"`
-			Column  store.SheetColumn `json:"column"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			log.Printf("ws op sheet.column.add: bad payload: %v", err)
-			return errOpSkipped
-		}
-		if payload.Column.Type == "" {
-			payload.Column.Type = "text"
-		}
-		if !isValidSheetColumnType(payload.Column.Type) {
-			log.Printf("ws op sheet.column.add: invalid type %q", payload.Column.Type)
-			return errOpSkipped
-		}
-		if payload.Column.ID == "" {
-			payload.Column.ID = uuid.New().String()
-		}
-		_, mutErr = wh.store.AddSheetColumn(ctx, canvasID, payload.SheetID, payload.Column)
-
-	case "sheet.column.update":
-		var payload struct {
-			SheetID  uuid.UUID              `json:"sheetId"`
-			ColumnID string                 `json:"columnId"`
-			Partial  store.SheetColumnPatch `json:"partial"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return errOpSkipped
-		}
-		if payload.Partial.Type != nil && !isValidSheetColumnType(*payload.Partial.Type) {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdateSheetColumn(ctx, canvasID, payload.SheetID, payload.ColumnID, payload.Partial)
-
-	case "sheet.column.delete":
-		var payload struct {
-			SheetID  uuid.UUID `json:"sheetId"`
-			ColumnID string    `json:"columnId"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeleteSheetColumn(ctx, canvasID, payload.SheetID, payload.ColumnID)
-
-	case "sheet.row.add":
-		var payload struct {
-			SheetID   uuid.UUID      `json:"sheetId"`
-			Data      map[string]any `json:"data"`
-			SortOrder int            `json:"sortOrder"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return errOpSkipped
-		}
-		if payload.Data == nil {
-			payload.Data = map[string]any{}
-		}
-		r := &store.SheetRow{
-			ID: uuid.New(), Kind: "sheetRow", SheetID: payload.SheetID,
-			Data: payload.Data, SortOrder: payload.SortOrder, CreatedBy: "user",
-		}
-		_, mutErr = wh.store.CreateSheetRow(ctx, canvasID, r)
-
-	case "sheet.row.update":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		var patch store.SheetRowPatch
-		if err := json.Unmarshal(msg.Partial, &patch); err != nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdateSheetRow(ctx, canvasID, *msg.ID, patch)
-
-	case "sheet.row.delete":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeleteSheetRow(ctx, canvasID, *msg.ID)
-
-	case "sheet.row.reorder":
-		var payload struct {
-			SheetID uuid.UUID               `json:"sheetId"`
-			Updates []store.SheetRowReorder `json:"updates"`
-		}
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			return errOpSkipped
-		}
-		if len(payload.Updates) == 0 {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.ReorderSheetRows(ctx, canvasID, payload.SheetID, payload.Updates)
-
-	case "chart.add":
-		var data struct {
-			Name      string    `json:"name"`
-			SheetID   uuid.UUID `json:"sheetId"`
-			ChartType string    `json:"chartType"`
-			XColumn   string    `json:"xColumn"`
-			YColumns  []string  `json:"yColumns"`
-			SortOrder int       `json:"sortOrder"`
-		}
-		if len(msg.Data) > 0 {
-			if err := json.Unmarshal(msg.Data, &data); err != nil {
-				log.Printf("ws op chart.add: bad data: %v", err)
-				return errOpSkipped
-			}
-		}
-		if data.ChartType == "" {
-			data.ChartType = "bar"
-		}
-		if !isValidChartType(data.ChartType) {
-			log.Printf("ws op chart.add: invalid chart type %q", data.ChartType)
-			return errOpSkipped
-		}
-		if data.Name == "" {
-			data.Name = "Untitled chart"
-		}
-		if data.YColumns == nil {
-			data.YColumns = []string{}
-		}
-		ch := &store.Chart{
-			ID: uuid.New(), Kind: "chart",
-			Name: data.Name, SheetID: data.SheetID, ChartType: data.ChartType,
-			XColumn: data.XColumn, YColumns: data.YColumns, SortOrder: data.SortOrder,
-			CreatedBy: "user",
-		}
-		_, mutErr = wh.store.CreateChart(ctx, canvasID, ch)
-
-	case "chart.update":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		var patch store.ChartPatch
-		if err := json.Unmarshal(msg.Partial, &patch); err != nil {
-			return errOpSkipped
-		}
-		if patch.ChartType != nil && !isValidChartType(*patch.ChartType) {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.UpdateChart(ctx, canvasID, *msg.ID, patch)
-
-	case "chart.delete":
-		if msg.ID == nil {
-			return errOpSkipped
-		}
-		_, mutErr = wh.store.DeleteChart(ctx, canvasID, *msg.ID)
 
 	case "scoped_edit_request":
 		if msg.EntityID == nil {

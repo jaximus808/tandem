@@ -17,14 +17,13 @@ import (
 //     the name/title of each item, so the agent can see what's there and decide
 //     what to pull.
 //   - fields=[...]: only the requested kinds returned in full (e.g. just
-//     roadmapItems, or notes+sheets).
+//     roadmapItems, or notes+documents).
 //   - full=true: the entire payload, back-compat escape hatch.
 //
 // stateKinds are the projectable kind keys, matching CanvasState's JSON field
 // names so the agent uses the same vocabulary it sees in the payload.
 var stateKinds = []string{
-	"documents", "pins", "events", "notes", "roadmapItems", "sheets",
-	"sheetRows", "charts", "forms", "actions", "agents",
+	"documents", "notes", "roadmapItems", "actions", "agents",
 }
 
 // maxSummaryNames caps how many names we list per kind so the summary itself
@@ -89,22 +88,10 @@ func projectState(state *store.CanvasState, fields []string) *store.CanvasState 
 		switch k {
 		case "documents":
 			out.Documents = state.Documents
-		case "pins":
-			out.Pins = state.Pins
-		case "events":
-			out.Events = state.Events
 		case "notes":
 			out.Notes = state.Notes
 		case "roadmapItems":
 			out.RoadmapItems = state.RoadmapItems
-		case "sheets":
-			out.Sheets = state.Sheets
-		case "sheetRows":
-			out.SheetRows = state.SheetRows
-		case "charts":
-			out.Charts = state.Charts
-		case "forms":
-			out.Forms = state.Forms
 		case "actions":
 			out.Actions = state.Actions
 		case "agents":
@@ -123,14 +110,8 @@ func countsFromState(state *store.CanvasState) map[string]int {
 		return counts
 	}
 	counts["documents"] = len(state.Documents)
-	counts["pins"] = len(state.Pins)
-	counts["events"] = len(state.Events)
 	counts["notes"] = len(state.Notes)
 	counts["roadmapItems"] = len(state.RoadmapItems)
-	counts["sheets"] = len(state.Sheets)
-	counts["sheetRows"] = len(state.SheetRows)
-	counts["charts"] = len(state.Charts)
-	counts["forms"] = len(state.Forms)
 	counts["actions"] = len(state.Actions)
 	counts["agents"] = len(state.Agents)
 	return counts
@@ -148,26 +129,11 @@ func namesFromState(state *store.CanvasState) map[string][]string {
 	for _, d := range state.Documents {
 		names["documents"] = append(names["documents"], orFallback(clip(d.Name), "(untitled)")+" ("+d.Type+")")
 	}
-	for _, p := range state.Pins {
-		names["pins"] = append(names["pins"], derefName(p.Label, "(unlabeled pin)"))
-	}
-	for _, e := range state.Events {
-		names["events"] = append(names["events"], orFallback(clip(e.Title), "(untitled event)"))
-	}
 	for _, n := range state.Notes {
 		names["notes"] = append(names["notes"], orFallback(clip(firstLine(n.Body)), "(empty note)"))
 	}
 	for _, r := range state.RoadmapItems {
 		names["roadmapItems"] = append(names["roadmapItems"], orFallback(clip(r.Title), "(untitled roadmap item)"))
-	}
-	for _, s := range state.Sheets {
-		names["sheets"] = append(names["sheets"], orFallback(clip(s.Name), "(untitled sheet)"))
-	}
-	for _, c := range state.Charts {
-		names["charts"] = append(names["charts"], orFallback(clip(c.Name), "(untitled chart)"))
-	}
-	for _, f := range state.Forms {
-		names["forms"] = append(names["forms"], orFallback(clip(f.Name), "(untitled form)"))
 	}
 	// Actions are deliberately NOT listed by name. Their only cheap projection
 	// is "type:state" (e.g. "task:done"), which is non-identifying noise that
@@ -215,7 +181,6 @@ func assembleSummary(canvas *store.Canvas, mode string, version int, enabledMode
 		Hint: "Summary only (counts + names). Re-read canvas_state_read with " +
 			`fields=["roadmapItems"] (any of: ` + strings.Join(stateKinds, ", ") +
 			") for the full objects of a kind, or full=true for the entire canvas. " +
-			"Reading a sheet? request both \"sheets\" and \"sheetRows\". " +
 			"Actions aren't listed by name — use canvas_task_list for the task queue " +
 			"or canvas_action_list for other actions.",
 	}

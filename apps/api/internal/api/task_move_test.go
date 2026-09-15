@@ -234,7 +234,7 @@ func TestMoveCannotLeaveProposed(t *testing.T) {
 			task := humanTask("proposed")
 			task.ApprovedBy = nil
 			f := newMoveStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w := httptest.NewRecorder()
 			h.MoveAction(w, moveRequest(t, canvasID, task.ID, map[string]any{"to": to}))
@@ -305,7 +305,7 @@ func TestMoveStartClaimsForTheHuman(t *testing.T) {
 	canvasID := uuid.New()
 	task := humanTask("approved")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w := httptest.NewRecorder()
 	h.MoveAction(w, moveRequest(t, canvasID, task.ID, map[string]any{"to": "executing"}))
@@ -356,7 +356,7 @@ func TestMoveStartLosesToAnAgentClaim(t *testing.T) {
 	canvasID := uuid.New()
 	task := humanTask("approved")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 	// The agent got there first.
 	if _, _, err := f.ClaimAction(context.Background(), canvasID, task.ID, "worker-3"); err != nil {
 		t.Fatalf("seed claim: %v", err)
@@ -379,7 +379,7 @@ func TestMoveCompleteWritesResultAuditAndWebhook(t *testing.T) {
 	task := humanTask("executing")
 	f := newMoveStore(task)
 	em := &recordingEmitter{}
-	h := NewHandler(f, nil, nil, WithTaskEvents(em))
+	h := NewHandler(f, nil, WithTaskEvents(em))
 
 	w := httptest.NewRecorder()
 	h.MoveAction(w, moveRequest(t, canvasID, task.ID,
@@ -419,7 +419,7 @@ func TestMoveGiveUpWritesTheReasonAsError(t *testing.T) {
 	task := humanTask("executing")
 	f := newMoveStore(task)
 	em := &recordingEmitter{}
-	h := NewHandler(f, nil, nil, WithTaskEvents(em))
+	h := NewHandler(f, nil, WithTaskEvents(em))
 
 	w := httptest.NewRecorder()
 	h.MoveAction(w, moveRequest(t, canvasID, task.ID,
@@ -448,7 +448,7 @@ func TestMoveReopenClearsTheLastLife(t *testing.T) {
 	task.Result, task.ClaimedBy = ptr("done in a4b1c2d"), ptr("worker-3")
 	f := newMoveStore(task)
 	em := &recordingEmitter{}
-	h := NewHandler(f, nil, nil, WithTaskEvents(em))
+	h := NewHandler(f, nil, WithTaskEvents(em))
 
 	w := httptest.NewRecorder()
 	h.MoveAction(w, moveRequest(t, canvasID, task.ID,
@@ -489,7 +489,7 @@ func TestMoveReconsiderReturnsToTheGate(t *testing.T) {
 	task := humanTask("rejected")
 	task.Error = ptr("out of scope")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w := httptest.NewRecorder()
 	h.MoveAction(w, moveRequest(t, canvasID, task.ID, map[string]any{"to": "proposed"}))
@@ -532,7 +532,7 @@ func TestReleaseAndRequeueStillWorkThroughRewind(t *testing.T) {
 				task.Error = ptr("tests red")
 			}
 			f := newMoveStore(task)
-			h := NewHandler(f, nil, nil)
+			h := NewHandler(f, nil)
 
 			w := httptest.NewRecorder()
 			// No body at all — the pre-existing web callers send none, and an
@@ -564,7 +564,7 @@ func TestMoveIdempotentAndIllegal(t *testing.T) {
 	t.Run("already there", func(t *testing.T) {
 		task := humanTask("done")
 		f := newMoveStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w := httptest.NewRecorder()
 		// 'done' → 'done' is not in the matrix at all; a retry whose first
 		// response was lost must still read as the success it was.
@@ -580,7 +580,7 @@ func TestMoveIdempotentAndIllegal(t *testing.T) {
 	t.Run("illegal move lists the legal ones", func(t *testing.T) {
 		task := humanTask("done")
 		f := newMoveStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w := httptest.NewRecorder()
 		h.MoveAction(w, moveRequest(t, canvasID, task.ID, map[string]any{"to": "executing"}))
 		if w.Code != http.StatusBadRequest {
@@ -601,7 +601,7 @@ func TestMoveIdempotentAndIllegal(t *testing.T) {
 	t.Run("missing target", func(t *testing.T) {
 		task := humanTask("approved")
 		f := newMoveStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w := httptest.NewRecorder()
 		h.MoveAction(w, moveRequest(t, canvasID, task.ID, map[string]any{}))
 		if w.Code != http.StatusBadRequest {
@@ -615,7 +615,7 @@ func TestMoveIdempotentAndIllegal(t *testing.T) {
 			Payload: json.RawMessage(`{"title":"E10"}`),
 		}
 		f := newMoveStore(epic)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w := httptest.NewRecorder()
 		h.MoveAction(w, moveRequest(t, canvasID, epic.ID, map[string]any{"to": "executing"}))
 		if w.Code != http.StatusBadRequest {
@@ -629,7 +629,7 @@ func TestMoveIdempotentAndIllegal(t *testing.T) {
 	t.Run("oversized note", func(t *testing.T) {
 		task := humanTask("executing")
 		f := newMoveStore(task)
-		h := NewHandler(f, nil, nil)
+		h := NewHandler(f, nil)
 		w := httptest.NewRecorder()
 		h.MoveAction(w, moveRequest(t, canvasID, task.ID,
 			map[string]any{"to": "done", "note": strings.Repeat("x", maxMoveNote+1)}))
@@ -649,7 +649,7 @@ func TestMoveAuditActorIsServerDerived(t *testing.T) {
 	canvasID := uuid.New()
 	task := humanTask("failed")
 	f := newMoveStore(task)
-	h := NewHandler(f, nil, nil)
+	h := NewHandler(f, nil)
 
 	w := httptest.NewRecorder()
 	// Provenance was NOT derived for this request: clear the author canvasRequest

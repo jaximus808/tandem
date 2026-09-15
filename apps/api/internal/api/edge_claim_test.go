@@ -245,7 +245,7 @@ func TestRivalClaimLosesCleanlyThenTakesAnotherTask(t *testing.T) {
 	canvasID := uuid.New()
 	mine, other := readyTask(101, "E9.5 the contested task"), readyTask(102, "E9.5 the next ready task")
 	fake := newEdgeClaimStore(mine, other)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	if w := patchTask(t, h, canvasID, mine.ID, map[string]any{"state": "executing", "agentName": "worker-a"}); w.Code != http.StatusOK {
 		t.Fatalf("worker-a claim status = %d, body %s", w.Code, w.Body.String())
@@ -282,7 +282,7 @@ func TestConcurrentWorkerClaimsProduceOneWinner(t *testing.T) {
 	canvasID := uuid.New()
 	task := readyTask(103, "E9.5 the concurrently contested task")
 	fake := newEdgeClaimStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	names := []string{"worker-a", "worker-b"}
 	codes := make([]int, len(names))
@@ -333,7 +333,7 @@ func TestHolderCompletesItsOwnClaimWithoutConflict(t *testing.T) {
 	canvasID := uuid.New()
 	task := readyTask(104, "E9.5 claim then finish")
 	fake := newEdgeClaimStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	if w := patchTask(t, h, canvasID, task.ID, map[string]any{"state": "executing", "agentName": "worker-a"}); w.Code != http.StatusOK {
 		t.Fatalf("claim status = %d, body %s", w.Code, w.Body.String())
@@ -362,7 +362,7 @@ func TestHolderFailsItsOwnClaimWithoutConflict(t *testing.T) {
 	canvasID := uuid.New()
 	task := readyTask(105, "E9.5 claim then fail")
 	fake := newEdgeClaimStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	if w := patchTask(t, h, canvasID, task.ID, map[string]any{"state": "executing", "agentName": "worker-a"}); w.Code != http.StatusOK {
 		t.Fatalf("claim status = %d, body %s", w.Code, w.Body.String())
@@ -390,7 +390,7 @@ func TestRivalCannotCompleteAClaimItDoesNotHold(t *testing.T) {
 			canvasID := uuid.New()
 			task := readyTask(106, "E9.5 held by worker-a")
 			fake := newEdgeClaimStore(task)
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			if w := patchTask(t, h, canvasID, task.ID, map[string]any{"state": "executing", "agentName": "worker-a"}); w.Code != http.StatusOK {
 				t.Fatalf("claim status = %d, body %s", w.Code, w.Body.String())
@@ -426,7 +426,7 @@ func TestGuardProtectsAnonymousSessionClaimants(t *testing.T) {
 	canvasID := uuid.New()
 	task := readyTask(107, "E9.5 held by an unregistered session")
 	fake := newEdgeClaimStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	if w := patchTask(t, h, canvasID, task.ID, map[string]any{"state": "executing", "agentName": "session-a1b2c3"}); w.Code != http.StatusOK {
 		t.Fatalf("claim status = %d, body %s", w.Code, w.Body.String())
@@ -458,7 +458,7 @@ func TestPlannerSeesItsWorkersAndTheirTasksInTheRoster(t *testing.T) {
 	taskA, taskB := readyTask(108, "E9.5 worker-a's task"), readyTask(109, "E9.5 worker-b's task")
 	unclaimed := readyTask(110, "E9.5 still in the queue")
 	fake := newEdgeClaimStore(taskA, taskB, unclaimed)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// The planner comes up first; the workers register UNDER it, exactly as
 	// canvas_connect(role:"executor", parentAgentId:<planner>) does.

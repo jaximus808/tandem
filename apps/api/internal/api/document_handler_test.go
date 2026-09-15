@@ -13,8 +13,8 @@ func doc(t, name string, sort int) *store.Document {
 }
 
 func TestResolveDocInList_ByName(t *testing.T) {
-	budget := doc("sheet", "Budget", 1)
-	docs := []*store.Document{doc("map", "Japan", 0), budget, doc("notes", "Ideas", 2)}
+	budget := doc("roadmap", "Budget", 1)
+	docs := []*store.Document{doc("roadmap", "Japan", 0), budget, doc("notes", "Ideas", 2)}
 
 	// case-insensitive name match.
 	got, err := resolveDocInList(docs, "budget", "")
@@ -35,8 +35,8 @@ func TestResolveDocInList_ByName(t *testing.T) {
 }
 
 func TestResolveDocInList_ByID(t *testing.T) {
-	target := doc("map", "Japan", 0)
-	docs := []*store.Document{target, doc("sheet", "Budget", 1)}
+	target := doc("notes", "Japan", 0)
+	docs := []*store.Document{target, doc("roadmap", "Budget", 1)}
 
 	got, err := resolveDocInList(docs, target.ID.String(), "")
 	if err != nil || got.ID != target.ID {
@@ -47,36 +47,36 @@ func TestResolveDocInList_ByID(t *testing.T) {
 		t.Fatalf("expected miss for absent id")
 	}
 	// id of the wrong type is out of scope.
-	if _, err := resolveDocInList(docs, target.ID.String(), "sheet"); err == nil {
+	if _, err := resolveDocInList(docs, target.ID.String(), "roadmap"); err == nil {
 		t.Fatalf("expected type-scoped id miss")
 	}
 }
 
 func TestResolveDocInList_Ambiguous(t *testing.T) {
-	docs := []*store.Document{doc("map", "Trip", 0), doc("notes", "Trip", 1)}
+	docs := []*store.Document{doc("roadmap", "Trip", 0), doc("notes", "Trip", 1)}
 	_, err := resolveDocInList(docs, "Trip", "")
 	if err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatalf("expected ambiguity error, got %v", err)
 	}
 	// but scoping by type disambiguates.
-	if got, err := resolveDocInList(docs, "Trip", "map"); err != nil || got.Type != "map" {
+	if got, err := resolveDocInList(docs, "Trip", "roadmap"); err != nil || got.Type != "roadmap" {
 		t.Fatalf("type-scoped resolve should be unambiguous, got %v err=%v", got, err)
 	}
 }
 
 // A folder is resolvable like any other document, and the "folder" type filter
 // (used when moving a document into a folder, item 8.5) excludes non-folders so a
-// document can't be nested under, say, a sheet that happens to share a name.
+// document can't be nested under, say, a notes doc that happens to share a name.
 func TestResolveDocInList_Folder(t *testing.T) {
 	trips := doc("folder", "Trips", 0)
-	docs := []*store.Document{trips, doc("sheet", "Trips", 1)}
+	docs := []*store.Document{trips, doc("notes", "Trips", 1)}
 
 	got, err := resolveDocInList(docs, "Trips", "folder")
 	if err != nil || got.ID != trips.ID {
 		t.Fatalf("expected the Trips folder, got %v err=%v", got, err)
 	}
 	// A name that only matches a non-folder is out of scope under the folder filter.
-	if _, err := resolveDocInList([]*store.Document{doc("sheet", "Budget", 0)}, "Budget", "folder"); err == nil {
+	if _, err := resolveDocInList([]*store.Document{doc("notes", "Budget", 0)}, "Budget", "folder"); err == nil {
 		t.Fatalf("expected no folder named Budget")
 	}
 }
@@ -88,13 +88,13 @@ func TestResolveDocInList_Empty(t *testing.T) {
 }
 
 func TestPickDefaultDoc(t *testing.T) {
-	first := doc("map", "A", 1)
-	docs := []*store.Document{doc("notes", "N", 0), doc("map", "B", 5), first}
-	got := pickDefaultDoc(docs, "map")
+	first := doc("roadmap", "A", 1)
+	docs := []*store.Document{doc("notes", "N", 0), doc("roadmap", "B", 5), first}
+	got := pickDefaultDoc(docs, "roadmap")
 	if got == nil || got.ID != first.ID {
-		t.Fatalf("expected lowest-sortOrder map doc, got %v", got)
+		t.Fatalf("expected lowest-sortOrder roadmap doc, got %v", got)
 	}
-	if pickDefaultDoc(docs, "itinerary") != nil {
+	if pickDefaultDoc(docs, "folder") != nil {
 		t.Fatalf("expected nil when no doc of type exists")
 	}
 }

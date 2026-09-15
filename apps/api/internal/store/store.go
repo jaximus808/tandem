@@ -116,7 +116,6 @@ type Canvas struct {
 	// canvas to a human (the dashboard cards, its filter) wants EnabledModes.
 	Mode         string     `json:"mode"`
 	EnabledModes []string   `json:"enabledModes"`
-	MapID        *string    `json:"mapId,omitempty"`
 	OwnerUserID  *uuid.UUID `json:"ownerUserId,omitempty"`
 	// ClaimToken is the private "own this canvas" capability for an anonymous
 	// canvas. It is deliberately surfaced ONLY on the create response (so the
@@ -199,39 +198,6 @@ func NewNotification(recipientID uuid.UUID, kind string, canvasID *uuid.UUID, ac
 	}
 }
 
-type Pin struct {
-	ID         uuid.UUID  `json:"id"`
-	Kind       string     `json:"kind"` // always "pin"
-	DocumentID *uuid.UUID `json:"documentId,omitempty"`
-	PinType    string     `json:"pinType"`
-	Lat        float64    `json:"lat"`
-	Lng        float64    `json:"lng"`
-	Label      *string    `json:"label,omitempty"`
-	Body       *string    `json:"body,omitempty"`
-	Color      *string    `json:"color,omitempty"`
-	CreatedBy  string     `json:"createdBy"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
-}
-
-type Event struct {
-	ID         uuid.UUID   `json:"id"`
-	Kind       string      `json:"kind"` // always "event"
-	DocumentID *uuid.UUID  `json:"documentId,omitempty"`
-	Title      string      `json:"title"`
-	Start      time.Time   `json:"start"`
-	End        *time.Time  `json:"end,omitempty"`
-	Timezone   *string     `json:"timezone,omitempty"`
-	PinIDs     []uuid.UUID `json:"pinIds,omitempty"`
-	PinID      *uuid.UUID  `json:"pinId,omitempty"`
-	FromPinID  *uuid.UUID  `json:"fromPinId,omitempty"`
-	ToPinID    *uuid.UUID  `json:"toPinId,omitempty"`
-	TravelMode *string     `json:"travelMode,omitempty"`
-	DayTag     *string     `json:"dayTag,omitempty"`
-	Cost       *float64    `json:"cost,omitempty"`
-	CreatedBy  string      `json:"createdBy"`
-	UpdatedAt  time.Time   `json:"updatedAt"`
-}
-
 type Note struct {
 	ID         uuid.UUID  `json:"id"`
 	Kind       string     `json:"kind"` // always "note"
@@ -278,133 +244,6 @@ type RoadmapItem struct {
 	StaleAfterSeconds *int       `json:"staleAfterSeconds,omitempty"`
 }
 
-type SheetColumn struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"` // "text" | "number" | "date" | "checkbox"
-	SortOrder int    `json:"sortOrder"`
-}
-
-type Sheet struct {
-	ID         uuid.UUID     `json:"id"`
-	Kind       string        `json:"kind"` // always "sheet"
-	DocumentID *uuid.UUID    `json:"documentId,omitempty"`
-	Name       string        `json:"name"`
-	Columns    []SheetColumn `json:"columns"`
-	SortOrder  int           `json:"sortOrder"`
-	CreatedBy  string        `json:"createdBy"`
-	UpdatedAt  time.Time     `json:"updatedAt"`
-}
-
-type SheetRow struct {
-	ID        uuid.UUID      `json:"id"`
-	Kind      string         `json:"kind"` // always "sheetRow"
-	SheetID   uuid.UUID      `json:"sheetId"`
-	Data      map[string]any `json:"data"` // keyed by SheetColumn.id; values: string|number|bool|null
-	SortOrder int            `json:"sortOrder"`
-	CreatedBy string         `json:"createdBy"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-}
-
-type Chart struct {
-	ID         uuid.UUID  `json:"id"`
-	Kind       string     `json:"kind"` // always "chart"
-	DocumentID *uuid.UUID `json:"documentId,omitempty"`
-	Name       string     `json:"name"`
-	SheetID    uuid.UUID  `json:"sheetId"`
-	ChartType  string     `json:"chartType"` // "bar" | "line" | "area" | "pie"
-	XColumn    string     `json:"xColumn"`   // SheetColumn.id
-	YColumns   []string   `json:"yColumns"`  // SheetColumn.ids
-	SortOrder  int        `json:"sortOrder"`
-	CreatedBy  string     `json:"createdBy"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
-}
-
-// ── Forms (direct-input layer) ────────────────────────────────────────────────
-// A Form is an agent-defined recipe a human fills from a lightweight surface to
-// mutate the canvas directly (no agent in the submit loop). Fields is the input
-// schema; Actions is the compiled, canonical DSL the resolver runs at submit.
-// See docs/DESIGN_DIRECT_INPUT.md.
-
-type Form struct {
-	ID          uuid.UUID    `json:"id"`
-	Kind        string       `json:"kind"` // always "form"
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Fields      []FormField  `json:"fields"`
-	Actions     []FormAction `json:"actions"`
-	SortOrder   int          `json:"sortOrder"`
-	CreatedBy   string       `json:"createdBy"`
-	UpdatedAt   time.Time    `json:"updatedAt"`
-}
-
-// FormField is one input the human fills. Type ∈ text|number|date|select|checkbox.
-type FormField struct {
-	Key         string   `json:"key"`
-	Label       string   `json:"label"`
-	Type        string   `json:"type"`
-	Required    bool     `json:"required,omitempty"`
-	Options     []string `json:"options,omitempty"`     // required iff select
-	Default     any      `json:"default,omitempty"`     // type-compatible default
-	Placeholder string   `json:"placeholder,omitempty"` // text/number only
-}
-
-// FormAction is one entry of the canonical DSL (forms.actions). The agent never
-// writes this directly — compile() expands the authoring Intent into it.
-// Op ∈ sheet.row.append | sheet.row.upsert | pin.patch. Columns are referenced
-// by NAME and resolved name→id at submit (so they survive column recreation).
-type FormAction struct {
-	Op     string     `json:"op"`
-	Target FormTarget `json:"target"`
-	Set    []Binding  `json:"set"`
-	Match  []Binding  `json:"match,omitempty"` // upsert only
-	Inc    []string   `json:"inc,omitempty"`   // upsert only: column names to increment
-}
-
-// FormTarget is a discriminated target: exactly one of Sheet (by name) or Pin (by id).
-type FormTarget struct {
-	Sheet string `json:"sheet,omitempty"`
-	Pin   string `json:"pin,omitempty"`
-}
-
-// Binding maps a target column (by name) to a value expression.
-type Binding struct {
-	Column string    `json:"column"`
-	Value  ValueExpr `json:"value"`
-}
-
-// ValueExpr is exactly one of: From (a submitted field key), Computed
-// ("today"|"now"), or Literal (a raw scalar). Presence is detected by which is
-// non-empty; the exactly-one-key invariant is enforced by compile().
-type ValueExpr struct {
-	From     string          `json:"from,omitempty"`
-	Computed string          `json:"computed,omitempty"`
-	Literal  json.RawMessage `json:"literal,omitempty"`
-}
-
-// Batch is the concrete, scope-checked result of resolving a form submission —
-// the input to the submit_canvas_form RPC. Every name is already a uuid and
-// every value concrete by the time a Batch exists.
-type Batch struct {
-	Inserts []RowInsert `json:"inserts"`
-	Patches []Patch     `json:"patches"`
-}
-
-// RowInsert appends a new sheet row. Data is keyed by SheetColumn.id.
-type RowInsert struct {
-	SheetID string         `json:"sheet_id"`
-	Data    map[string]any `json:"data"`
-}
-
-// Patch is either a sheet-row patch (RowID + Set/Inc, keyed by column id) or a
-// pin patch (PinID + Set, keyed by whitelisted column). Exactly one id is set.
-type Patch struct {
-	RowID *string            `json:"row_id,omitempty"`
-	PinID *string            `json:"pin_id,omitempty"`
-	Set   map[string]any     `json:"set,omitempty"`
-	Inc   map[string]float64 `json:"inc,omitempty"`
-}
-
 // Action is the v1 execution primitive: the unit two agents coordinate on and
 // a human approves before anything moves. Payload shape depends on Type; for
 // "navigate" it is { goalLabel?, goal?{lat,lng}, waypoints?[{lat,lng}] }.
@@ -419,11 +258,10 @@ type Action struct {
 	ApprovedBy *string         `json:"approvedBy,omitempty"`
 	// ClaimedBy/ClaimedAt record which agent holds the executing claim (set by
 	// ClaimAction, cleared by ReleaseAction). Migration 0032.
-	ClaimedBy    *string     `json:"claimedBy,omitempty"`
-	ClaimedAt    *time.Time  `json:"claimedAt,omitempty"`
-	Result       *string     `json:"result,omitempty"`
-	Error        *string     `json:"error,omitempty"`
-	LinkedPinIDs []uuid.UUID `json:"linkedPinIds"`
+	ClaimedBy *string    `json:"claimedBy,omitempty"`
+	ClaimedAt *time.Time `json:"claimedAt,omitempty"`
+	Result    *string    `json:"result,omitempty"`
+	Error     *string    `json:"error,omitempty"`
 	// Ticket is the per-canvas sequential task number (type "task" only; nil
 	// for other action types). Only the integer is stored — the "TDM-<n>"
 	// display form is added at serialization time (see MarshalJSON).
@@ -694,12 +532,10 @@ type PendingEdit struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// Document is a named, multi-instance tab on a canvas (migration 0024). It
-// generalizes what sheets already do to every view type: a canvas is a bag of
-// documents, each with a Type (map/notes/itinerary/roadmap/sheet/chart), a Name,
-// and a SortOrder. Child rows (pins/events/notes/roadmap items/sheets/charts)
-// point back at their document via DocumentID. Config carries type-specific
-// settings — e.g. {"mapId":"tokyo"} for a map document.
+// Document is a named, multi-instance tab on a canvas (migration 0024): a
+// canvas is a bag of documents, each with a Type (notes/roadmap/folder), a
+// Name, and a SortOrder. Child rows (notes/roadmap items) point back at their
+// document via DocumentID. Config carries type-specific settings.
 //
 // ParentID is reserved for a future folder tree (the document explorer sidebar,
 // roadmap item 9) — it is always null today, so the model is flat now but a tree
@@ -732,14 +568,8 @@ type CanvasState struct {
 	Mode         string                  `json:"mode"`
 	EnabledModes []string                `json:"enabledModes"`
 	Documents    map[string]*Document    `json:"documents"`
-	Pins         map[string]*Pin         `json:"pins"`
-	Events       map[string]*Event       `json:"events"`
 	Notes        map[string]*Note        `json:"notes"`
 	RoadmapItems map[string]*RoadmapItem `json:"roadmapItems"`
-	Sheets       map[string]*Sheet       `json:"sheets"`
-	SheetRows    map[string]*SheetRow    `json:"sheetRows"`
-	Charts       map[string]*Chart       `json:"charts"`
-	Forms        map[string]*Form        `json:"forms"`
 	Actions      map[string]*Action      `json:"actions"`
 	Agents       map[string]*Agent       `json:"agents"`
 }
@@ -765,33 +595,6 @@ type CanvasSummary struct {
 
 // ── Patch types (partial updates from JSON body) ──────────────────────────────
 
-type PinPatch struct {
-	PinType *string  `json:"pinType"`
-	Lat     *float64 `json:"lat"`
-	Lng     *float64 `json:"lng"`
-	Label   *string  `json:"label"`
-	Body    *string  `json:"body"`
-	Color   *string  `json:"color"`
-}
-
-type EventPatch struct {
-	Title      *string      `json:"title"`
-	Start      *time.Time   `json:"start"`
-	End        *time.Time   `json:"end"`
-	Timezone   *string      `json:"timezone"`
-	PinIDs     *[]uuid.UUID `json:"pinIds"`
-	PinID      *uuid.UUID   `json:"pinId"`
-	FromPinID  *uuid.UUID   `json:"fromPinId"`
-	ToPinID    *uuid.UUID   `json:"toPinId"`
-	TravelMode *string      `json:"travelMode"`
-	DayTag     *string      `json:"dayTag"`
-	Cost       *float64     `json:"cost"`
-	// Explicit clears — a nil pointer can't be distinguished from JSON null, so
-	// removing an optional field (rather than setting it) rides its own flag.
-	ClearEnd  bool `json:"clearEnd"`
-	ClearCost bool `json:"clearCost"`
-}
-
 type NotePatch struct {
 	Body       *string    `json:"body"`
 	ImageRefs  []string   `json:"imageRefs"`
@@ -805,7 +608,7 @@ type NotePatch struct {
 // note / roadmap-item / document patches (migration 0037). nil value + false
 // clear = column untouched; the explicit Clear flags exist because a nil
 // pointer can't distinguish "leave it" from "null it out" — same reason
-// EventPatch carries ClearEnd/ClearCost. Embedded rather than repeated so the
+// DocumentPatch carries SetParent. Embedded rather than repeated so the
 // three patches can't drift, and so applyFreshnessPatch has one shape to apply.
 //
 // Verifying is deliberately its own act, separate from editing: a patch that
@@ -841,11 +644,6 @@ type RoadmapReorder struct {
 	SortOrder int        `json:"sortOrder"`
 }
 
-type SheetPatch struct {
-	Name      *string `json:"name"`
-	SortOrder *int    `json:"sortOrder"`
-}
-
 type DocumentPatch struct {
 	Name      *string        `json:"name"`
 	SortOrder *int           `json:"sortOrder"`
@@ -866,43 +664,6 @@ type DocumentReorder struct {
 	ID        uuid.UUID  `json:"id"`
 	ParentID  *uuid.UUID `json:"parentId"`
 	SortOrder int        `json:"sortOrder"`
-}
-
-type SheetColumnPatch struct {
-	Name      *string `json:"name"`
-	Type      *string `json:"type"`
-	SortOrder *int    `json:"sortOrder"`
-}
-
-type SheetRowPatch struct {
-	// Data is a partial merge into the existing row data (keys not present are
-	// left untouched; explicit JSON null clears a field).
-	Data      map[string]any `json:"data"`
-	SortOrder *int           `json:"sortOrder"`
-}
-
-type SheetRowReorder struct {
-	ID        uuid.UUID `json:"id"`
-	SortOrder int       `json:"sortOrder"`
-}
-
-// FormPatch replaces a form's authoring surface wholesale (the compiler always
-// re-expands the full intent). nil fields are left unchanged.
-type FormPatch struct {
-	Name        *string       `json:"name"`
-	Description *string       `json:"description"`
-	Fields      *[]FormField  `json:"fields"`
-	Actions     *[]FormAction `json:"actions"`
-	SortOrder   *int          `json:"sortOrder"`
-}
-
-type ChartPatch struct {
-	Name      *string    `json:"name"`
-	SheetID   *uuid.UUID `json:"sheetId"`
-	ChartType *string    `json:"chartType"`
-	XColumn   *string    `json:"xColumn"`
-	YColumns  *[]string  `json:"yColumns"`
-	SortOrder *int       `json:"sortOrder"`
 }
 
 // ActionStatePatch carries a single state transition plus its outcome fields.
@@ -995,8 +756,7 @@ type Store interface {
 	GetCanvasSummary(ctx context.Context, canvasID uuid.UUID, sampleLimit int) (*Canvas, *CanvasSummary, []*PendingEdit, error)
 	SetMode(ctx context.Context, canvasID uuid.UUID, mode string) (int, error)
 	EnableMode(ctx context.Context, canvasID uuid.UUID, mode string) (int, error)
-	SetMapID(ctx context.Context, canvasID uuid.UUID, mapID string) (int, error)
-	ApplyTemplate(ctx context.Context, canvasID uuid.UUID, mode string, mapID *string) (int, error)
+	ApplyTemplate(ctx context.Context, canvasID uuid.UUID, mode string) (int, error)
 	LeaveWelcomeIfNeeded(ctx context.Context, canvasID uuid.UUID, fallbackMode string) error
 
 	// Documents (migration 0024) — named, multi-instance tabs. Child rows point
@@ -1010,18 +770,6 @@ type Store interface {
 	ReorderDocuments(ctx context.Context, canvasID uuid.UUID, updates []DocumentReorder) (int, error)
 	ListDocuments(ctx context.Context, canvasID uuid.UUID) ([]*Document, error)
 	GetDocument(ctx context.Context, canvasID, id uuid.UUID) (*Document, error)
-
-	// Pins
-	CreatePin(ctx context.Context, canvasID uuid.UUID, p *Pin) (int, error)
-	CreatePins(ctx context.Context, canvasID uuid.UUID, pins []*Pin) (int, error)
-	UpdatePin(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch PinPatch) (int, error)
-	DeletePin(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
-
-	// Events
-	CreateEvent(ctx context.Context, canvasID uuid.UUID, e *Event) (int, error)
-	CreateEvents(ctx context.Context, canvasID uuid.UUID, events []*Event) (int, error)
-	UpdateEvent(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch EventPatch) (int, error)
-	DeleteEvent(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
 
 	// Notes
 	CreateNote(ctx context.Context, canvasID uuid.UUID, n *Note) (int, error)
@@ -1044,38 +792,6 @@ type Store interface {
 	// ListRoadmapItems returns a canvas's roadmap items, optionally filtered by
 	// assignee ("agent" = the agent-task queue; "" = all).
 	ListRoadmapItems(ctx context.Context, canvasID uuid.UUID, assignee string) ([]*RoadmapItem, error)
-
-	// Sheets + columns + rows
-	CreateSheet(ctx context.Context, canvasID uuid.UUID, s *Sheet) (int, error)
-	UpdateSheet(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch SheetPatch) (int, error)
-	DeleteSheet(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
-	AddSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, col SheetColumn) (int, error)
-	CreateSheetColumns(ctx context.Context, canvasID, sheetID uuid.UUID, cols []SheetColumn) (int, error)
-	UpdateSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, columnID string, patch SheetColumnPatch) (int, error)
-	DeleteSheetColumn(ctx context.Context, canvasID, sheetID uuid.UUID, columnID string) (int, error)
-	CreateSheetRow(ctx context.Context, canvasID uuid.UUID, r *SheetRow) (int, error)
-	CreateSheetRows(ctx context.Context, canvasID uuid.UUID, rows []*SheetRow) (int, error)
-	UpdateSheetRow(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch SheetRowPatch) (int, error)
-	DeleteSheetRow(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
-	ReorderSheetRows(ctx context.Context, canvasID, sheetID uuid.UUID, updates []SheetRowReorder) (int, error)
-
-	// Charts
-	CreateChart(ctx context.Context, canvasID uuid.UUID, c *Chart) (int, error)
-	// CreateCharts bulk-inserts many charts in one round trip (one INSERT, one
-	// version bump), minting any needed backing 'chart' documents in a single
-	// bulk documents INSERT rather than N individual CreateDocument calls.
-	CreateCharts(ctx context.Context, canvasID uuid.UUID, charts []*Chart) (int, error)
-	UpdateChart(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch ChartPatch) (int, error)
-	DeleteChart(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
-
-	// Forms (direct-input layer)
-	CreateForm(ctx context.Context, canvasID uuid.UUID, f *Form) (int, error)
-	GetForm(ctx context.Context, canvasID, id uuid.UUID) (*Form, error)
-	UpdateForm(ctx context.Context, canvasID uuid.UUID, id uuid.UUID, patch FormPatch) (int, error)
-	DeleteForm(ctx context.Context, canvasID uuid.UUID, id uuid.UUID) (int, error)
-	// SubmitForm applies a resolved batch atomically (submit_canvas_form RPC),
-	// deduping by submissionID when non-empty, and returns the new version.
-	SubmitForm(ctx context.Context, canvasID uuid.UUID, batch Batch, submissionID string) (int, error)
 
 	// Agents (v1 identity / provenance)
 	// RegisterAgent UPSERTs on the (canvas_id, name) identity (unique since
@@ -1422,7 +1138,6 @@ type Store interface {
 	// dead-letter list in the web UI. Returns ErrWebhookDeliveryNotRetryable
 	// when nothing matched.
 	RetryWebhookDelivery(ctx context.Context, canvasID, id uuid.UUID) (*WebhookDelivery, error)
-
 	// ── Metrics history (migration 0040) ──────────────────────────────────────
 	//
 	// The persisted series behind /api/metrics/history plus the cmd/loadtest

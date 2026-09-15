@@ -339,7 +339,7 @@ func TestClaimOnlyTransitionPayloadIsNotContentLocked(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask() // title "fence every write path", assignee "agent"
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 
@@ -373,7 +373,7 @@ func TestReclaimAfterExpiryFencesTheOldHolder(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	genA := claimVia(t, h, canvasID, task.ID, "worker-a")
 	if genA != 1 {
@@ -440,7 +440,7 @@ func TestGenerationContinuityAcrossReclaims(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	if got := claimVia(t, h, canvasID, task.ID, "worker-a"); got != 1 {
 		t.Fatalf("claim 1 generation = %d, want 1", got)
@@ -477,7 +477,7 @@ func TestIdempotentReclaimKeepsTheGeneration(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	first := claimVia(t, h, canvasID, task.ID, "worker-a")
 	again := claimVia(t, h, canvasID, task.ID, "worker-a")
@@ -577,7 +577,7 @@ func TestNonHolderWritesAreFencedOnEveryPath(t *testing.T) {
 			canvasID := uuid.New()
 			task := fenceTask()
 			fake := newFenceStore(task)
-			h := NewHandler(fake, nil, nil)
+			h := NewHandler(fake, nil)
 
 			gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 			// The stale-generation row needs a lease that ended: bump the counter by
@@ -630,7 +630,7 @@ func TestHolderWritesPassTheFence(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 
@@ -670,7 +670,7 @@ func TestUnidentifiedCallerKeepsTheEscapeHatch(t *testing.T) {
 	t.Run("complete", func(t *testing.T) {
 		task := fenceTask()
 		fake := newFenceStore(task)
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		claimVia(t, h, canvasID, task.ID, "worker-a")
 		w := moveTask(t, h, canvasID, task.ID, map[string]any{"to": "done", "note": "the agent finished, I saw the PR"}, "")
 		if w.Code != http.StatusOK {
@@ -681,7 +681,7 @@ func TestUnidentifiedCallerKeepsTheEscapeHatch(t *testing.T) {
 	t.Run("release", func(t *testing.T) {
 		task := fenceTask()
 		fake := newFenceStore(task)
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		claimVia(t, h, canvasID, task.ID, "worker-a")
 		w := moveTask(t, h, canvasID, task.ID, map[string]any{"to": "approved"}, "")
 		if w.Code != http.StatusOK {
@@ -695,7 +695,7 @@ func TestUnidentifiedCallerKeepsTheEscapeHatch(t *testing.T) {
 	t.Run("delete", func(t *testing.T) {
 		task := fenceTask()
 		fake := newFenceStore(task)
-		h := NewHandler(fake, nil, nil)
+		h := NewHandler(fake, nil)
 		claimVia(t, h, canvasID, task.ID, "worker-a")
 		r := canvasRequest(t, "DELETE", "/api/canvas/actions/"+task.ID.String(), nil, canvasID, task.ID.String())
 		w := httptest.NewRecorder()
@@ -717,7 +717,7 @@ func TestPayloadCannotForgeTheClaimRecord(t *testing.T) {
 	canvasID := uuid.New()
 	task := fenceTask()
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 	w := patchTask(t, h, canvasID, task.ID, map[string]any{
@@ -846,7 +846,7 @@ func TestApprovalIsNotFenced(t *testing.T) {
 	task := fenceTask()
 	task.State = "proposed"
 	fake := newFenceStore(task)
-	h := NewHandler(fake, nil, nil)
+	h := NewHandler(fake, nil)
 
 	// The caller is a human — approval is the human gate (TDM-129); canvasRequest
 	// stamps human provenance. The point here is the CLAIM FENCE: ApproveAction
@@ -873,7 +873,7 @@ func TestFencedWritesAreCounted(t *testing.T) {
 	task := fenceTask()
 	fake := newFenceStore(task)
 	reg := metrics.NewRegistry()
-	h := NewHandler(fake, nil, nil, WithMetrics(reg))
+	h := NewHandler(fake, nil, WithMetrics(reg))
 
 	gen := claimVia(t, h, canvasID, task.ID, "worker-a")
 	if got := counters(reg).FencedWrites; got != 0 {

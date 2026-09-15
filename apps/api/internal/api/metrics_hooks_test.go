@@ -36,7 +36,7 @@ func metricsHarness(t *testing.T, tasks ...*store.Action) (*Handler, *statusFake
 		fake.actions[a.ID] = a
 	}
 	reg := metrics.NewRegistry()
-	return NewHandler(fake, nil, nil, WithMetrics(reg)), fake, reg, canvasID
+	return NewHandler(fake, nil, WithMetrics(reg)), fake, reg, canvasID
 }
 
 func counters(reg *metrics.Registry) metrics.Counters { return reg.Snapshot().Counters }
@@ -182,7 +182,7 @@ func TestMetricsNilRegistryHandlerStillClaims(t *testing.T) {
 func TestMetricsEndpointWiring(t *testing.T) {
 	authSvc := auth.NewService("test-secret-for-tdm-42", time.Hour)
 	reg := metrics.NewRegistry()
-	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, nil, "", t.TempDir(), "", reg, nil)
+	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, "", t.TempDir(), "", reg, nil)
 
 	// Drive one authenticated request so the registry has a row to report.
 	token, err := authSvc.Issue(uuid.New(), "read", nil)
@@ -220,7 +220,7 @@ func TestMetricsEndpointWiring(t *testing.T) {
 // the middleware is a pass-through, so the rest of the API is unaffected.
 func TestMetricsEndpointAbsentWhenDisabled(t *testing.T) {
 	authSvc := auth.NewService("test-secret-for-tdm-42", time.Hour)
-	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, nil, "", t.TempDir(), "", nil, nil)
+	r := NewRouter(&fleetFakeStore{}, nil, authSvc, nil, false, "", t.TempDir(), "", nil, nil)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/metrics", nil))
