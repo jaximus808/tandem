@@ -12,7 +12,7 @@ interface State {
 
 // ErrorBoundary stops a transient render crash from white-screening the whole
 // app. A live canvas takes a steady stream of state over WS; if one render
-// throws (a malformed entity, a Leaflet hiccup on tab-back), we'd rather show a
+// throws (a malformed entity, a render hiccup on tab-back), we'd rather show a
 // recoverable panel than a blank page that only a full reload fixes. The error
 // is logged so the underlying cause is still diagnosable.
 export default class ErrorBoundary extends Component<Props, State> {

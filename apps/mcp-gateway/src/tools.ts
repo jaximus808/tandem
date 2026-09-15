@@ -480,17 +480,6 @@ async function runTool(
       return gateway.post("/api/canvas/mode", { mode: args.mode });
 
     // ── Map ────────────────────────────────────────────────────────────────────
-    case "canvas_map_list":
-      return gateway.getPublic("/api/maps");
-
-    case "canvas_map_set":
-      // Implicit: switching map also switches mode to "map" (per §10 in DESIGN_PHASE3.md).
-      return gateway.post("/api/canvas/template", {
-        templateId: `map-${args.mapId}`,
-        mode: "map",
-        mapId: args.mapId,
-      });
-
     // ── Documents ──────────────────────────────────────────────────────────────
     case "canvas_document_list":
       return gateway.get("/api/canvas/documents");
@@ -534,171 +523,12 @@ async function runTool(
         refs: (args.documents as unknown[]) ?? [],
       });
 
-    // ── Pins ───────────────────────────────────────────────────────────────────
-    case "canvas_pin_add":
-      return gateway.post("/api/canvas/pins", {
-        pinType: args.pinType ?? "marker",
-        lat: args.lat,
-        lng: args.lng,
-        label: args.label,
-        body: args.body,
-        color: args.color,
-        document: args.document,
-        createdBy: "agent",
-      });
-
-    case "canvas_pin_add_batch":
-      return gateway.post("/api/canvas/pins/batch", {
-        document: args.document,
-        pins: ((args.pins as Record<string, unknown>[]) ?? []).map((p) => ({
-          pinType: p.pinType ?? "marker",
-          lat: p.lat,
-          lng: p.lng,
-          label: p.label,
-          body: p.body,
-          color: p.color,
-          document: p.document,
-          createdBy: "agent",
-        })),
-      });
-
-    case "canvas_pin_update": {
-      const { id, ...partial } = args;
-      const result = await gateway.patch(`/api/canvas/pins/${id}`, partial);
-      return withUpdateFanOutHint(result, updateFanOutHint("pin", "pins", "canvas_pin_update_batch"));
-    }
-
-    case "canvas_pin_update_batch":
-      return gateway.post("/api/canvas/pins/batch-update", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          id: it.id,
-          pinType: it.pinType,
-          lat: it.lat,
-          lng: it.lng,
-          label: it.label,
-          body: it.body,
-          color: it.color,
-        })),
-      });
-
-    case "canvas_pin_delete":
-      return gateway.del(`/api/canvas/pins/${args.id}`);
-
-    case "canvas_pin_delete_batch":
-      return gateway.post("/api/canvas/pins/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
-    // ── Events ─────────────────────────────────────────────────────────────────
-    case "canvas_event_add":
-      return gateway.post("/api/canvas/events", {
-        title: args.title,
-        start: args.start,
-        end: args.end,
-        timezone: args.timezone,
-        pinIds: args.pinIds,
-        pinId: args.pinId,
-        fromPinId: args.fromPinId,
-        toPinId: args.toPinId,
-        travelMode: args.travelMode,
-        dayTag: args.dayTag,
-        cost: args.cost,
-        document: args.document,
-        createdBy: "agent",
-      });
-
-    case "canvas_event_add_batch":
-      return gateway.post("/api/canvas/events/batch", {
-        document: args.document,
-        events: ((args.events as Record<string, unknown>[]) ?? []).map((e) => ({
-          title: e.title,
-          start: e.start,
-          end: e.end,
-          timezone: e.timezone,
-          pinIds: e.pinIds,
-          pinId: e.pinId,
-          fromPinId: e.fromPinId,
-          toPinId: e.toPinId,
-          travelMode: e.travelMode,
-          dayTag: e.dayTag,
-          cost: e.cost,
-          document: e.document,
-          createdBy: "agent",
-        })),
-      });
-
-    case "canvas_event_update": {
-      const { id, ...partial } = args;
-      const result = await gateway.patch(`/api/canvas/events/${id}`, partial);
-      return withUpdateFanOutHint(result, updateFanOutHint("event", "events", "canvas_event_update_batch"));
-    }
-
-    case "canvas_event_update_batch":
-      return gateway.post("/api/canvas/events/batch-update", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          id: it.id,
-          title: it.title,
-          start: it.start,
-          end: it.end,
-          timezone: it.timezone,
-          pinIds: it.pinIds,
-          pinId: it.pinId,
-          fromPinId: it.fromPinId,
-          toPinId: it.toPinId,
-          travelMode: it.travelMode,
-          dayTag: it.dayTag,
-          cost: it.cost,
-        })),
-      });
-
-    case "canvas_event_delete":
-      return gateway.del(`/api/canvas/events/${args.id}`);
-
-    case "canvas_event_delete_batch":
-      return gateway.post("/api/canvas/events/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
-    // ── Map (pins + events in one write) ─────────────────────────────────────────
-    case "canvas_map_add_batch":
-      return gateway.post("/api/canvas/map/batch", {
-        document: args.document,
-        itineraryDocument: args.itineraryDocument,
-        pins: ((args.pins as Record<string, unknown>[]) ?? []).map((p) => ({
-          clientId: p.clientId,
-          pinType: p.pinType ?? "marker",
-          lat: p.lat,
-          lng: p.lng,
-          label: p.label,
-          body: p.body,
-          color: p.color,
-          document: p.document,
-          createdBy: "agent",
-        })),
-        events: ((args.events as Record<string, unknown>[]) ?? []).map((e) => ({
-          title: e.title,
-          start: e.start,
-          end: e.end,
-          timezone: e.timezone,
-          clientPinIds: e.clientPinIds,
-          clientPinId: e.clientPinId,
-          fromClientId: e.fromClientId,
-          toClientId: e.toClientId,
-          pinIds: e.pinIds,
-          pinId: e.pinId,
-          fromPinId: e.fromPinId,
-          toPinId: e.toPinId,
-          travelMode: e.travelMode,
-          dayTag: e.dayTag,
-          cost: e.cost,
-          document: e.document,
-          createdBy: "agent",
-        })),
-      });
-
     // ── Notes ──────────────────────────────────────────────────────────────────
     case "canvas_note_add":
       return gateway.post("/api/canvas/notes", {
         body: args.body,
         imageRefs: args.imageRefs ?? [],
         parentId: args.parentId,
-        parentKind: args.parentKind,
         document: args.document,
         createdBy: "agent",
       });
@@ -710,7 +540,6 @@ async function runTool(
           body: n.body,
           imageRefs: n.imageRefs ?? [],
           parentId: n.parentId,
-          parentKind: n.parentKind,
           document: n.document,
           createdBy: "agent",
         })),
@@ -728,7 +557,6 @@ async function runTool(
           id: it.id,
           body: it.body,
           parentId: it.parentId,
-          parentKind: it.parentKind,
           imageRefs: it.imageRefs,
           sortOrder: it.sortOrder,
         })),
@@ -864,183 +692,8 @@ async function runTool(
     }
 
     // ── Sheets ─────────────────────────────────────────────────────────────────
-    case "canvas_sheet_add":
-      return gateway.post("/api/canvas/sheets", {
-        name: args.name,
-        columns: args.columns,
-        sortOrder: args.sortOrder ?? 0,
-        createdBy: "agent",
-      });
-
-    case "canvas_sheet_update": {
-      const { id, ...partial } = args;
-      return gateway.patch(`/api/canvas/sheets/${id}`, partial);
-    }
-
-    case "canvas_sheet_delete":
-      return gateway.del(`/api/canvas/sheets/${args.id}`);
-
-    case "canvas_sheet_delete_batch":
-      return gateway.post("/api/canvas/sheets/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
-    case "canvas_sheet_column_add":
-      return gateway.post(`/api/canvas/sheets/${args.sheetId}/columns`, {
-        name: args.name,
-        type: args.type,
-        sortOrder: args.sortOrder ?? 0,
-      });
-
-    case "canvas_sheet_column_add_batch":
-      return gateway.post(`/api/canvas/sheets/${args.sheetId}/columns/batch`, {
-        columns: ((args.columns as Record<string, unknown>[]) ?? []).map((c) => ({
-          name: c.name,
-          type: c.type ?? "text",
-          sortOrder: c.sortOrder,
-        })),
-      });
-
-    case "canvas_sheet_column_update": {
-      const { sheetId, columnId, ...partial } = args;
-      const result = await gateway.patch(`/api/canvas/sheets/${sheetId}/columns/${columnId}`, partial);
-      return withUpdateFanOutHint(
-        result,
-        updateFanOutHint("sheet_column", "columns", "canvas_sheet_column_update_batch")
-      );
-    }
-
-    case "canvas_sheet_column_update_batch":
-      return gateway.post("/api/canvas/sheet-columns/batch-update", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          sheetId: it.sheetId,
-          columnId: it.columnId,
-          name: it.name,
-          type: it.type,
-          sortOrder: it.sortOrder,
-        })),
-      });
-
-    case "canvas_sheet_column_delete":
-      return gateway.del(`/api/canvas/sheets/${args.sheetId}/columns/${args.columnId}`);
-
-    case "canvas_sheet_column_delete_batch":
-      return gateway.post("/api/canvas/sheet-columns/batch-delete", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          sheetId: it.sheetId,
-          columnId: it.columnId,
-        })),
-      });
-
-    case "canvas_sheet_row_add":
-      return gateway.post("/api/canvas/sheet-rows", {
-        sheetId: args.sheetId,
-        data: args.data ?? {},
-        sortOrder: args.sortOrder ?? 0,
-        createdBy: "agent",
-      });
-
-    case "canvas_sheet_row_add_batch":
-      return gateway.post(`/api/canvas/sheets/${args.sheetId}/rows/batch`, {
-        rows: ((args.rows as Record<string, unknown>[]) ?? []).map((r) => ({
-          data: r.data ?? {},
-          sortOrder: r.sortOrder ?? 0,
-          createdBy: "agent",
-        })),
-      });
-
-    case "canvas_sheet_row_update": {
-      const { id, ...partial } = args;
-      const result = await gateway.patch(`/api/canvas/sheet-rows/${id}`, partial);
-      return withUpdateFanOutHint(result, updateFanOutHint("sheet_row", "rows", "canvas_sheet_row_update_batch"));
-    }
-
-    case "canvas_sheet_row_update_batch":
-      return gateway.post("/api/canvas/sheet-rows/batch-update", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          id: it.id,
-          data: it.data,
-          sortOrder: it.sortOrder,
-        })),
-      });
-
-    case "canvas_sheet_row_delete":
-      return gateway.del(`/api/canvas/sheet-rows/${args.id}`);
-
-    case "canvas_sheet_row_delete_batch":
-      return gateway.post("/api/canvas/sheet-rows/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
     // ── Charts ─────────────────────────────────────────────────────────────────
-    case "canvas_chart_add":
-      return gateway.post("/api/canvas/charts", {
-        name: args.name,
-        sheetId: args.sheetId,
-        chartType: args.chartType,
-        xColumn: args.xColumn,
-        yColumns: args.yColumns,
-        sortOrder: args.sortOrder ?? 0,
-        createdBy: "agent",
-      });
-
-    case "canvas_chart_add_batch":
-      return gateway.post("/api/canvas/charts/batch", {
-        charts: ((args.charts as Record<string, unknown>[]) ?? []).map((c) => ({
-          name: c.name,
-          sheetId: c.sheetId,
-          chartType: c.chartType,
-          xColumn: c.xColumn,
-          yColumns: c.yColumns,
-          sortOrder: c.sortOrder ?? 0,
-          createdBy: "agent",
-        })),
-      });
-
-    case "canvas_chart_update": {
-      const { id, ...partial } = args;
-      const result = await gateway.patch(`/api/canvas/charts/${id}`, partial);
-      return withUpdateFanOutHint(result, updateFanOutHint("chart", "charts", "canvas_chart_update_batch"));
-    }
-
-    case "canvas_chart_update_batch":
-      return gateway.post("/api/canvas/charts/batch-update", {
-        items: ((args.items as Record<string, unknown>[]) ?? []).map((it) => ({
-          id: it.id,
-          name: it.name,
-          sheetId: it.sheetId,
-          chartType: it.chartType,
-          xColumn: it.xColumn,
-          yColumns: it.yColumns,
-          sortOrder: it.sortOrder,
-        })),
-      });
-
-    case "canvas_chart_delete":
-      return gateway.del(`/api/canvas/charts/${args.id}`);
-
-    case "canvas_chart_delete_batch":
-      return gateway.post("/api/canvas/charts/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
     // ── Forms (direct-input layer) ───────────────────────────────────────────────
-    case "canvas_form_scaffold":
-      return gateway.post("/api/canvas/forms/scaffold", { sheet: args.sheet });
-
-    case "canvas_form_define":
-      return gateway.post("/api/canvas/forms", {
-        name: args.name,
-        description: args.description,
-        fields: args.fields,
-        writes: args.writes,
-      });
-
-    case "canvas_form_update": {
-      const { id, ...intent } = args;
-      return gateway.patch(`/api/canvas/forms/${id}`, intent);
-    }
-
-    case "canvas_form_delete":
-      return gateway.del(`/api/canvas/forms/${args.id}`);
-
-    case "canvas_form_delete_batch":
-      return gateway.post("/api/canvas/forms/batch-delete", { ids: (args.ids as unknown[]) ?? [] });
-
     // ── Pending edits ──────────────────────────────────────────────────────────
     case "canvas_pending_edits_read":
       // Dedicated endpoint — queries just the pending_edits table. Previously this
@@ -1476,9 +1129,8 @@ const RAW_TOOLS = [
       "enabledModes too) — so you can see what's on the canvas without pulling the whole board " +
       "(a real canvas is 100k+ chars and will blow your token budget). To read actual objects, " +
       "pass `fields` with just the kinds you need, e.g. fields:[\"roadmapItems\"] or " +
-      "fields:[\"sheets\",\"sheetRows\"]. Valid kinds: pins, events, notes, roadmapItems, sheets, " +
-      "sheetRows, charts, forms, actions, agents. Reading a sheet? request BOTH \"sheets\" and " +
-      "\"sheetRows\". Only pass full:true if you truly need the entire canvas. If you're looking " +
+      "fields:[\"notes\",\"documents\"]. Valid kinds: documents, notes, roadmapItems, actions, " +
+      "agents. Only pass full:true if you truly need the entire canvas. If you're looking " +
       "for work to do, start with queue_next (the ready-work queue) instead.",
     inputSchema: {
       type: "object" as const,
@@ -1487,10 +1139,7 @@ const RAW_TOOLS = [
           type: "array",
           items: {
             type: "string",
-            enum: [
-              "documents", "pins", "events", "notes", "roadmapItems", "sheets",
-              "sheetRows", "charts", "forms", "actions", "agents",
-            ],
+            enum: ["documents", "notes", "roadmapItems", "actions", "agents"],
           },
           description:
             "Return the full objects for only these kinds. Omit for a summary of the whole canvas.",
@@ -1506,29 +1155,11 @@ const RAW_TOOLS = [
     name: "canvas_mode_set",
     description:
       "Set the canvas display mode. 'welcome' returns to the template picker; " +
-      "'map', 'itinerary', and 'docs' switch the active view.",
+      "'docs' and 'roadmap' switch the active view.",
     inputSchema: {
       type: "object" as const,
-      properties: { mode: { type: "string", enum: ["welcome", "map", "itinerary", "docs", "roadmap", "sheets", "charts"] } },
+      properties: { mode: { type: "string", enum: ["welcome", "docs", "roadmap"] } },
       required: ["mode"],
-    },
-  },
-  {
-    name: "canvas_map_list",
-    description:
-      "List the available base map presets (currently just 'us', the Continental US map). " +
-      "Use the returned ids with canvas_map_set.",
-    inputSchema: { type: "object" as const, properties: {} },
-  },
-  {
-    name: "canvas_map_set",
-    description:
-      "Switch the base map to a registered preset. The only preset today is 'us' (the " +
-      "Continental US map). Also switches the canvas into map mode. Call canvas_map_list to enumerate options.",
-    inputSchema: {
-      type: "object" as const,
-      properties: { mapId: { type: "string", description: "Preset id from canvas_map_list" } },
-      required: ["mapId"],
     },
   },
 
@@ -1538,7 +1169,7 @@ const RAW_TOOLS = [
     description:
       "List the canvas's documents (its tabs) — each is {id, type, name, parentId?, sortOrder, config}, " +
       "ordered for display. A canvas holds multiple named documents of each type (e.g. a " +
-      "'Japan' map and a 'Budget' sheet). Use this to discover what exists, then address a " +
+      "'Thesis' notes tab and a 'Q3' roadmap). Use this to discover what exists, then address a " +
       "document by name or id when adding content or editing it. A `type: \"folder\"` document " +
       "holds no content — it groups others into a tree; a document's `parentId` is the folder it " +
       "sits under (absent = root level).",
@@ -1547,19 +1178,17 @@ const RAW_TOOLS = [
   {
     name: "canvas_document_add",
     description:
-      "Create a new document (a new tab). type is one of map, notes, itinerary, roadmap, sheet, folder. " +
-      "A 'sheet' document also creates its empty backing sheet (add columns/rows next). A 'folder' " +
+      "Create a new document (a new tab). type is one of notes, roadmap, folder. A 'folder' " +
       "holds no content — it groups other documents in the explorer tree; put documents in it by " +
-      "passing their `parentId`. To create a chart use canvas_chart_add (a chart needs a source " +
-      "sheet). New content added afterward can target this document by its name.",
+      "passing their `parentId`. New content added afterward can target this document by its name.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        type: { type: "string", enum: ["map", "notes", "itinerary", "roadmap", "sheet", "folder"] },
+        type: { type: "string", enum: ["notes", "roadmap", "folder"] },
         name: { type: "string", description: "Display name / tab title (e.g. \"Japan trip\")." },
         config: {
           type: "object",
-          description: "Type-specific settings — e.g. { \"mapId\": \"us\" } for a map document.",
+          description: "Type-specific settings (rarely needed).",
         },
         sortOrder: { type: "number", description: "Tab position; omit to append at the end." },
         parentId: {
@@ -1578,10 +1207,7 @@ const RAW_TOOLS = [
       "canvas_document_add repeatedly when creating several documents at once (e.g. a set of " +
       "notes tabs): the whole array persists in a single write and fires one live update, " +
       "instead of one round trip per document. Each item takes the SAME fields as " +
-      "canvas_document_add EXCEPT type \"sheet\" isn't supported here (a sheet needs its paired " +
-      "backing sheet minted 1:1 — create it individually with canvas_document_add) and \"chart\" " +
-      "is never valid (use canvas_chart_add_batch — a chart needs a source sheet). Returns the " +
-      "created documents (with their generated ids), in input order.",
+      "canvas_document_add. Returns the created documents (with their generated ids), in input order.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1591,11 +1217,11 @@ const RAW_TOOLS = [
           items: {
             type: "object" as const,
             properties: {
-              type: { type: "string", enum: ["map", "notes", "itinerary", "roadmap", "folder"] },
+              type: { type: "string", enum: ["notes", "roadmap", "folder"] },
               name: { type: "string", description: "Display name / tab title (e.g. \"Japan trip\")." },
               config: {
                 type: "object",
-                description: "Type-specific settings — e.g. { \"mapId\": \"us\" } for a map document.",
+                description: "Type-specific settings (rarely needed).",
               },
               sortOrder: { type: "number", description: "Tab position; omit to append at the end." },
               parentId: {
@@ -1615,7 +1241,7 @@ const RAW_TOOLS = [
     name: "canvas_document_update",
     description:
       "Rename, reorder, reconfigure, or move a document. Address it by `document` = its id or current " +
-      "name (e.g. \"Budget\"). Set config to change type-specific settings (e.g. a map's base layer). " +
+      "name (e.g. \"Thesis\"). Set config to change type-specific settings. " +
       "Set parentId to move it into a folder (or to \"root\" to pull it back to the top level).",
     inputSchema: {
       type: "object" as const,
@@ -1638,7 +1264,7 @@ const RAW_TOOLS = [
     name: "canvas_document_delete",
     description:
       "Delete a document (a tab) and everything in it — addressed by `document` = id or name. " +
-      "Cascades: a map doc takes its pins, a notes doc its notes, a sheet doc its rows, etc. " +
+      "Cascades: a notes doc takes its notes, a roadmap doc its items. " +
       "Irreversible.",
     inputSchema: {
       type: "object" as const,
@@ -1667,529 +1293,13 @@ const RAW_TOOLS = [
   },
 
   {
-    name: "canvas_pin_add",
-    description: "Add a location pin to the canvas map.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pinType: { type: "string", enum: ["marker", "annotation"] },
-        lat: { type: "number" },
-        lng: { type: "number" },
-        label: { type: "string" },
-        body: { type: "string" },
-        color: { type: "string" },
-        document: {
-          type: "string",
-          description:
-            "Which map document (tab) to add this pin to — an existing document id or name (e.g. \"Japan\"); " +
-            "the named document must already exist (create it first with canvas_document_add). " +
-            "Omit to use the canvas's default map document, which IS created on demand if none exists.",
-        },
-      },
-      required: ["pinType", "lat", "lng"],
-    },
-  },
-  {
-    name: "canvas_pin_add_batch",
-    description:
-      "Add MANY location pins in ONE call. Strongly preferred over calling " +
-      "canvas_pin_add repeatedly when placing several pins (e.g. a full trip's " +
-      "stops): the whole array persists in a single write and fires one live " +
-      "update, instead of one round trip per pin. Returns the created pins (with " +
-      "their generated ids), in input order — use those ids when you then add " +
-      "itinerary entries that reference the pins.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pins: {
-          type: "array",
-          description: "The pins to add. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              pinType: { type: "string", enum: ["marker", "annotation"] },
-              lat: { type: "number" },
-              lng: { type: "number" },
-              label: { type: "string" },
-              body: { type: "string" },
-              color: { type: "string" },
-              document: {
-                type: "string",
-                description:
-                  "Per-pin override of the target map document. Usually omit and set `document` " +
-                  "once at the top level for the whole batch.",
-              },
-            },
-            required: ["pinType", "lat", "lng"],
-          },
-        },
-        document: {
-          type: "string",
-          description:
-            "Shared target map document (tab) for every pin in this batch — an existing document " +
-            "id or name (e.g. \"Japan\"); the named document must already exist. Omit to use the " +
-            "canvas's default map document, which IS created on demand if none exists.",
-        },
-      },
-      required: ["pins"],
-    },
-  },
-  {
-    name: "canvas_pin_update",
-    description:
-      "Update an existing pin by its ID. To edit several pins at once, use " +
-      "canvas_pin_update_batch instead of calling this repeatedly.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        pinType: { type: "string", enum: ["marker", "annotation"] },
-        lat: { type: "number" },
-        lng: { type: "number" },
-        label: { type: "string" },
-        body: { type: "string" },
-        color: { type: "string" },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "canvas_pin_update_batch",
-    description:
-      "Update MANY pins in ONE call - the batch counterpart of canvas_pin_update. Strongly " +
-      "preferred over calling canvas_pin_update repeatedly when editing several existing pins " +
-      "at once; N one-at-a-time updates become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The pins to update. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              id: { type: "string" },
-              pinType: { type: "string", enum: ["marker", "annotation"] },
-              lat: { type: "number" },
-              lng: { type: "number" },
-              label: { type: "string" },
-              body: { type: "string" },
-              color: { type: "string" },
-            },
-            required: ["id"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_pin_delete",
-    description: "Delete a pin by its ID.",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_pin_delete_batch",
-    description:
-      "Delete MANY pins in ONE call — the batch counterpart of canvas_pin_delete. Strongly " +
-      "preferred over calling canvas_pin_delete repeatedly when removing several pins at once; " +
-      "N one-at-a-time deletes become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: { type: "array", items: { type: "string" }, description: "Pin ids to delete. At least one." },
-      },
-      required: ["ids"],
-    },
-  },
-  {
-    name: "canvas_event_add",
-    description:
-      "Add a timed itinerary entry. Three flavors:\n" +
-      "  • Single-stop entry: set pinIds to one pin id (or use pinId).\n" +
-      "  • Multi-stop entry: set pinIds to several pin ids — one entry that " +
-      "covers multiple places (e.g. a 'check-in errands' block hitting a few " +
-      "stops). All listed pins are grouped under this entry in the map sidebar.\n" +
-      "  • Travel segment between two pins (flight/train/drive): set " +
-      "fromPinId + toPinId + travelMode TOGETHER. The map will draw a " +
-      "polyline between the two pins with a mode icon at the midpoint, " +
-      "and the itinerary will show the card as 'A → B'. Use end for the " +
-      "arrival time on travel events.\n" +
-      "Pins left off every entry stay 'ungrouped' (fine for 'just pin some places' use).\n" +
-      "Set `cost` for anything you priced (flights, hotels, activities) — the itinerary " +
-      "sums costs into live per-day + grand totals, so spend tracks the plan with no " +
-      "separate sheet to maintain. Keep the itinerary the source of truth for trip cost.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        title: { type: "string" },
-        start: {
-          type: "string",
-          description:
-            "The actual instant as timezone-aware ISO-8601. Write the local time at the " +
-            "location WITH its UTC offset, e.g. 6:00 PM in Chicago (CDT) = " +
-            "2024-06-01T18:00:00-05:00. A 'Z' UTC form is also fine. Always include an " +
-            "offset or Z — do NOT send a bare time. Pair with `timezone` below so it " +
-            "displays in the location's local zone.",
-        },
-        end: {
-          type: "string",
-          description: "End / arrival instant, same timezone-aware ISO-8601 format as start.",
-        },
-        timezone: {
-          type: "string",
-          description:
-            "IANA timezone of THIS event's location, e.g. 'America/Chicago', 'America/New_York', " +
-            "'Asia/Tokyo'. The itinerary formats and day-groups the event in this zone. Set it " +
-            "per-event so a trip across timezones shows each stop in its own local time.",
-        },
-        pinIds: {
-          type: "array",
-          items: { type: "string" },
-          description: "Pin ids this entry covers. Use this (not pinId) when an entry spans multiple stops.",
-        },
-        pinId: { type: "string", description: "Single pin this entry takes place at. Legacy — pinIds is preferred." },
-        fromPinId: { type: "string", description: "Origin pin for a travel segment." },
-        toPinId: { type: "string", description: "Destination pin for a travel segment." },
-        travelMode: {
-          type: "string",
-          enum: ["flight", "train", "drive"],
-          description: "Travel mode. Required when fromPinId/toPinId are set.",
-        },
-        dayTag: {
-          type: "string",
-          description:
-            "Optional SHORT prefix the map renders before the day-cluster label " +
-            "(e.g. 'DAY 1' → 'DAY 1 · Friday, May 29'). Any event on a day can carry " +
-            "this; the renderer picks the first non-empty tag (sorted by start), so " +
-            "typically set it on the FIRST event of each day. Keep it punchy: 'DAY 1', " +
-            "'ARRIVAL', 'KYOTO'.",
-        },
-        cost: {
-          type: "number",
-          description:
-            "Optional cost of this entry (flight/hotel/activity) in the trip's currency. " +
-            "The itinerary sums these into live per-day and grand totals — set it whenever " +
-            "you know a price so the running trip cost stays correct as the plan changes.",
-        },
-        document: {
-          type: "string",
-          description:
-            "Which itinerary document (tab) to add this entry to — an existing document id or name; " +
-            "the named document must already exist (create it first with canvas_document_add). " +
-            "Omit to use the canvas's default itinerary, which IS created on demand if none exists.",
-        },
-      },
-      required: ["title", "start"],
-    },
-  },
-  {
-    name: "canvas_event_add_batch",
-    description:
-      "Add MANY itinerary entries in ONE call — the batch counterpart of " +
-      "canvas_event_add. Strongly preferred when adding several entries at once " +
-      "(a whole day, or a whole trip): the array persists in a single write and " +
-      "fires one live update instead of one round trip per entry. Each entry " +
-      "takes the SAME fields as canvas_event_add (title, start, end, timezone, " +
-      "pinIds/pinId, fromPinId+toPinId+travelMode, dayTag, cost). Entries " +
-      "reference pins by their real ids, so create the pins first " +
-      "(canvas_pin_add_batch) and use the ids it returns. If you're adding the " +
-      "pins AND the events together from scratch, prefer canvas_map_add_batch — " +
-      "it lets events reference brand-new pins by a clientId, so the whole trip " +
-      "goes out in ONE call with no id round trip.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        events: {
-          type: "array",
-          description: "The itinerary entries to add. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              title: { type: "string" },
-              start: {
-                type: "string",
-                description:
-                  "Timezone-aware ISO-8601 instant (include offset or Z), e.g. 2024-06-01T18:00:00-05:00.",
-              },
-              end: { type: "string", description: "End / arrival instant, timezone-aware ISO-8601." },
-              timezone: {
-                type: "string",
-                description: "IANA timezone of THIS entry's location, e.g. 'Asia/Tokyo'.",
-              },
-              pinIds: {
-                type: "array",
-                items: { type: "string" },
-                description: "Pin ids this entry covers (multi-stop). Prefer over pinId.",
-              },
-              pinId: { type: "string", description: "Single pin this entry takes place at. Legacy." },
-              fromPinId: { type: "string", description: "Origin pin for a travel segment." },
-              toPinId: { type: "string", description: "Destination pin for a travel segment." },
-              travelMode: {
-                type: "string",
-                enum: ["flight", "train", "drive"],
-                description: "Travel mode. Required when fromPinId/toPinId are set.",
-              },
-              dayTag: { type: "string", description: "Optional short day-cluster prefix, e.g. 'DAY 1'." },
-              cost: { type: "number", description: "Optional cost; summed into per-day and grand totals." },
-              document: {
-                type: "string",
-                description:
-                  "Per-entry override of the target itinerary document. Usually omit and set " +
-                  "`document` once at the top level for the whole batch.",
-              },
-            },
-            required: ["title", "start"],
-          },
-        },
-        document: {
-          type: "string",
-          description:
-            "Shared target itinerary document (tab) for every entry in this batch — an existing " +
-            "document id or name; must already exist. Omit to use the canvas's default itinerary, " +
-            "which IS created on demand if none exists.",
-        },
-      },
-      required: ["events"],
-    },
-  },
-  {
-    name: "canvas_map_add_batch",
-    description:
-      "Place pins AND itinerary entries in ONE call — the highest-leverage tool " +
-      "for building a trip from scratch. Normally an itinerary entry references " +
-      "pins by their real ids, so you'd have to add pins, read back their ids, " +
-      "THEN add events — two-plus round trips. Here you give each pin a `clientId` " +
-      "(any short handle you choose, e.g. \"hotel\" or \"p1\") and let events " +
-      "reference those not-yet-created pins via clientPinIds / clientPinId / " +
-      "fromClientId / toClientId. The server mints the real pin ids, resolves your " +
-      "client refs against them, and writes pins + events with a single live " +
-      "update — a whole 13-pin / 8-event itinerary in ONE call. Events may also " +
-      "reference ALREADY-EXISTING pins by real id (pinIds/pinId/fromPinId/toPinId); " +
-      "the two styles compose. Use canvas_pin_add_batch or canvas_event_add_batch " +
-      "instead when you only need one of the two.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pins: {
-          type: "array",
-          description:
-            "Pins to place. Give a pin a `clientId` when an event in this same call needs to reference it.",
-          items: {
-            type: "object" as const,
-            properties: {
-              clientId: {
-                type: "string",
-                description:
-                  "Your temporary handle for this pin (e.g. \"hotel\", \"p1\"). Events in the SAME call " +
-                  "reference it via clientPinIds/clientPinId/fromClientId/toClientId. Must be unique within " +
-                  "the batch. Not stored — it only wires up references. Omit for pins no event points at.",
-              },
-              pinType: { type: "string", enum: ["marker", "annotation"] },
-              lat: { type: "number" },
-              lng: { type: "number" },
-              label: { type: "string" },
-              body: { type: "string" },
-              color: { type: "string" },
-              document: {
-                type: "string",
-                description:
-                  "Per-pin override of the target map document. Usually omit and set `document` once at top level.",
-              },
-            },
-            required: ["pinType", "lat", "lng"],
-          },
-        },
-        events: {
-          type: "array",
-          description:
-            "Itinerary entries to add. Reference pins from `pins` above by their clientId, or existing pins by real id.",
-          items: {
-            type: "object" as const,
-            properties: {
-              title: { type: "string" },
-              start: {
-                type: "string",
-                description: "Timezone-aware ISO-8601 instant (include offset or Z), e.g. 2024-06-01T18:00:00-05:00.",
-              },
-              end: { type: "string", description: "End / arrival instant, timezone-aware ISO-8601." },
-              timezone: { type: "string", description: "IANA timezone of THIS entry's location, e.g. 'Asia/Tokyo'." },
-              clientPinIds: {
-                type: "array",
-                items: { type: "string" },
-                description:
-                  "clientIds of pins (declared in `pins` above) this entry covers. Resolved to real ids server-side.",
-              },
-              clientPinId: { type: "string", description: "Single pin (by clientId) this entry takes place at." },
-              fromClientId: { type: "string", description: "Origin pin (by clientId) for a travel segment." },
-              toClientId: { type: "string", description: "Destination pin (by clientId) for a travel segment." },
-              pinIds: {
-                type: "array",
-                items: { type: "string" },
-                description: "Real ids of ALREADY-EXISTING pins this entry covers (composes with clientPinIds).",
-              },
-              pinId: { type: "string", description: "Single already-existing pin by real id. Legacy." },
-              fromPinId: { type: "string", description: "Origin pin by real id (already-existing)." },
-              toPinId: { type: "string", description: "Destination pin by real id (already-existing)." },
-              travelMode: {
-                type: "string",
-                enum: ["flight", "train", "drive"],
-                description: "Travel mode. Required when a from/to pin (client or real) is set.",
-              },
-              dayTag: { type: "string", description: "Optional short day-cluster prefix, e.g. 'DAY 1'." },
-              cost: { type: "number", description: "Optional cost; summed into per-day and grand totals." },
-              document: {
-                type: "string",
-                description: "Per-entry override of the target itinerary document.",
-              },
-            },
-            required: ["title", "start"],
-          },
-        },
-        document: {
-          type: "string",
-          description:
-            "Shared target MAP document for every pin in this batch — an existing document id or name; must " +
-            "already exist. Omit to use the canvas's default map doc, created on demand if none exists.",
-        },
-        itineraryDocument: {
-          type: "string",
-          description:
-            "Shared target ITINERARY document for every event in this batch — an existing document id or name; " +
-            "must already exist. Omit to use the canvas's default itinerary, created on demand if none exists.",
-        },
-      },
-    },
-  },
-  {
-    name: "canvas_event_update",
-    description:
-      "Update an existing entry by its ID. Set pinIds to change which pins it " +
-      "covers (replaces the whole list; pass [] to clear). To convert an entry " +
-      "into a travel segment, set fromPinId + toPinId + travelMode. To edit " +
-      "several entries at once, use canvas_event_update_batch instead of " +
-      "calling this repeatedly.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        title: { type: "string" },
-        start: {
-          type: "string",
-          description: "Timezone-aware ISO-8601 instant (include offset or Z), e.g. 2024-06-01T18:00:00-05:00.",
-        },
-        end: {
-          type: "string",
-          description: "End / arrival instant, timezone-aware ISO-8601.",
-        },
-        timezone: {
-          type: "string",
-          description: "IANA timezone of the location, e.g. 'America/Chicago'. Controls how the event displays.",
-        },
-        pinIds: {
-          type: "array",
-          items: { type: "string" },
-          description: "Replaces the entry's pin list. Pass [] to clear all pins.",
-        },
-        pinId: { type: "string" },
-        fromPinId: { type: "string" },
-        toPinId: { type: "string" },
-        travelMode: { type: "string", enum: ["flight", "train", "drive"] },
-        dayTag: {
-          type: "string",
-          description:
-            "Short prefix for the map day label, e.g. 'DAY 1'. First non-empty tag on the day wins.",
-        },
-        cost: {
-          type: "number",
-          description:
-            "Cost of this entry in the trip's currency. Updating it re-totals the itinerary " +
-            "live (per-day + grand total) — keep it current so trip spend always matches the plan.",
-        },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "canvas_event_update_batch",
-    description:
-      "Update MANY itinerary entries in ONE call - the batch counterpart of canvas_event_update. " +
-      "Strongly preferred over calling canvas_event_update repeatedly when editing several " +
-      "existing entries at once; N one-at-a-time updates become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The entries to update. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              id: { type: "string" },
-              title: { type: "string" },
-              start: {
-                type: "string",
-                description:
-                  "Timezone-aware ISO-8601 instant (include offset or Z), e.g. 2024-06-01T18:00:00-05:00.",
-              },
-              end: { type: "string", description: "End / arrival instant, timezone-aware ISO-8601." },
-              timezone: {
-                type: "string",
-                description: "IANA timezone of the location, e.g. 'America/Chicago'.",
-              },
-              pinIds: {
-                type: "array",
-                items: { type: "string" },
-                description: "Replaces the entry's pin list. Pass [] to clear all pins.",
-              },
-              pinId: { type: "string" },
-              fromPinId: { type: "string" },
-              toPinId: { type: "string" },
-              travelMode: { type: "string", enum: ["flight", "train", "drive"] },
-              dayTag: {
-                type: "string",
-                description: "Short prefix for the map day label, e.g. 'DAY 1'.",
-              },
-              cost: {
-                type: "number",
-                description: "Cost of this entry; updating re-totals the itinerary live.",
-              },
-            },
-            required: ["id"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_event_delete",
-    description: "Delete an event by its ID.",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_event_delete_batch",
-    description:
-      "Delete MANY itinerary entries in ONE call — the batch counterpart of canvas_event_delete. " +
-      "Strongly preferred over calling canvas_event_delete repeatedly when removing several " +
-      "entries at once; N one-at-a-time deletes become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: { type: "array", items: { type: "string" }, description: "Event ids to delete. At least one." },
-      },
-      required: ["ids"],
-    },
-  },
-  {
     name: "canvas_note_add",
-    description: "Add a markdown note. Attach to a Pin or Event via parentId + parentKind.",
+    description: "Add a markdown note to a notes document.",
     inputSchema: {
       type: "object" as const,
       properties: {
         body: { type: "string" },
         parentId: { type: "string" },
-        parentKind: { type: "string", enum: ["pin", "event"] },
         imageRefs: { type: "array", items: { type: "string" } },
         document: {
           type: "string",
@@ -2221,7 +1331,6 @@ const RAW_TOOLS = [
             properties: {
               body: { type: "string" },
               parentId: { type: "string" },
-              parentKind: { type: "string", enum: ["pin", "event"] },
               imageRefs: { type: "array", items: { type: "string" } },
               document: {
                 type: "string",
@@ -2255,7 +1364,6 @@ const RAW_TOOLS = [
         id: { type: "string" },
         body: { type: "string" },
         parentId: { type: "string" },
-        parentKind: { type: "string", enum: ["pin", "event"] },
         imageRefs: { type: "array", items: { type: "string" } },
         sortOrder: {
           type: "number",
@@ -2286,7 +1394,6 @@ const RAW_TOOLS = [
               id: { type: "string" },
               body: { type: "string" },
               parentId: { type: "string" },
-              parentKind: { type: "string", enum: ["pin", "event"] },
               imageRefs: { type: "array", items: { type: "string" } },
               sortOrder: {
                 type: "number",
@@ -2525,547 +1632,6 @@ const RAW_TOOLS = [
     },
   },
   {
-    name: "canvas_sheet_add",
-    description:
-      "Create a new sheet (spreadsheet) on the canvas. A canvas can have multiple sheets — " +
-      "they appear as tabs at the top of the sheets view. Pass `columns` to seed the schema " +
-      "(each column needs `name` and `type` ∈ text|number|date|checkbox). Also switches the " +
-      "canvas into sheets mode if it was on welcome.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string" },
-        columns: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              type: { type: "string", enum: ["text", "number", "date", "checkbox"] },
-              sortOrder: { type: "number" },
-            },
-            required: ["name", "type"],
-          },
-        },
-        sortOrder: { type: "number" },
-      },
-      required: ["name"],
-    },
-  },
-  {
-    name: "canvas_sheet_update",
-    description: "Rename or reorder a sheet.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        name: { type: "string" },
-        sortOrder: { type: "number" },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "canvas_sheet_delete",
-    description: "Delete a sheet and all its rows.",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_sheet_delete_batch",
-    description:
-      "Delete MANY sheets in ONE call — the batch counterpart of canvas_sheet_delete. Strongly " +
-      "preferred over calling canvas_sheet_delete repeatedly when removing several sheets at once; " +
-      "N one-at-a-time deletes become one round trip and one live update. Each sheet's rows are " +
-      "deleted along with it, same as the single delete.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: { type: "array", items: { type: "string" }, description: "Sheet ids to delete. At least one." },
-      },
-      required: ["ids"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_add",
-    description:
-      "Add a column to an existing sheet. Column types: text | number | date | checkbox. " +
-      "Dates are ISO-8601 'YYYY-MM-DD' strings.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        name: { type: "string" },
-        type: { type: "string", enum: ["text", "number", "date", "checkbox"] },
-        sortOrder: { type: "number" },
-      },
-      required: ["sheetId", "name", "type"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_add_batch",
-    description:
-      "Add MANY columns to a sheet in ONE call — the batch counterpart of " +
-      "canvas_sheet_column_add. Strongly preferred over calling the single-item tool " +
-      "repeatedly when defining a sheet's schema (several columns at once): the whole " +
-      "array persists in a single write and fires one live update, instead of one round " +
-      "trip per column. Column types: text | number | date | checkbox.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        columns: {
-          type: "array",
-          description: "The columns to add. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              name: { type: "string" },
-              type: { type: "string", enum: ["text", "number", "date", "checkbox"] },
-              sortOrder: { type: "number" },
-            },
-            required: ["name", "type"],
-          },
-        },
-      },
-      required: ["sheetId", "columns"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_update",
-    description:
-      "Rename a column, change its type, or reorder it within the sheet. To edit " +
-      "several columns at once, use canvas_sheet_column_update_batch instead of " +
-      "calling this repeatedly.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        columnId: { type: "string" },
-        name: { type: "string" },
-        type: { type: "string", enum: ["text", "number", "date", "checkbox"] },
-        sortOrder: { type: "number" },
-      },
-      required: ["sheetId", "columnId"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_update_batch",
-    description:
-      "Update MANY columns in ONE call - the batch counterpart of canvas_sheet_column_update. " +
-      "Strongly preferred over calling canvas_sheet_column_update repeatedly when editing several " +
-      "existing columns at once; N one-at-a-time updates become one round trip and one live update. " +
-      "Each item carries its own sheetId + columnId, so a single call can span multiple sheets.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The columns to update. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              sheetId: { type: "string" },
-              columnId: { type: "string" },
-              name: { type: "string" },
-              type: { type: "string", enum: ["text", "number", "date", "checkbox"] },
-              sortOrder: { type: "number" },
-            },
-            required: ["sheetId", "columnId"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_delete",
-    description:
-      "Delete a column from a sheet. Also strips that column's data from every row " +
-      "(non-reversible — the cell values are gone).",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        columnId: { type: "string" },
-      },
-      required: ["sheetId", "columnId"],
-    },
-  },
-  {
-    name: "canvas_sheet_column_delete_batch",
-    description:
-      "Delete MANY columns in ONE call — the batch counterpart of canvas_sheet_column_delete. " +
-      "Strongly preferred over calling canvas_sheet_column_delete repeatedly when removing " +
-      "several columns at once; N one-at-a-time deletes become one round trip and one live " +
-      "update. Each item carries its own sheetId + columnId, so a single call can span multiple " +
-      "sheets. Also strips each column's data from every row (non-reversible).",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The columns to delete. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              sheetId: { type: "string" },
-              columnId: { type: "string" },
-            },
-            required: ["sheetId", "columnId"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_sheet_row_add",
-    description:
-      "Add a row to a sheet. `data` is an object of cell values keyed by either the " +
-      "column NAME (e.g. \"Task\", case-insensitive) or the column.id — names are " +
-      "resolved to ids server-side, so you don't need to look up the uuids. Values: " +
-      "strings for text/date, numbers for number, booleans for checkbox.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        data: { type: "object" },
-        sortOrder: { type: "number" },
-      },
-      required: ["sheetId"],
-    },
-  },
-  {
-    name: "canvas_sheet_row_add_batch",
-    description:
-      "Add MANY rows to a sheet in ONE call — the batch counterpart of canvas_sheet_row_add. " +
-      "Strongly preferred over calling the single-item tool repeatedly: spreadsheets are " +
-      "inherently many-row, so batching an N-row add turns N round trips (and N live " +
-      "updates) into one. Each row's `data` is an object of cell values keyed by either the " +
-      "column NAME (e.g. \"Task\", case-insensitive) or the column.id — names are resolved to " +
-      "ids server-side. Values: strings for text/date, numbers for number, booleans for checkbox.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sheetId: { type: "string" },
-        rows: {
-          type: "array",
-          description: "The rows to add. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              data: { type: "object" },
-              sortOrder: { type: "number" },
-            },
-          },
-        },
-      },
-      required: ["sheetId", "rows"],
-    },
-  },
-  {
-    name: "canvas_sheet_row_update",
-    description:
-      "Update a row by ID. `data` is merged into the existing row data — keys not present " +
-      "are left untouched; setting a key to null clears that cell. Cells may be keyed by " +
-      "column NAME (case-insensitive) or column.id; names are resolved to ids server-side. " +
-      "To edit several rows at once, use canvas_sheet_row_update_batch instead of calling " +
-      "this repeatedly.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        data: { type: "object" },
-        sortOrder: { type: "number" },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "canvas_sheet_row_update_batch",
-    description:
-      "Update MANY rows in ONE call - the batch counterpart of canvas_sheet_row_update. Strongly " +
-      "preferred over calling canvas_sheet_row_update repeatedly when editing several existing " +
-      "rows at once; N one-at-a-time updates become one round trip and one live update. Each row's " +
-      "`data` is merged into the existing row data — keys not present are left untouched, setting " +
-      "a key to null clears that cell. Cells may be keyed by column NAME (case-insensitive) or " +
-      "column.id.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The rows to update. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              id: { type: "string" },
-              data: { type: "object" },
-              sortOrder: { type: "number" },
-            },
-            required: ["id"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_sheet_row_delete",
-    description: "Delete a sheet row by its ID.",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_sheet_row_delete_batch",
-    description:
-      "Delete MANY rows in ONE call — the batch counterpart of canvas_sheet_row_delete. Strongly " +
-      "preferred over calling canvas_sheet_row_delete repeatedly when removing several rows at " +
-      "once (spreadsheets are inherently many-row): N one-at-a-time deletes become one round trip " +
-      "and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "Sheet row ids to delete. At least one.",
-        },
-      },
-      required: ["ids"],
-    },
-  },
-  {
-    name: "canvas_chart_add",
-    description:
-      "Add a chart that visualizes data from a sheet. Pick a source `sheetId`, a " +
-      "`chartType` (bar | line | area | pie), an `xColumn` for category/x-axis labels, " +
-      "and one or more `yColumns` to plot as numeric series. Columns may be referenced " +
-      "by NAME (case-insensitive) or column.id — names are resolved server-side. Use " +
-      "this for tracking values over time (e.g. projected inventory by month, spend by " +
-      "category). Also switches the canvas into charts mode.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string", description: "Chart title." },
-        sheetId: { type: "string", description: "Source sheet id." },
-        chartType: { type: "string", enum: ["bar", "line", "area", "pie"] },
-        xColumn: { type: "string", description: "Column name or id for x-axis / categories." },
-        yColumns: {
-          type: "array",
-          items: { type: "string" },
-          description: "Column names or ids to plot as series (numeric). Pie uses the first.",
-        },
-        sortOrder: { type: "number" },
-      },
-      required: ["sheetId"],
-    },
-  },
-  {
-    name: "canvas_chart_add_batch",
-    description:
-      "Add MANY charts in ONE call — the batch counterpart of canvas_chart_add. Strongly " +
-      "preferred over calling canvas_chart_add repeatedly when adding several charts at once " +
-      "(e.g. one chart per category from the same sheet): the whole array persists in a single " +
-      "write and fires one live update, instead of one round trip per chart. Each entry takes " +
-      "the SAME fields as canvas_chart_add (sheetId, chartType, xColumn, yColumns, sortOrder) " +
-      "and gets its own 1:1 backing chart document, same as the single-item tool. Returns the " +
-      "created charts (with their generated ids), in input order.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        charts: {
-          type: "array",
-          description: "The charts to add. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              name: { type: "string", description: "Chart title." },
-              sheetId: { type: "string", description: "Source sheet id." },
-              chartType: { type: "string", enum: ["bar", "line", "area", "pie"] },
-              xColumn: { type: "string", description: "Column name or id for x-axis / categories." },
-              yColumns: {
-                type: "array",
-                items: { type: "string" },
-                description: "Column names or ids to plot as series (numeric). Pie uses the first.",
-              },
-              sortOrder: { type: "number" },
-            },
-            required: ["sheetId"],
-          },
-        },
-      },
-      required: ["charts"],
-    },
-  },
-  {
-    name: "canvas_chart_update",
-    description:
-      "Update a chart by ID. Any of name, sheetId, chartType, xColumn, yColumns, sortOrder " +
-      "may be set. Column refs (xColumn / yColumns) may be names or ids; resolved server-side. " +
-      "To edit several charts at once, use canvas_chart_update_batch instead of calling this " +
-      "repeatedly.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        name: { type: "string" },
-        sheetId: { type: "string" },
-        chartType: { type: "string", enum: ["bar", "line", "area", "pie"] },
-        xColumn: { type: "string" },
-        yColumns: { type: "array", items: { type: "string" } },
-        sortOrder: { type: "number" },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "canvas_chart_update_batch",
-    description:
-      "Update MANY charts in ONE call - the batch counterpart of canvas_chart_update. Strongly " +
-      "preferred over calling canvas_chart_update repeatedly when editing several existing charts " +
-      "at once; N one-at-a-time updates become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          description: "The charts to update. At least one.",
-          items: {
-            type: "object" as const,
-            properties: {
-              id: { type: "string" },
-              name: { type: "string" },
-              sheetId: { type: "string" },
-              chartType: { type: "string", enum: ["bar", "line", "area", "pie"] },
-              xColumn: { type: "string" },
-              yColumns: { type: "array", items: { type: "string" } },
-              sortOrder: { type: "number" },
-            },
-            required: ["id"],
-          },
-        },
-      },
-      required: ["items"],
-    },
-  },
-  {
-    name: "canvas_chart_delete",
-    description: "Delete a chart by its ID.",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_chart_delete_batch",
-    description:
-      "Delete MANY charts in ONE call — the batch counterpart of canvas_chart_delete. Strongly " +
-      "preferred over calling canvas_chart_delete repeatedly when removing several charts at " +
-      "once; N one-at-a-time deletes become one round trip and one live update.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: { type: "array", items: { type: "string" }, description: "Chart ids to delete. At least one." },
-      },
-      required: ["ids"],
-    },
-  },
-  {
-    name: "canvas_form_scaffold",
-    description:
-      "Draft a form from an existing sheet — the easy on-ramp to the direct-input layer. " +
-      "Returns a DRAFT intent (one field + one append binding per column) plus a compile " +
-      "report. Stores NOTHING. Edit the returned intent (rename, mark fields required, swap " +
-      "a field for {computed:'today'}, add upsert/pin writes) then call canvas_form_define. " +
-      "Needs the sheet to exist first (create it with canvas_sheet_add if needed).",
-    inputSchema: {
-      type: "object" as const,
-      properties: { sheet: { type: "string", description: "Name of an existing sheet." } },
-      required: ["sheet"],
-    },
-  },
-  {
-    name: "canvas_form_define",
-    description:
-      "Define a form: a recipe a human fills from a phone to mutate the canvas directly — " +
-      "no agent in the submit loop. You express INTENT (fields + where they go); the server " +
-      "validates against live state, compiles it to a stored mapping, and persists it. " +
-      "Returns { ok, errors, warnings, formId }. On ok:false NOTHING is stored — fix the " +
-      "errors (each has a path + suggestion) and call again. A `writes` entry targets either " +
-      "a sheet (append a row, or upsert+increment a running total) or a pin (patch its " +
-      "color/label/body/pinType). Columns are referenced by NAME. Each column/set value is a " +
-      "Source with EXACTLY ONE of: {field:'<fieldKey>'}, {computed:'today'|'now'}, " +
-      "{literal:<scalar>}.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string", description: "Form name, e.g. 'Log a meal'." },
-        description: { type: "string" },
-        fields: {
-          type: "array",
-          description: "The inputs a human fills (1..20).",
-          items: {
-            type: "object",
-            properties: {
-              key: { type: "string", description: "lowercase id: ^[a-z][a-z0-9_]{0,31}$, unique." },
-              label: { type: "string" },
-              type: { type: "string", enum: ["text", "number", "date", "select", "checkbox"] },
-              required: { type: "boolean" },
-              options: { type: "array", items: { type: "string" }, description: "Required iff type=select." },
-              default: { description: "Type-compatible default; select ⇒ one of options." },
-              placeholder: { type: "string" },
-            },
-            required: ["key", "label", "type"],
-          },
-        },
-        writes: {
-          type: "array",
-          description:
-            "Where submitted values go (1..8). A SheetWrite has {sheet, mode:'append'|'upsert', " +
-            "columns:{<colName>:Source}, match?:[colName] (required for upsert), inc?:[colName] " +
-            "(upsert only — increments a numeric column, e.g. a running total)}. A PinWrite has " +
-            "{pin:<pinId>, set:{color|label|body|pinType: Source}}.",
-          items: { type: "object" },
-        },
-      },
-      required: ["name", "fields", "writes"],
-    },
-  },
-  {
-    name: "canvas_form_update",
-    description:
-      "Redefine an existing form by id from a full intent (same shape as canvas_form_define). " +
-      "Re-compiled and re-validated; on ok:false nothing changes.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        id: { type: "string" },
-        name: { type: "string" },
-        description: { type: "string" },
-        fields: { type: "array", items: { type: "object" } },
-        writes: { type: "array", items: { type: "object" } },
-      },
-      required: ["id", "name", "fields", "writes"],
-    },
-  },
-  {
-    name: "canvas_form_delete",
-    description: "Delete a form by its ID. (Rows/pins it already produced are unaffected.)",
-    inputSchema: { type: "object" as const, properties: { id: { type: "string" } }, required: ["id"] },
-  },
-  {
-    name: "canvas_form_delete_batch",
-    description:
-      "Delete MANY forms in ONE call — the batch counterpart of canvas_form_delete. Strongly " +
-      "preferred over calling canvas_form_delete repeatedly when removing several forms at once; " +
-      "N one-at-a-time deletes become one round trip and one live update. (Rows/pins they already " +
-      "produced are unaffected.)",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        ids: { type: "array", items: { type: "string" }, description: "Form ids to delete. At least one." },
-      },
-      required: ["ids"],
-    },
-  },
-  {
     name: "canvas_pending_edits_read",
     description: "Read pending scoped edit requests from the browser UI.",
     inputSchema: { type: "object" as const, properties: {} },
@@ -3240,7 +1806,7 @@ const RAW_TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to sheets'." },
+        title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to the board'." },
         body: { type: "string", description: "Concise brief: what to do, acceptance criteria." },
         linkedIds: {
           type: "array",
@@ -3291,7 +1857,7 @@ const RAW_TOOLS = [
           items: {
             type: "object" as const,
             properties: {
-              title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to sheets'." },
+              title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to the board'." },
               body: { type: "string", description: "Concise brief: what to do, acceptance criteria." },
               linkedIds: {
                 type: "array",

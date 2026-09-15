@@ -30,7 +30,6 @@ import { RotateCcw, Undo2 } from "lucide-react";
 
 import { T_BTN, TAP } from "../lib/boardScale";
 import { moveEpicState, moveTaskToGate } from "../lib/api";
-import posthog from "../lib/posthog";
 import {
   epicCascadePreview,
   epicOwnerMovesFor,
@@ -97,14 +96,6 @@ export function EpicOwnerMoves({
       onMove={async (move, reason) => {
         const from = epic.state;
         const res = await moveEpicState(code, epic.id, move.to, reason || undefined);
-        posthog.capture("epic_moved", {
-          canvas_code: code,
-          from,
-          to: move.to,
-          unapproved: res.unapprovedCount,
-          noted: reason.length > 0,
-          surface,
-        });
         if (!res.moved) return "It was already there — nothing changed.";
         // Always a receipt, even for zero: "nothing else moved" is the answer to
         // the question the confirm just raised, and silence reads as "did the
@@ -153,13 +144,6 @@ export function TaskOwnerMoves({
       onMove={async (move, reason) => {
         const from = task.state;
         const res = await moveTaskToGate(code, task.id, move.to, reason || undefined);
-        posthog.capture("task_gate_moved", {
-          canvas_code: code,
-          from,
-          to: move.to,
-          noted: reason.length > 0,
-          surface,
-        });
         if (!res.moved) return "It was already there — nothing changed.";
         return from === "approved"
           ? "Out of the ready queue — it waits at the gate now."

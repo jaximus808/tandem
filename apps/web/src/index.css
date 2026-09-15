@@ -225,34 +225,8 @@ body {
   background-clip: padding-box;
 }
 
-/* Leaflet container needs an explicit height */
-.leaflet-container {
-  height: 100%;
-  width: 100%;
-}
-
-/* Leaflet popups are Tandem UI (pin label/body editing), so they follow the
-   theme — a dark card on the light map in dark mode, matching the map toolbar
-   and sidebar. The raster tiles + baked annotation pills stay light (a
-   deliberate light frame); only Tandem-rendered chrome inverts. Leaflet's own
-   stylesheet hardcodes a white wrapper, so override it against our tokens. */
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
-  background: rgb(var(--color-surface));
-  color: rgb(var(--color-ink));
-}
-.leaflet-popup-content-wrapper {
-  box-shadow: 0 3px 14px rgb(0 0 0 / 0.28);
-}
-.leaflet-container a.leaflet-popup-close-button {
-  color: rgb(var(--color-ink) / 0.5);
-}
-.leaflet-container a.leaflet-popup-close-button:hover {
-  color: rgb(var(--color-ink));
-}
-
-/* Tailwind Typography (`prose`, used by DocsMode notes + rendered markdown in
-   MapMode/ItineraryMode) hardcodes its heading/bold/link/list-marker colors to
+/* Tailwind Typography (`prose`, used by DocsMode notes + rendered markdown)
+   hardcodes its heading/bold/link/list-marker colors to
    dark grays via its own `--tw-prose-*` variables. Those are more specific than
    the container's `text-ink/NN` utility, so on a dark surface headings, bold
    runs, and links go near-black and vanish (plain body text still inherits the

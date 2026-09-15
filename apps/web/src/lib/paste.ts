@@ -1,20 +1,6 @@
-/* Paste power (roadmap item 13). Two self-contained helpers, no deps:
-   - parseClipboardGrid: TSV/Excel clipboard text → a 2D grid, for pasting a
-     block into a sheet that auto-grows rows/columns.
+/* Paste power (roadmap item 13). One self-contained helper, no deps:
    - htmlToMarkdown: rich clipboard HTML (webpage, Google Docs) → Markdown, so a
      paste into a note keeps its formatting instead of flattening to plain text. */
-
-/** Parse spreadsheet clipboard text (tab-separated, newline rows) into a grid.
-    Excel / Google Sheets / Numbers all copy as TSV in text/plain. Returns [] for
-    a single plain value (caller should fall back to the browser's default paste). */
-export function parseClipboardGrid(text: string): string[][] {
-  if (!text) return [];
-  // Normalise line endings, then drop a single trailing newline (spreadsheets
-  // append one) so we don't synthesise a phantom empty row.
-  const normalised = text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
-  if (!normalised.includes("\t") && !normalised.includes("\n")) return [];
-  return normalised.split("\n").map((line) => line.split("\t"));
-}
 
 /** Convert an HTML fragment (as found on a clipboard) to Markdown. Handles the
     common tags — headings, bold/italic, links, lists, code, blockquotes, and

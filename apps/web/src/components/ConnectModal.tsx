@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { PresentAgent } from "../lib/useAgentActivity";
-import posthog from "../lib/posthog";
 
 interface Props {
   code: string;
@@ -166,7 +165,6 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
   const prevConnectedRef = useRef(false);
   useEffect(() => {
     if (connected && !prevConnectedRef.current) {
-      posthog.capture("agent_connected", { canvas_code: code, agent_name: connectedAgent?.name });
       markConnectDismissed(code);
     }
     prevConnectedRef.current = connected;
@@ -183,7 +181,6 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
 
   function copy(text: string, which: CopyKey) {
     navigator.clipboard.writeText(text).then(() => {
-      posthog.capture("connect_prompt_copied", { copy_type: which, canvas_code: code });
       setCopied(which);
       setTimeout(() => setCopied((c) => (c === which ? null : c)), 1500);
     });

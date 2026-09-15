@@ -112,13 +112,8 @@ function toMs(u: number | string): number {
 
 // Each editable collection mapped to its tab and the noun we narrate it as.
 const KIND_MODE: { key: keyof CanvasState; mode: CanvasMode; noun: string }[] = [
-  { key: "pins", mode: "map", noun: "map pin" },
-  { key: "events", mode: "itinerary", noun: "itinerary event" },
   { key: "notes", mode: "docs", noun: "doc" },
   { key: "roadmapItems", mode: "roadmap", noun: "roadmap item" },
-  { key: "sheets", mode: "sheets", noun: "spreadsheet" },
-  { key: "sheetRows", mode: "sheets", noun: "spreadsheet row" },
-  { key: "charts", mode: "charts", noun: "chart" },
 ];
 
 type Snap = { ms: number; mode: CanvasMode; noun: string };

@@ -6,11 +6,7 @@ import type {
   CanvasMeta,
   CanvasState,
   Note,
-  Pin,
-  CanvasEvent,
   RoadmapItem,
-  Sheet,
-  SheetRow,
   Document,
   EntityId,
 } from "../types";
@@ -20,127 +16,8 @@ export const MOCK_ENABLED = import.meta.env.VITE_MOCK === "1";
 let counter = 0;
 const id = (): EntityId => `mock-${++counter}`;
 
-const pin1Id = id();
-const pin2Id = id();
-const pin3Id = id();
-const pinKyotoId = id();
-const pinSfoId = id();
-const event1Id = id();
-const event2Id = id();
-const eventFlightId = id();
-const eventTrainId = id();
 const note1Id = id();
 const note2Id = id();
-
-const pins: Pin[] = [
-  {
-    id: pin1Id,
-    kind: "pin",
-    pinType: "marker",
-    lat: 35.6895,
-    lng: 139.6917,
-    label: "Shibuya Crossing",
-    body:
-      "World's busiest pedestrian crossing. **Tip:** ride the escalator in Shibuya Station up to the upper level for the iconic overhead view.\n\n| Metric | Value |\n|---|---|\n| Daily crossings | ~3M |\n| Best photo time | Dusk |",
-    color: "#3b82f6",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: pin2Id,
-    kind: "pin",
-    pinType: "marker",
-    lat: 35.7148,
-    lng: 139.7967,
-    label: "Sensō-ji Temple",
-    body: "Tokyo's oldest temple, dating to 645 CE. Don't skip Nakamise-dōri for snacks on the way in.",
-    color: "#ef4444",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: pin3Id,
-    kind: "pin",
-    pinType: "marker",
-    lat: 35.6586,
-    lng: 139.7454,
-    label: "Tokyo Tower",
-    body: "",
-    color: "#f59e0b",
-    createdBy: "user",
-    updatedAt: Date.now(),
-  },
-  {
-    id: pinKyotoId,
-    kind: "pin",
-    pinType: "marker",
-    lat: 35.0116,
-    lng: 135.7681,
-    label: "Kyoto",
-    body: "Old capital, day trip from Tokyo via Shinkansen.",
-    color: "#8b5cf6",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: pinSfoId,
-    kind: "pin",
-    pinType: "marker",
-    lat: 37.6213,
-    lng: -122.379,
-    label: "SFO",
-    body: "Home base — return leg lands here.",
-    color: "#0ea5e9",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-];
-
-const events: CanvasEvent[] = [
-  {
-    id: event1Id,
-    kind: "event",
-    title: "Shibuya street photography walk",
-    start: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-    end: new Date(Date.now() + 27 * 3600 * 1000).toISOString(),
-    pinId: pin1Id,
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: event2Id,
-    kind: "event",
-    title: "Sensō-ji at sunrise",
-    start: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
-    pinId: pin2Id,
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: eventTrainId,
-    kind: "event",
-    title: "Shinkansen to Kyoto",
-    start: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
-    end: new Date(Date.now() + 74.25 * 3600 * 1000).toISOString(),
-    fromPinId: pin1Id,
-    toPinId: pinKyotoId,
-    travelMode: "train",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-  {
-    id: eventFlightId,
-    kind: "event",
-    title: "Return flight NRT → SFO",
-    start: new Date(Date.now() + 120 * 3600 * 1000).toISOString(),
-    end: new Date(Date.now() + 130 * 3600 * 1000).toISOString(),
-    fromPinId: pinKyotoId,
-    toPinId: pinSfoId,
-    travelMode: "flight",
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-];
 
 const notes: Note[] = [
   {
@@ -168,7 +45,6 @@ const notes: Note[] = [
 > Alternative: hotel near DEN, drive Friday morning (you WFH Fridays).
 `,
     imageRefs: [],
-    parentId: pin1Id,
     sortOrder: 0,
     createdBy: "agent",
     updatedAt: Date.now(),
@@ -245,66 +121,11 @@ const roadmapItems: RoadmapItem[] = [
     createdBy: "agent", updatedAt: Date.now() },
 ];
 
-// ── Sheets seed: hotel comparison (exercises all four column types) ──────────
-const hotelSheetId = id();
-const colHotelId = id();
-const colPriceId = id();
-const colStarsId = id();
-const colBookedId = id();
-const colCheckinId = id();
-
-const sheetRowHiltonId = id();
-const sheetRowMarriottId = id();
-const sheetRowHyattId = id();
-const sheetRowAirbnbId = id();
-
-const sheets: Sheet[] = [
-  {
-    id: hotelSheetId,
-    kind: "sheet",
-    name: "Hotel comparison",
-    sortOrder: 0,
-    columns: [
-      { id: colHotelId,   name: "Hotel",     type: "text",     sortOrder: 0 },
-      { id: colPriceId,   name: "Price/night", type: "number", sortOrder: 1 },
-      { id: colStarsId,   name: "Stars",     type: "number",   sortOrder: 2 },
-      { id: colBookedId,  name: "Booked",    type: "checkbox", sortOrder: 3 },
-      { id: colCheckinId, name: "Check-in",  type: "date",     sortOrder: 4 },
-    ],
-    createdBy: "agent",
-    updatedAt: Date.now(),
-  },
-];
-
-const sheetRows: SheetRow[] = [
-  {
-    id: sheetRowHiltonId, kind: "sheetRow", sheetId: hotelSheetId, sortOrder: 0,
-    data: { [colHotelId]: "Hilton Tokyo", [colPriceId]: 285, [colStarsId]: 4, [colBookedId]: true,  [colCheckinId]: "2026-07-12" },
-    createdBy: "agent", updatedAt: Date.now(),
-  },
-  {
-    id: sheetRowMarriottId, kind: "sheetRow", sheetId: hotelSheetId, sortOrder: 1,
-    data: { [colHotelId]: "Marriott Shinjuku", [colPriceId]: 220, [colStarsId]: 4, [colBookedId]: false, [colCheckinId]: "2026-07-12" },
-    createdBy: "agent", updatedAt: Date.now(),
-  },
-  {
-    id: sheetRowHyattId, kind: "sheetRow", sheetId: hotelSheetId, sortOrder: 2,
-    data: { [colHotelId]: "Park Hyatt Tokyo", [colPriceId]: 510, [colStarsId]: 5, [colBookedId]: false, [colCheckinId]: "2026-07-12" },
-    createdBy: "agent", updatedAt: Date.now(),
-  },
-  {
-    id: sheetRowAirbnbId, kind: "sheetRow", sheetId: hotelSheetId, sortOrder: 3,
-    data: { [colHotelId]: "Airbnb in Shibuya", [colPriceId]: 165, [colStarsId]: 3, [colBookedId]: false, [colCheckinId]: "2026-07-13" },
-    createdBy: "user", updatedAt: Date.now(),
-  },
-];
-
 const initialCanvas: CanvasMeta = {
   id: "mock-canvas",
   code: "MOCKCNV1",
   name: "Mock Canvas (offline)",
-  mode: "sheets",
-  mapId: "us",
+  mode: "docs",
   version: 1,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -319,35 +140,23 @@ function toRecord<T extends { id: EntityId }>(arr: T[]): Record<EntityId, T> {
 // Documents (migration 0024): the mock's content predates the model, so wrap
 // each kind in a named document and stamp its rows with that documentId — the
 // canvas tab strip renders one tab per document.
-const mapDocId = id();
-const itinDocId = id();
 const notesDocId = id();
 const roadmapDocId = id();
-const sheetDocId = id();
 
 const documents: Document[] = [
-  { id: mapDocId, kind: "document", type: "map", name: "US map", sortOrder: 0, config: { mapId: "us" }, createdBy: "user", updatedAt: Date.now() },
-  { id: itinDocId, kind: "document", type: "itinerary", name: "Itinerary", sortOrder: 1, config: {}, createdBy: "user", updatedAt: Date.now() },
   { id: notesDocId, kind: "document", type: "notes", name: "Notes", sortOrder: 2, config: {}, createdBy: "user", updatedAt: Date.now() },
   { id: roadmapDocId, kind: "document", type: "roadmap", name: "Roadmap", sortOrder: 3, config: {}, createdBy: "user", updatedAt: Date.now() },
-  { id: sheetDocId, kind: "document", type: "sheet", name: "Hotel comparison", sortOrder: 4, config: {}, createdBy: "user", updatedAt: Date.now() },
 ];
 
 const stamp = <T,>(arr: T[], documentId: string): T[] => arr.map((e) => ({ ...e, documentId }));
 
 const initialState: CanvasState = {
   version: 1,
-  mode: "sheets",
+  mode: "docs",
   enabledModes: [],
   documents: toRecord(documents),
-  pins: toRecord(stamp(pins, mapDocId)),
-  events: toRecord(stamp(events, itinDocId)),
   notes: toRecord(stamp(notes, notesDocId)),
   roadmapItems: toRecord(stamp(roadmapItems, roadmapDocId)),
-  sheets: toRecord(stamp(sheets, sheetDocId)),
-  sheetRows: toRecord(sheetRows),
-  charts: {},
-  forms: {},
   actions: {},
   agents: {},
 };

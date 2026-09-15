@@ -95,8 +95,8 @@ export function fullToolsEnabled(override?: boolean): boolean {
  * facade first, then every CRUD tool the facade doesn't already own by name
  * (only canvas_connect overlaps, and the facade's version wins because its
  * description teaches the queue-first workflow). Additive rather than
- * either/or because the facade covers the queue but not maps, sheets, charts
- * or forms — a session that opts in usually wants both.
+ * either/or because the facade covers the queue but not the raw document/note/
+ * roadmap CRUD — a session that opts in usually wants both.
  */
 export function manifestFor(fullTools: boolean) {
   if (!fullTools) return FACADE_TOOLS;

@@ -16,7 +16,6 @@ import AccessTokensSection from "../components/AccessTokensSection";
 import ConnectedAppsSection from "../components/ConnectedAppsSection";
 import ThemeToggle from "../components/ThemeToggle";
 import FollowStyleControl from "../components/FollowStyleControl";
-import posthog from "../lib/posthog";
 
 interface Props {
   onHome: () => void;
@@ -69,8 +68,6 @@ export default function UserSettings({ onHome, onShowCanvases, onShowAbout, onOp
 
   async function handleLogout() {
     await logout();
-    posthog.capture("user_signed_out");
-    posthog.reset();
     window.google?.accounts.id.disableAutoSelect();
     setLoad({ status: "signedOut" });
   }
@@ -124,8 +121,6 @@ export default function UserSettings({ onHome, onShowCanvases, onShowAbout, onOp
     setDeleteError(null);
     try {
       await deleteAccount();
-      posthog.capture("account_deleted");
-      posthog.reset();
       window.google?.accounts.id.disableAutoSelect();
       setDeleteOpen(false);
       setLoad({ status: "signedOut" });

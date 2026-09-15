@@ -62,7 +62,7 @@ const CANVAS_COUNT_FLOOR = 50;
 
 // The board's view modes, name-dropped once in the workspace note below —
 // deliberately NOT a full section of demos; the queue is the story.
-const MODE_NAMES = ["Roadmap", "Sheets", "Docs", "Charts", "Map", "Itinerary"];
+const MODE_NAMES = ["Board", "Roadmap", "Docs"];
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -524,7 +524,7 @@ export default function Landing({ onJoin, onOpenMCP, onShowCanvases, onShowSetti
           </h2>
           <p className="mt-3 leading-relaxed text-ink/65">
             Everything your agents write lands as structured state you can actually read — the
-            epic as a roadmap, results as a sheet, findings as a doc. Same data they see, rendered
+            epic as a roadmap, results on the board, findings as a doc. Same data they see, rendered
             for the human who has to review it.
           </p>
           <div className="mt-5 flex flex-wrap gap-1.5">

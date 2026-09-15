@@ -84,7 +84,7 @@ pnpm --filter @jaximus/tandem-mcp build
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `API_URL`           | `https://tandemcanvas.com` | Tandem HTTP API base URL. Only set this to override the default.                                                                                    |
 | `TANDEM_TOKEN`      | _(unset)_                  | Personal access token — lets the agent act as **you** on your private and shared canvases. Mint one at `/me`. Without it, only public canvases work. |
-| `TANDEM_FULL_TOOLS` | _(unset)_                  | Set to `1` to also advertise the full CRUD surface (maps, sheets, charts, forms, …) alongside the default intent facade. Same as `--full-tools`.    |
+| `TANDEM_FULL_TOOLS` | _(unset)_                  | Set to `1` to also advertise the full CRUD surface (documents, notes, roadmap items, raw actions, …) alongside the default intent facade. Same as `--full-tools`.    |
 | `TANDEM_CANVAS_CODE` | _(unset)_                 | This project's canvas code, written by `init`. Named in the `canvas_connect` tool description so the agent knows which canvas it belongs to, and used as the default when it calls `canvas_connect` without one. |
 | `MCP_TRACE`         | _(unset)_                  | Per-tool-call timing on stderr, plus a session summary on exit. `1` for human-readable lines, `json` for one JSON object per line. See [Tracing](#tracing). |
 | `REQUEST_TIMEOUT_MS` | `15000`                   | Per-request timeout for calls to the Tandem API. `queue_wait` is exempt — its deadline is derived from the wait it asked for, so a long wait is never cut short by this budget. |
@@ -196,7 +196,7 @@ Reading a tab is `doc_read`, not a hand-built HTTP call: `context_get` lists the
 
 ### The full CRUD surface
 
-Behind `TANDEM_FULL_TOOLS=1` (or `tandem-mcp --full-tools`) the gateway **also** advertises the ~80-tool CRUD surface — documents, notes, roadmap items, sheets, charts, forms, map pins, timed events, agent registration, epics — each with `add` / `update` / `delete` and `_batch` variants, plus `canvas_state_read`. It is additive: you get the facade *and* CRUD. Full schemas come back from the MCP `tools/list` request, or see [`src/tools.ts`](https://github.com/jaximus808/tandam/blob/main/apps/mcp-gateway/src/tools.ts).
+Behind `TANDEM_FULL_TOOLS=1` (or `tandem-mcp --full-tools`) the gateway **also** advertises the ~40-tool CRUD surface — documents, notes, roadmap items, agent registration, epics — each with `add` / `update` / `delete` and `_batch` variants, plus `canvas_state_read`. It is additive: you get the facade *and* CRUD. Full schemas come back from the MCP `tools/list` request, or see [`src/tools.ts`](https://github.com/jaximus808/tandam/blob/main/apps/mcp-gateway/src/tools.ts).
 
 Those tools stay **callable** either way — the flag decides what's *advertised*, so existing prompts that name `canvas_task_list` keep working against the default manifest.
 

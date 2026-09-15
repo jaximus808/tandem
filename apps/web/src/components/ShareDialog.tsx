@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApprovalPolicy, CanvasMeta } from "../types";
-import posthog from "../lib/posthog";
 import { approvalPolicySentence, policyIsLoose, policyOf } from "../lib/provenance";
 import {
   addCanvasAccess,
@@ -113,7 +112,6 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
     setPublicRole(next.publicRole);
     try {
       await setCanvasVisibility(code, next.visibility, next.publicRole);
-      posthog.capture("canvas_visibility_changed", { canvas_code: code, visibility: next.visibility, public_role: next.publicRole });
     } catch (err) {
       setVisibility(prev.visibility);
       setPublicRole(prev.publicRole);
@@ -131,7 +129,6 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
     setApprovalPolicy(next);
     try {
       await setCanvasApprovalPolicy(code, next);
-      posthog.capture("canvas_approval_policy_changed", { canvas_code: code, approval_policy: next });
     } catch (err) {
       setApprovalPolicy(prev);
       setPolicyError(err instanceof Error ? err.message : "Could not save");
@@ -148,7 +145,6 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
     setShareError(null);
     try {
       const entry = await addCanvasAccess(code, addr, inviteRole);
-      posthog.capture("canvas_shared", { canvas_code: code, role: inviteRole });
       setAccess((rows) => {
         const others = (rows ?? []).filter((r) => r.userId !== entry.userId);
         return [...others, entry];

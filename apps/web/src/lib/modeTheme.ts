@@ -1,8 +1,7 @@
 import type { CanvasMode } from "../types";
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Per-mode CONTENT identity (Map=sky, Itinerary=amber, Docs=violet,
-   Sheets=emerald, Roadmap=rose, Charts=indigo).
+   Per-mode CONTENT identity (Docs=violet, Roadmap=rose).
 
    SCOPE (Design v2 decision, /DESIGN.md): these hues are content-level
    semantics ONLY — e.g. the docTypes icon tints. They never colour chrome or
@@ -29,18 +28,6 @@ export const MODE_THEME: Record<CanvasMode, ModeTheme> = {
     line: "rgba(100,116,139,0.22)",
     hover: "#475569",
   },
-  map: {
-    solid: "#0EA5E9",
-    soft: "rgba(14,165,233,0.10)",
-    line: "rgba(14,165,233,0.24)",
-    hover: "#0284C7",
-  },
-  itinerary: {
-    solid: "#F59E0B",
-    soft: "rgba(245,158,11,0.12)",
-    line: "rgba(245,158,11,0.26)",
-    hover: "#D97706",
-  },
   docs: {
     solid: "#7C3AED",
     soft: "rgba(124,58,237,0.10)",
@@ -52,18 +39,6 @@ export const MODE_THEME: Record<CanvasMode, ModeTheme> = {
     soft: "rgba(244,63,94,0.10)",
     line: "rgba(244,63,94,0.24)",
     hover: "#E11D48",
-  },
-  sheets: {
-    solid: "#10B981",
-    soft: "rgba(16,185,129,0.10)",
-    line: "rgba(16,185,129,0.24)",
-    hover: "#059669",
-  },
-  charts: {
-    solid: "#6366F1",
-    soft: "rgba(99,102,241,0.10)",
-    line: "rgba(99,102,241,0.24)",
-    hover: "#4F46E5",
   },
 };
 

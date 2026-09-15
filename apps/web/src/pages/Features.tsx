@@ -562,8 +562,7 @@ const PILLARS: Pillar[] = [
             name: "Named document tabs",
             line: (
               <>
-                <M>map</M>, <M>notes</M>, <M>itinerary</M>, <M>roadmap</M>, <M>sheet</M>,{" "}
-                <M>chart</M>, <M>folder</M>. Deleting a folder returns its children to the root
+                <M>notes</M>, <M>roadmap</M>, <M>folder</M>. Deleting a folder returns its children to the root
                 instead of destroying them.
               </>
             ),
@@ -752,8 +751,8 @@ const PILLARS: Pillar[] = [
             line: (
               <>
                 On purpose: a state change is a <B>decision</B>, not a gesture, and has to be as
-                available to a keyboard as to a mouse. Drag exists elsewhere — tabs, docs, roadmap
-                and sheet reordering.
+                available to a keyboard as to a mouse. Drag exists elsewhere — tabs, docs and
+                roadmap reordering.
               </>
             ),
           },
@@ -882,28 +881,16 @@ const PILLARS: Pillar[] = [
               <>
                 The drawer passes the <B>same</B> components as desktop and shares its view state,
                 so the choice is continuous across breakpoints. Safe-area insets, a 48px touch
-                target, and a reduced-motion opt-out on sheet animation.
+                target, and a reduced-motion opt-out on drawer animation.
               </>
             ),
           },
           {
-            name: "Seven canvas modes",
+            name: "Three canvas modes",
             line: (
               <>
-                <M>welcome</M>, <M>map</M>, <M>itinerary</M>, <M>docs</M>, <M>roadmap</M>,{" "}
-                <M>sheets</M>, <M>charts</M> — nestable roadmap goals, Leaflet pins with travel
-                polylines, timezone-aware itineraries, grid-paste sheets, and charts drawn as
-                hand-rolled SVG with no charting library in the app.
-              </>
-            ),
-          },
-          {
-            name: "Forms",
-            line: (
-              <>
-                An authoring intent compiled against live canvas state and stored only if it
-                validates, plus a scaffold that derives a draft form from an existing sheet.
-                Submissions are idempotent by submission id.
+                <M>welcome</M>, <M>docs</M>, <M>roadmap</M> — markdown notes with live autosave
+                and nestable roadmap goals, next to the board itself.
               </>
             ),
           },
@@ -1024,8 +1011,8 @@ const PILLARS: Pillar[] = [
             name: "The CRUD surface is still there",
             line: (
               <>
-                Eighty-odd tools covering maps, pins, events, notes, roadmap items, sheets, rows,
-                charts, forms and documents — each with a batch variant — callable always, but
+                Forty-odd tools covering documents, notes, roadmap items, raw actions and agents
+                — each with a batch variant — callable always, but
                 advertised only behind an explicit opt-in. When opted in the manifest is additive,
                 facade first.
               </>
@@ -1093,54 +1080,6 @@ const PILLARS: Pillar[] = [
                 A bounded ring over a five-minute window, keyed by <B>route patterns</B> and never
                 by concrete ids, with every counter a process-wide scalar — which is exactly why
                 the endpoint can be open.
-              </>
-            ),
-          },
-          {
-            name: "Persisted history",
-            line: (
-              <>
-                A collector scrapes the registry on a timer into snapshots with a retention
-                window. There is deliberately no canvas id on that table.
-              </>
-            ),
-          },
-          {
-            name: "An operator console",
-            line: (
-              <>
-                Latency, fan-out, throughput, contention and connected clients as hand-rolled SVG
-                charts, with CSV/JSON export. Counters render as rates and delta series are{" "}
-                <B>split at restart boundaries</B>, since every counter is cumulative since boot.
-              </>
-            ),
-          },
-          {
-            name: "Access is an env allowlist",
-            line: (
-              <>
-                Unset, the whole subtree 404s. Deliberately not a database role — Tandem has no
-                admin model and is not getting one by accident.
-              </>
-            ),
-          },
-          {
-            name: "A load-test harness",
-            line: (
-              <>
-                Agent-concurrency scenarios asserting claim and queue latency, publishing
-                baselines. Aborted and skipped runs are <B>stored, not dropped</B> — "the
-                256-agent point could not complete" is itself the finding.
-              </>
-            ),
-          },
-          {
-            name: "Exports and copies",
-            line: (
-              <>
-                Sheet export and a calendar-subscribable itinerary feed that still enforces
-                private-canvas visibility, plus an atomic deep-copy that regenerates ids while
-                preserving sheet column ids so chart references stay valid.
               </>
             ),
           },

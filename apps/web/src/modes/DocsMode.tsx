@@ -637,11 +637,6 @@ function NoteCard({
     }
   }, [note.body, focused]);
 
-  const parent =
-    note.parentId
-      ? state.pins[note.parentId] ?? state.events[note.parentId]
-      : null;
-
   // Send the current draft if it changed. Returns whether an op was actually
   // pushed, so callers only touch the saved-at indicator on a real save.
   function persist(): boolean {
@@ -711,13 +706,6 @@ function NoteCard({
           it on the right. Freshness joins the left — it's a fact about the
           note, not an action. */}
       <div className="flex items-center gap-2 px-4 pt-3">
-        {parent && (
-          <span className="text-xs bg-ink/10 text-ink/60 rounded-full px-2 py-0.5">
-            {parent.kind === "pin"
-              ? `Pin · ${parent.label ?? "Unnamed"}`
-              : `Event · ${"title" in parent ? parent.title : ""}`}
-          </span>
-        )}
         <FreshnessChip item={note} now={now} />
         <span className="flex-1" />
         {!readOnly && <VerifyControl item={note} onPatch={handleVerify} alwaysVisible={stale} />}

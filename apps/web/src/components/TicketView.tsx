@@ -11,7 +11,6 @@ import {
   GitCommitHorizontal,
   Layers,
   Link2,
-  MapPin,
   Milestone,
   Play,
   RotateCcw,
@@ -44,7 +43,6 @@ import { eventLabel, eventSentence, repeatsOf, tallyContention } from "../lib/co
 import { humanMovesFor, type HumanMove } from "../lib/taskMoves";
 import { moveTask } from "../lib/api";
 import { TaskOwnerMoves } from "./OwnerMoveControls";
-import posthog from "../lib/posthog";
 import TaskLinks from "./TaskLinks";
 import TandemLogo from "./TandemLogo";
 import { useFreshnessNow } from "./Freshness";
@@ -390,16 +388,6 @@ function resolveLink(state: CanvasState, id: string): Resolved | null {
       Glyph: StickyNote,
     };
   }
-  const pin = (state.pins ?? {})[id];
-  if (pin) {
-    return {
-      id,
-      kind: "pin",
-      label: pin.label || pin.body?.split("\n")[0] || "Untitled pin",
-      docId: pin.documentId ?? null,
-      Glyph: MapPin,
-    };
-  }
   return null;
 }
 
@@ -524,18 +512,7 @@ function MoveControls({
     try {
       const from = task.state;
       await moveTask(code, task.id, move.to, note.trim() || undefined);
-      posthog.capture("task_moved", {
-        canvas_code: code,
-        from,
-        to: move.to,
-        assignee,
-        noted: note.trim().length > 0,
-        // The board's two move surfaces already report themselves; this is the
-        // third, and the point of the property is telling them apart.
-        surface: "ticket_page",
-      });
       if (from === "failed" && move.to === "approved") {
-        posthog.capture("agent_task_requeued", { canvas_code: code });
       }
       setPending(null);
       setNote("");

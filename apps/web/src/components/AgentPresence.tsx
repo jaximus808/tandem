@@ -20,12 +20,8 @@ interface Props {
 
 const MODE_LABEL: Record<CanvasMode, string> = {
   welcome: "Templates",
-  map: "Map",
-  itinerary: "Itinerary",
   docs: "Docs",
   roadmap: "Roadmap",
-  sheets: "Sheets",
-  charts: "Charts",
 };
 
 /**

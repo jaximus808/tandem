@@ -1,9 +1,6 @@
 export type EntityId = string;
-export type CanvasMode = "welcome" | "map" | "itinerary" | "docs" | "roadmap" | "sheets" | "charts";
+export type CanvasMode = "welcome" | "docs" | "roadmap";
 export type RoadmapStatus = "todo" | "in_progress" | "done" | "blocked";
-export type TravelMode = "flight" | "train" | "drive";
-export type SheetColumnType = "text" | "number" | "date" | "checkbox";
-export type ChartType = "bar" | "line" | "area" | "pie";
 // v1 (Tandem × ANDR) execution primitive. "epic" = a batch of related tasks
 // approved as one unit (lifecycle proposed → approved only; never executed —
 // progress is derived from its tasks).
@@ -26,9 +23,6 @@ export type ActionState =
   | "failed";
 export type AgentRole = "planner" | "executor";
 export type AgentStatus = "online" | "offline";
-// A cell value is the JSON shape stored in sheet_rows.data[columnId].
-// `null` means cleared/empty. Date stored as ISO-8601 "YYYY-MM-DD" string.
-export type SheetCellValue = string | number | boolean | null;
 
 export interface CanvasMeta {
   id: string;
@@ -36,7 +30,6 @@ export interface CanvasMeta {
   name: string;
   mode: string;      // the ACTIVE mode — what's on screen now, not what the canvas is
   enabledModes?: CanvasMode[]; // every mode turned on for this canvas; what it actually contains
-  mapId?: string;    // Phase 3: active map preset (only meaningful in map mode)
   ownerUserId?: string; // set when a logged-in user owns the canvas; absent = anonymous
   visibility?: "public" | "private"; // access posture (migration 0021); absent treated as public
   publicRole?: "read" | "write";     // when public, what the code grants
@@ -50,54 +43,6 @@ export interface CanvasMeta {
   version: number;
   createdAt: string; // ISO timestamp (Go API returns strings)
   updatedAt: string;
-}
-
-export interface Pin {
-  id: EntityId;
-  kind: "pin";
-  documentId?: EntityId; // the map document this pin belongs to (see Document)
-  pinType: "marker" | "annotation";
-  lat: number;
-  lng: number;
-  label?: string;
-  body?: string;
-  color?: string;
-  createdBy: "agent" | "user";
-  updatedAt: number;
-}
-
-export interface CanvasEvent {
-  id: EntityId;
-  kind: "event";
-  documentId?: EntityId; // the itinerary document this event belongs to
-  title: string;
-  start: string;     // true UTC instant (ISO-8601)
-  end?: string;
-  // IANA timezone of this event's location (e.g. "America/Chicago"). The
-  // itinerary formats + day-groups `start`/`end` in this zone. Per-event so
-  // cross-timezone trips render correctly. Absent → viewer's local zone.
-  timezone?: string;
-  // Pins this entry covers. A single entry can span multiple stops (e.g. a
-  // "check-in errands" entry hitting several places). The API populates this
-  // from pinId for legacy single-pin events, so prefer reading pinIds.
-  pinIds?: EntityId[];
-  pinId?: EntityId;
-  // Travel segment: set fromPinId + toPinId + travelMode together to render
-  // this event as a route between two pins on the map (e.g. a flight).
-  fromPinId?: EntityId;
-  toPinId?: EntityId;
-  travelMode?: TravelMode;
-  // Optional short prefix the map renders before the day-cluster label
-  // (e.g. "DAY 1" → "DAY 1 · Friday, May 29"). Any event on a given day can
-  // carry the tag; the renderer picks the first non-empty one (sorted by
-  // start) so agents typically set it on the first event of each day.
-  dayTag?: string;
-  // Optional cost of this event (flights, hotels, activities…), in the trip's
-  // currency. The itinerary sums these into live per-day + grand totals, so the
-  // total spend always tracks the plan without a separate sheet to maintain.
-  cost?: number;
-  createdBy: "agent" | "user";
-  updatedAt: number;
 }
 
 /* Freshness (migration 0037) — the stored half of "can this still be trusted?".
@@ -119,7 +64,7 @@ export interface FreshnessFields {
 
 /* The write side of the freshness pair. A null-able column can't tell "leave it
    alone" from "null it out" through an absent field, so clearing rides an
-   explicit flag — the same shape event.update uses for clearEnd/clearCost. */
+   explicit flag. */
 export interface FreshnessPatchFields extends FreshnessFields {
   clearVerifiedAt?: boolean;
   clearStaleAfterSeconds?: boolean;
@@ -156,52 +101,6 @@ export interface RoadmapItem extends FreshnessFields {
   // session pulls (canvas_roadmap_task_list) and executes. Absent/"human" = a
   // human goal, the default.
   assignee?: "agent" | "human";
-  sortOrder: number;
-  createdBy: "agent" | "user";
-  updatedAt: number;
-}
-
-export interface SheetColumn {
-  id: string; // uuid, stable across renames so row data keys don't break
-  name: string;
-  type: SheetColumnType;
-  sortOrder: number;
-}
-
-export interface Sheet {
-  id: EntityId;
-  kind: "sheet";
-  documentId?: EntityId; // the sheet document this sheet backs (1:1)
-  name: string;
-  columns: SheetColumn[];
-  sortOrder: number;
-  createdBy: "agent" | "user";
-  updatedAt: number;
-}
-
-export interface SheetRow {
-  id: EntityId;
-  kind: "sheetRow";
-  sheetId: EntityId;
-  data: Record<string, SheetCellValue>; // keyed by SheetColumn.id
-  sortOrder: number;
-  createdBy: "agent" | "user";
-  updatedAt: number;
-}
-
-// A chart visualizes data from a sheet. The agent (or user) picks a source
-// sheet, a category column for the x-axis, and one or more numeric columns to
-// plot as series. Column refs are stored as SheetColumn.id; the API resolves
-// column NAMES → ids on write so agents can pass human-readable names.
-export interface Chart {
-  id: EntityId;
-  kind: "chart";
-  documentId?: EntityId;   // the chart document this chart backs (1:1)
-  name: string;
-  sheetId: EntityId;       // source sheet
-  chartType: ChartType;
-  xColumn: string;          // SheetColumn.id used for category / x-axis labels
-  yColumns: string[];       // SheetColumn.ids plotted as series (numeric)
   sortOrder: number;
   createdBy: "agent" | "user";
   updatedAt: number;
@@ -459,53 +358,14 @@ export interface Agent {
   lastSeen: string;
 }
 
-// ── Forms (direct-input layer) ───────────────────────────────────────────────
-// A Form is an agent-defined recipe a human fills from a lightweight surface to
-// mutate the canvas directly (no agent in the submit loop). `fields` is the input
-// schema the dock renders; `actions` is the compiled fan-out the server runs at
-// submit (opaque to the web — the dock only needs `fields`). See
-// docs/DESIGN_DIRECT_INPUT.md.
-export type FormFieldType = "text" | "number" | "date" | "select" | "checkbox";
-
-export interface FormField {
-  key: string;
-  label: string;
-  type: FormFieldType;
-  required?: boolean;
-  options?: string[];
-  default?: string | number | boolean;
-  placeholder?: string;
-}
-
-export interface FormAction {
-  op: "sheet.row.append" | "sheet.row.upsert" | "pin.patch";
-  target: { sheet?: string; pin?: string };
-  set: { column: string; value: unknown }[];
-  match?: { column: string; value: unknown }[];
-  inc?: string[];
-}
-
-export interface Form {
-  id: EntityId;
-  kind: "form";
-  name: string;
-  description: string;
-  fields: FormField[];
-  actions: FormAction[];
-  sortOrder: number;
-  createdBy: "agent" | "user";
-  updatedAt: number;
-}
-
 // A Document is a named, multi-instance tab on a canvas (migration 0024). It
 // generalizes what sheets already do to every view type: a canvas is a bag of
 // documents, each an instance of a `type`, with a `name` and `sortOrder`. Child
-// entities (pins/events/notes/roadmap items/sheets/charts) point back via their
-// `documentId`. `config` carries type-specific settings — e.g. { mapId } for a
-// map document. `parentId` nests a document under a `folder` document (roadmap
+// entities (notes/roadmap items) point back via their `documentId`. `config`
+// carries type-specific settings. `parentId` nests a document under a `folder` document (roadmap
 // item 8.5) — the document explorer renders these as a tree. A folder holds no
 // content; it exists only to group other documents (and nested folders).
-export type DocumentType = "map" | "notes" | "itinerary" | "roadmap" | "sheet" | "chart" | "folder";
+export type DocumentType = "notes" | "roadmap" | "folder";
 
 export interface Document extends FreshnessFields {
   id: EntityId;
@@ -519,7 +379,7 @@ export interface Document extends FreshnessFields {
   config: Record<string, unknown>;
   createdBy: "agent" | "user";
   // Server-derived provenance (migration 0039) — see Action.authoredBy. Absent
-  // on the document a sheet mints for itself (store-side; no request context).
+  // on documents minted store-side without a request context.
   authoredBy?: string;
   updatedAt: number;
 }
@@ -534,14 +394,8 @@ export interface CanvasState {
   // Named document instances — the source of truth for the tab strip (item 8)
   // and document explorer (item 9). Keyed by Document.id.
   documents: Record<EntityId, Document>;
-  pins: Record<EntityId, Pin>;
-  events: Record<EntityId, CanvasEvent>;
   notes: Record<EntityId, Note>;
   roadmapItems: Record<EntityId, RoadmapItem>;
-  sheets: Record<EntityId, Sheet>;
-  sheetRows: Record<EntityId, SheetRow>;
-  charts: Record<EntityId, Chart>;
-  forms: Record<EntityId, Form>;
   actions: Record<EntityId, Action>;
   agents: Record<EntityId, Agent>;
 }
@@ -554,21 +408,6 @@ export interface PendingEdit {
 }
 
 export type WSClientMessage =
-  | { op: "pin.add"; data: Omit<Pin, "id" | "kind" | "createdBy" | "updatedAt"> }
-  | { op: "pin.update"; id: EntityId; partial: Partial<Omit<Pin, "id" | "kind">> }
-  | { op: "pin.delete"; id: EntityId }
-  | { op: "event.add"; data: Omit<CanvasEvent, "id" | "kind" | "createdBy" | "updatedAt"> }
-  | {
-      op: "event.update";
-      id: EntityId;
-      // clearEnd / clearCost remove an optional field (a nil pointer can't be
-      // told from JSON null server-side, so clearing rides an explicit flag).
-      partial: Partial<Omit<CanvasEvent, "id" | "kind">> & {
-        clearEnd?: boolean;
-        clearCost?: boolean;
-      };
-    }
-  | { op: "event.delete"; id: EntityId }
   | { op: "note.add"; data: Omit<Note, "id" | "kind" | "createdBy" | "updatedAt" | "sortOrder"> }
   // The freshness half of the partial rides FreshnessPatchFields: setting
   // verifiedAt is VOUCHING, a separate act from editing, so a body-only patch
@@ -590,36 +429,6 @@ export type WSClientMessage =
       op: "roadmap.reorder";
       updates: { id: EntityId; parentId: EntityId | null; sortOrder: number }[];
     }
-  | { op: "sheet.add"; data: { name?: string; columns?: Omit<SheetColumn, "id">[]; sortOrder?: number } }
-  | { op: "sheet.update"; id: EntityId; partial: { name?: string; sortOrder?: number } }
-  | { op: "sheet.delete"; id: EntityId }
-  // `id` is normally minted server-side, but the client may supply one so a
-  // paste that creates several columns can immediately key row data to them
-  // without waiting for a round-trip (item 13 — paste power).
-  | { op: "sheet.column.add"; sheetId: EntityId; column: Omit<SheetColumn, "id"> & { id?: string } }
-  | { op: "sheet.column.update"; sheetId: EntityId; columnId: string; partial: Partial<Omit<SheetColumn, "id">> }
-  | { op: "sheet.column.delete"; sheetId: EntityId; columnId: string }
-  | { op: "sheet.row.add"; sheetId: EntityId; data?: Record<string, SheetCellValue>; sortOrder?: number }
-  | { op: "sheet.row.update"; id: EntityId; partial: { data?: Record<string, SheetCellValue>; sortOrder?: number } }
-  | { op: "sheet.row.delete"; id: EntityId }
-  | { op: "sheet.row.reorder"; sheetId: EntityId; updates: { id: EntityId; sortOrder: number }[] }
-  | {
-      op: "chart.add";
-      data: {
-        name?: string;
-        sheetId: EntityId;
-        chartType?: ChartType;
-        xColumn?: string;
-        yColumns?: string[];
-        sortOrder?: number;
-      };
-    }
-  | {
-      op: "chart.update";
-      id: EntityId;
-      partial: Partial<Pick<Chart, "name" | "sheetId" | "chartType" | "xColumn" | "yColumns" | "sortOrder">>;
-    }
-  | { op: "chart.delete"; id: EntityId }
   | {
       op: "document.add";
       data: {
@@ -649,12 +458,10 @@ export type WSClientMessage =
     }
   | { op: "mode.set"; mode: CanvasMode }
   | { op: "mode.enable"; mode: CanvasMode }
-  | { op: "map.set"; mapId: string }
-  | { op: "template.apply"; templateId: string; mode: CanvasMode; mapId?: string }
+  | { op: "template.apply"; templateId: string; mode: CanvasMode }
   | { op: "scoped_edit_request"; entityId: EntityId; instruction: string }
   // Generic batch envelope: apply several ops as one WS message with ONE state
-  // broadcast at the end, instead of one broadcast per op. Introduced for grid
-  // paste (item 13 — a 10x20 paste is ~30 column/row ops) but works for any mix
+  // broadcast at the end, instead of one broadcast per op. Works for any mix
   // of ops. Ops are applied in order; a sub-op that fails is logged and skipped,
   // the rest still apply. Not nested — a "batch" op inside `ops` is ignored.
   | { op: "batch"; ops: WSClientMessage[] };

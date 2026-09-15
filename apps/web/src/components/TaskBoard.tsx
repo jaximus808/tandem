@@ -67,7 +67,6 @@ import {
 } from "../lib/contention";
 import { useFreshnessNow } from "./Freshness";
 import { GateRecordDisclosure } from "./GateRecord";
-import posthog from "../lib/posthog";
 import TaskComposer, { linkTargets } from "./TaskComposer";
 import { epicLifecycle, TERMINAL_STATES } from "../lib/epicLifecycle";
 import { CHIP_BASE, STATE_CHIP } from "../lib/stateChips";
@@ -2020,12 +2019,6 @@ export default function TaskBoard({
     setError(null);
     try {
       const { approved } = await approveBatch(code, ids);
-      posthog.capture("agent_tasks_batch_approved", {
-        canvas_code: code,
-        requested: ids.length,
-        approved: approved.length,
-        surface: "board",
-      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not approve tasks");
     } finally {
@@ -2055,10 +2048,6 @@ export default function TaskBoard({
   function approve(a: Action) {
     void run(a.id, async () => {
       await approveAction(code, a.id);
-      posthog.capture(a.type === "epic" ? "epic_approved" : "agent_task_approved", {
-        canvas_code: code,
-        surface: "board",
-      });
     });
   }
 
@@ -2069,11 +2058,6 @@ export default function TaskBoard({
     return run(id, async () => {
       await rejectAction(code, id, reason);
       setRejectingId(null);
-      posthog.capture("agent_task_rejected", {
-        canvas_code: code,
-        with_reason: !!reason,
-        surface: "board",
-      });
     });
   }
 
@@ -2114,11 +2098,6 @@ export default function TaskBoard({
         if (back.length < target.ids.length) {
           setError(`Put ${back.length} of ${target.ids.length} back — the rest could not be undone.`);
         }
-        posthog.capture("agent_task_reject_undone", {
-          canvas_code: code,
-          count: back.length,
-          surface: "board",
-        });
       },
     );
   }
@@ -2134,7 +2113,6 @@ export default function TaskBoard({
     void run(a.id, async () => {
       await updateTask(code, a.id, next);
       setAmendingId(null);
-      posthog.capture("agent_task_amended", { canvas_code: code, surface: "board" });
     });
   }
 
@@ -2258,13 +2236,6 @@ export default function TaskBoard({
     setError(null);
     try {
       const { approved } = await approveBatch(code, ids);
-      posthog.capture("agent_tasks_batch_approved", {
-        canvas_code: code,
-        requested: ids.length,
-        approved: approved.length,
-        surface: "board",
-        via: "selection",
-      });
       clearSelection();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not approve tasks");
@@ -2293,13 +2264,6 @@ export default function TaskBoard({
         ids: rejected,
         label: rejected.length === 1 ? oneLabel : `${rejected.length} tickets`,
       });
-      posthog.capture("agent_tasks_batch_rejected", {
-        canvas_code: code,
-        requested: ids.length,
-        rejected: rejected.length,
-        with_reason: shared.length > 0,
-        surface: "board",
-      });
     }
     if (rejected.length < ids.length) {
       setError(
@@ -2316,13 +2280,6 @@ export default function TaskBoard({
     void run(t.id, async () => {
       const from = t.state;
       await moveTask(code, t.id, move.to);
-      posthog.capture("task_moved", {
-        canvas_code: code,
-        from,
-        to: move.to,
-        assignee: taskPayload(t).assignee ?? "agent",
-        surface: "board",
-      });
     });
   }
 
@@ -3397,7 +3354,6 @@ export default function TaskBoard({
               onCancel={() => setComposing(false)}
               onSubmit={async (draft) => {
                 await createTask(code, scopedEpic ? { ...draft, epicId: scopedEpic.id } : draft);
-                posthog.capture("agent_task_created", { canvas_code: code, surface: "board" });
                 setComposing(false);
               }}
             />
@@ -4354,10 +4310,6 @@ function TaskDetail({
   function approve() {
     void run(async () => {
       await approveAction(code, action.id);
-      posthog.capture(isTask ? "agent_task_approved" : "epic_approved", {
-        canvas_code: code,
-        surface: "board_detail",
-      });
     });
   }
 
@@ -4379,18 +4331,9 @@ function TaskDetail({
     void run(async () => {
       const from = action.state;
       await moveTask(code, action.id, move.to, moveNote.trim() || undefined);
-      posthog.capture("task_moved", {
-        canvas_code: code,
-        from,
-        to: move.to,
-        assignee: p.assignee ?? "agent",
-        noted: moveNote.trim().length > 0,
-        surface: "board_detail",
-      });
       // The requeue funnel predates this control; keep feeding it so the
       // existing analytics don't silently go to zero.
       if (from === "failed" && move.to === "approved") {
-        posthog.capture("agent_task_requeued", { canvas_code: code });
       }
       setPendingMove(null);
       setMoveNote("");
@@ -4418,7 +4361,6 @@ function TaskDetail({
   function doDelete() {
     void run(async () => {
       await deleteTask(code, action.id);
-      posthog.capture("agent_task_deleted", { canvas_code: code });
       onClose();
     });
   }

@@ -17,7 +17,6 @@ import { deriveLease } from "../lib/lease";
 import { LeaseChip } from "./TaskBoard";
 import { useFreshnessNow } from "./Freshness";
 import ActivityFeed from "./ActivityFeed";
-import posthog from "../lib/posthog";
 
 // The roster's in-flight task carries the extra lease fields the fleet view
 // needs to read the claim the SAME way the board does (TDM-112). They live on
@@ -361,11 +360,6 @@ export default function FleetView({
           const next = !open;
           onOpenChange(next);
           if (next) {
-            posthog.capture("fleet_panel_opened", {
-              canvas_code: code,
-              agents: total,
-              working: workingCount,
-            });
           }
         }}
         aria-haspopup="dialog"
@@ -430,7 +424,6 @@ export default function FleetView({
                     onClick={() => {
                       setTab(t.id);
                       if (t.id === "feed") {
-                        posthog.capture("fleet_feed_opened", { canvas_code: code, unseen: feed.unseen });
                       }
                     }}
                     className={[

@@ -43,7 +43,7 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "name", label: "Name (A–Z)" },
 ];
 
-const ALL_MODES: CanvasMode[] = ["map", "itinerary", "docs", "roadmap", "sheets", "charts", "welcome"];
+const ALL_MODES: CanvasMode[] = ["docs", "roadmap", "welcome"];
 
 // What a canvas actually *contains*, in canonical order — not `c.mode`, which is
 // only whichever view was open last and changes as you click around. A canvas
@@ -176,7 +176,7 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = owned;
-    // Membership, not equality: a canvas with sheets matches "Sheets" even if it
+    // Membership, not equality: a canvas with a roadmap matches "Roadmap" even if it
     // was last left on the docs tab.
     if (modeFilter !== "all") list = list.filter((c) => modesOf(c).includes(modeFilter));
     if (q) {

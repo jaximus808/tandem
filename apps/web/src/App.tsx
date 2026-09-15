@@ -11,12 +11,8 @@ import MobileNavDrawer from "./components/MobileNavDrawer";
 import DocumentExplorer from "./components/DocumentExplorer";
 import SettingsPanel from "./components/SettingsPanel";
 import { DOC_TYPE_TO_MODE } from "./lib/docTypes";
-import MapMode from "./modes/MapMode";
-import ItineraryMode from "./modes/ItineraryMode";
 import DocsMode from "./modes/DocsMode";
 import RoadmapMode from "./modes/RoadmapMode";
-import SheetsMode from "./modes/SheetsMode";
-import ChartsMode from "./modes/ChartsMode";
 import WelcomeMode from "./modes/WelcomeMode";
 import Landing from "./pages/Landing";
 import MCPSupport from "./pages/MCPSupport";
@@ -24,8 +20,6 @@ import About from "./pages/About";
 import WhyTandem from "./pages/WhyTandem";
 import Features from "./pages/Features";
 import MyCanvases from "./pages/MyCanvases";
-import StatsPage from "./pages/StatsPage";
-import MetricsPage from "./pages/MetricsPage";
 import UserSettings from "./pages/UserSettings";
 import OAuthConsent from "./pages/OAuthConsent";
 import { fetchMe, getCachedUser, type User } from "./lib/auth";
@@ -59,13 +53,10 @@ import { recordRecent } from "./lib/recentCanvases";
 import { loadTabState, saveTabState } from "./lib/tabState";
 import { loadSidebarState, saveSidebarState } from "./lib/sidebarState";
 import { MOCK_ENABLED, mockCanvas } from "./lib/mockFixture";
-import posthog from "./lib/posthog";
 
 // A canvas is a bag of named documents (migration 0024). Each document renders
 // through its type's existing mode component; to show ONE document we hand that
 // component a state scoped to just that document's slice of the matching kind.
-// Cross-references (a pin's attached notes, an event's pins) are left intact —
-// the mode components already skip references they can't resolve.
 function scopeStateToDocument(state: CanvasState, doc: Document | undefined): CanvasState {
   if (!doc) return state;
   const only = <T extends { documentId?: string }>(rec: Record<string, T>): Record<string, T> => {
@@ -74,37 +65,20 @@ function scopeStateToDocument(state: CanvasState, doc: Document | undefined): Ca
     return out;
   };
   switch (doc.type) {
-    case "map":
-      return { ...state, pins: only(state.pins) };
-    case "itinerary":
-      return { ...state, events: only(state.events) };
     case "notes":
       return { ...state, notes: only(state.notes) };
     case "roadmap":
       return { ...state, roadmapItems: only(state.roadmapItems) };
-    case "sheet":
-      return { ...state, sheets: only(state.sheets) };
-    case "chart":
-      return { ...state, charts: only(state.charts) };
     default:
       return state;
   }
 }
 
 // Which document an entity belongs to — used to follow the agent to the right
-// tab when it edits. Sheet rows resolve via their parent sheet.
+// tab when it edits.
 function documentIdForEntity(state: CanvasState, entityId: string): string | null {
-  const direct =
-    state.pins[entityId] ??
-    state.events[entityId] ??
-    state.notes[entityId] ??
-    state.roadmapItems[entityId] ??
-    state.sheets[entityId] ??
-    state.charts[entityId];
-  if (direct?.documentId) return direct.documentId;
-  const row = state.sheetRows[entityId];
-  if (row) return state.sheets[row.sheetId]?.documentId ?? null;
-  return null;
+  const direct = state.notes[entityId] ?? state.roadmapItems[entityId];
+  return direct?.documentId ?? null;
 }
 
 function getCodeFromURL(): string | null {
@@ -182,11 +156,9 @@ type Route =
   | "home"
   | "mcp"
   | "dashboard"
-  | "stats"
   // The owner-only performance console (TDM-94). Reachable only by typing the
   // URL: it is an operator tool, not a product surface, and the API gate is what
   // actually protects it (the SPA cannot keep a secret).
-  | "metrics"
   | "settings"
   | "about"
   | "why"
@@ -197,8 +169,6 @@ function routeFromPath(): Route {
   const p = window.location.pathname.replace(/\/$/, "");
   if (p === "/mcp") return "mcp";
   if (p === "/dashboard") return "dashboard";
-  if (p === "/stats") return "stats";
-  if (p === "/metrics") return "metrics";
   if (p === "/me") return "settings";
   if (p === "/about") return "about";
   if (p === "/why-tandem") return "why";
@@ -466,7 +436,7 @@ export default function App() {
   const [autoOpenedFor, setAutoOpenedFor] = useState<string | null>(null);
   // Keep-alive: once a mode has been opened, keep its subtree mounted and
   // toggle visibility instead of re-mounting on every tab switch. This avoids
-  // re-constructing Leaflet, re-parsing markdown, and losing useMemo caches.
+  // re-parsing markdown and losing useMemo caches.
   const [visitedModes, setVisitedModes] = useState<Set<CanvasMode>>(new Set());
 
   // Board keep-alive: mirrors visitedModes — once the Board surface has been
@@ -496,7 +466,7 @@ export default function App() {
   // epic sheet, detail slide-over). The nav FAB is a fixed z-30 sibling of the
   // board's `relative isolate` container, so `isolate` cages those overlays
   // below it and it steals taps from their bottom-right CTAs. Hide the FAB while
-  // one is open. (Removing `isolate` is not an option — it cages Leaflet.)
+  // one is open. (Removing `isolate` is not an option — it cages mode overlays.)
   const [boardOverlayOpen, setBoardOverlayOpen] = useState(false);
 
   // ── Document tabs (migration 0024) ──────────────────────────────────────────
@@ -830,7 +800,6 @@ export default function App() {
       disconnectFromCanvas();
       setAutoOpenedFor(null);
     }
-    posthog.capture("canvas_joined", { canvas_code: code });
     setCanvasCode(code);
     setCodeInURL(code);
     resetPerCanvasState();
@@ -856,11 +825,6 @@ export default function App() {
     setRoute("about");
   }
 
-  function showMetrics() {
-    window.history.pushState(null, "", "/metrics");
-    setRoute("metrics");
-  }
-
   function showWhy() {
     window.history.pushState(null, "", "/why-tandem");
     setRoute("why");
@@ -882,7 +846,6 @@ export default function App() {
       `/c/${canvasCode}/ticket/${ticketId}`,
     );
     setTicketRef(ticketId.toUpperCase());
-    posthog.capture("ticket_view_opened", { canvas_code: canvasCode, ticket: ticketId });
   }
 
   // Leaving the ticket. If we pushed our way in, the board is literally the
@@ -904,10 +867,8 @@ export default function App() {
     setCopying(true);
     try {
       const copy = await copyCanvas(canvas.code);
-      posthog.capture("canvas_copied_to_account", { source_canvas_code: canvas.code, new_canvas_code: copy.code });
       handleJoin(copy.code);
     } catch (err) {
-      posthog.captureException(err instanceof Error ? err : new Error(String(err)));
       alert(err instanceof Error ? err.message : "Copy failed");
     } finally {
       setCopying(false);
@@ -926,7 +887,6 @@ export default function App() {
     } catch {
       /* storage disabled — the ref still resumes the in-page sign-in path */
     }
-    posthog.capture("signed_out_copy_cta_clicked", { canvas_code: canvas.code });
     setSignInForCopy(true);
   }
 
@@ -973,7 +933,6 @@ export default function App() {
       .then((updated) => {
         // Reflect new ownership immediately so the "Copy to my account" button
         // disappears; WS updates will keep meta fresh after this.
-        posthog.capture("canvas_claimed", { canvas_code: updated.code });
         setCanvas((prev) =>
           prev && prev.code === updated.code ? { ...prev, ...updated } : prev,
         );
@@ -1284,50 +1243,6 @@ export default function App() {
     );
   }
 
-  if (route === "stats") {
-    return (
-      <StatsPage
-        onHome={() => {
-          window.history.pushState(null, "", "/");
-          setRoute("home");
-        }}
-        onOpenMCP={() => {
-          setMCPInURL();
-          setRoute("mcp");
-        }}
-        onShowCanvases={showMyCanvases}
-        onShowSettings={showSettings}
-        onShowAbout={showAbout}
-        onOpenCanvas={(code) => {
-          setRoute("home");
-          handleJoin(code);
-        }}
-      />
-    );
-  }
-
-  if (route === "metrics") {
-    return (
-      <MetricsPage
-        onHome={() => {
-          window.history.pushState(null, "", "/");
-          setRoute("home");
-        }}
-        onOpenMCP={() => {
-          setMCPInURL();
-          setRoute("mcp");
-        }}
-        onShowCanvases={showMyCanvases}
-        onShowSettings={showSettings}
-        onShowAbout={showAbout}
-        onOpenCanvas={(code) => {
-          setRoute("home");
-          handleJoin(code);
-        }}
-      />
-    );
-  }
-
   if (route === "settings") {
     return (
       <UserSettings
@@ -1501,7 +1416,6 @@ export default function App() {
     if (activeDocId === id) setActiveDocId(null);
   }
   function createDocument(type: DocumentType) {
-    posthog.capture("document_created", { document_type: type, canvas_code: canvas?.code });
     activateNextNewDocRef.current = true;
     sendOp({ op: "document.add", data: { type } });
   }
@@ -1993,14 +1907,13 @@ export default function App() {
             <SummaryPanel code={canvas.code} state={canvasState} />
           </div>
         )}
-        {(["welcome", "map", "itinerary", "docs", "roadmap", "sheets", "charts"] as CanvasMode[]).map((m) => {
+        {(["welcome", "docs", "roadmap"] as CanvasMode[]).map((m) => {
           const active = surface === "documents" && effectiveMode === m;
           // Lazy-mount: only render a mode after the user has visited it at
           // least once. After that, keep it mounted and hide with CSS.
           if (!active && !visitedModes.has(m)) return null;
           // `isolate` gives each mode its own stacking context so a mode's
-          // internal z-indexes (notably Leaflet's panes/controls, which go up to
-          // ~1000) can't escape and paint over the surrounding chrome.
+          // internal z-indexes can't escape and paint over the surrounding chrome.
           const wrapperClass = active ? "relative isolate flex flex-1 min-h-0 min-w-0" : "hidden";
           // Render just the focused document's slice. For a hidden (kept-alive)
           // mode, fall back to the first open doc of its type so it stays coherent.
@@ -2017,27 +1930,6 @@ export default function App() {
                   onOpenCanvas={handleJoin}
                   onCreateDoc={createDocument}
                   onOpenAll={openAllDocs}
-                />
-              )}
-              {m === "map" && (
-                <MapMode
-                  canvasId={canvas.id}
-                  mapId={canvas.mapId}
-                  state={scopedState}
-                  active={active}
-                  selectedPinId={selectedPinId}
-                  onSelectPin={setSelectedPinId}
-                  selectedEventId={selectedEventId}
-                  onSelectEvent={setSelectedEventId}
-                />
-              )}
-              {m === "itinerary" && (
-                <ItineraryMode
-                  state={scopedState}
-                  canvasCode={canvas.code}
-                  canvasName={canvas.name}
-                  selectedEventId={selectedEventId}
-                  onSelectEvent={setSelectedEventId}
                 />
               )}
               {m === "docs" && (
@@ -2063,8 +1955,6 @@ export default function App() {
                   onOpenBoardForEpic={openBoardForEpic}
                 />
               )}
-              {m === "sheets" && <SheetsMode state={scopedState} canvasCode={canvas.code} />}
-              {m === "charts" && <ChartsMode state={scopedState} />}
             </div>
           );
         })}

@@ -3681,7 +3681,7 @@ export const FACADE_RAW_TOOLS: RawTool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to sheets'." },
+        title: { type: "string", description: "Short imperative title, e.g. 'Add CSV export to the board'." },
         body: { type: "string", description: "Concise brief: what to do, acceptance criteria." },
         linkedIds: {
           type: "array",

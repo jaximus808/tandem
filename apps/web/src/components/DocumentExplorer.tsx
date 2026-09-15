@@ -37,8 +37,8 @@ import { DOC_TYPE_LABEL } from "../lib/docTypes";
 
 const ROOT = "__root__";
 
-// The order type groups appear in — mirrors the tab "+" menu, charts last.
-const GROUP_ORDER: DocumentType[] = ["map", "notes", "itinerary", "roadmap", "sheet", "chart"];
+// The order type groups appear in — mirrors the tab "+" menu.
+const GROUP_ORDER: DocumentType[] = ["notes", "roadmap"];
 
 interface Props {
   /** Every document on the canvas (including folders), in sortOrder order. */
@@ -83,20 +83,14 @@ export default function DocumentExplorer({
   const [dropTarget, setDropTarget] = useState<string | null>(null); // folder id or ROOT
 
   // How many primary entities each document holds — a cheap "is this empty?"
-  // signal. Sheet rows resolve through their parent sheet's document.
+  // signal.
   const countByDoc = useMemo(() => {
     const c: Record<string, number> = {};
     const add = (id?: string) => {
       if (id) c[id] = (c[id] ?? 0) + 1;
     };
-    for (const p of Object.values(state.pins)) add(p.documentId);
-    for (const e of Object.values(state.events)) add(e.documentId);
     for (const n of Object.values(state.notes)) add(n.documentId);
     for (const r of Object.values(state.roadmapItems)) add(r.documentId);
-    for (const ch of Object.values(state.charts)) add(ch.documentId);
-    const sheetDoc: Record<string, string | undefined> = {};
-    for (const s of Object.values(state.sheets)) sheetDoc[s.id] = s.documentId;
-    for (const row of Object.values(state.sheetRows)) add(sheetDoc[row.sheetId]);
     return c;
   }, [state]);
 

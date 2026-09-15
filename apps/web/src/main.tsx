@@ -5,7 +5,6 @@ import App from "./App";
 // fontsource so the app doesn't depend on Google Fonts for its primary face.
 import "@fontsource-variable/inter";
 import "./index.css";
-import "./lib/posthog";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
