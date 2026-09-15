@@ -19,7 +19,7 @@ npx -y @jaximus/tandem-mcp up          # downloads the binary on first run, star
 claude mcp add tandem -- npx -y @jaximus/tandem-mcp
 ```
 
-That's the whole install. `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the [GitHub release](https://github.com/jaximus808/tandam/releases) matching this package's version and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
+That's the whole install. `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the latest [GitHub release](https://github.com/jaximus808/tandam/releases) (pin one with `TANDEM_VERSION=0.1.0`) and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
 
 | Command                      | Effect                                                                                  |
 | ---------------------------- | --------------------------------------------------------------------------------------- |
@@ -104,6 +104,7 @@ pnpm --filter @jaximus/tandem-mcp build
 | ------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `API_URL`           | `http://127.0.0.1:7891`    | Tandem HTTP API base URL — the local server. Only set this for a self-hosted instance.                                                            |
 | `TANDEM_DATA_DIR`   | `~/.tandem`                | Where the local server keeps its database, images, logs, the cached binary (`bin/`) and the pid file `up` writes.                                  |
+| `TANDEM_VERSION`    | `latest`                   | Server release `up` downloads when nothing is cached (the gateway and the server are separate version lines).                                     |
 | `TANDEM_BIN`        | _(unset)_                  | Path to a `tandem` binary to run instead of the downloaded one (e.g. one you built with `scripts/build.sh`).                                      |
 | `TANDEM_AUTOSTART`  | _(unset = on)_             | Set to `0` to stop the MCP server from starting the local backend itself when a tool call finds nothing listening. Only ever applies to a loopback `API_URL`. |
 | `TANDEM_AUTOSTART_OPEN` | _(unset)_              | Set to `1` to also open the browser when the MCP server auto-starts the backend.                                                                   |

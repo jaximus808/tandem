@@ -79,6 +79,8 @@ function printHelp() {
       `                             self-hosted instance.\n` +
       `  TANDEM_DATA_DIR            Where the local server keeps its database,\n` +
       `                             images and logs. Default: ~/.tandem\n` +
+      `  TANDEM_VERSION             Server release to download (e.g. 0.1.0).\n` +
+      `                             Default: latest.\n` +
       `  TANDEM_BIN                 Path to a \`tandem\` binary to run instead of\n` +
       `                             the downloaded one.\n` +
       `  TANDEM_AUTOSTART           Set to 0 to stop the MCP server from starting\n` +
@@ -126,6 +128,12 @@ if (!SUBCOMMAND && (cliArgs.includes("--help") || cliArgs.includes("-h"))) {
 // is an explicit override; without it, TANDEM_FULL_TOOLS decides (see server.ts).
 const FULL_TOOLS = cliArgs.includes("--full-tools") ? true : undefined;
 
+// Which server binary `up` downloads. The gateway (this package) and the Go
+// binary are separate version lines — a gateway bump is not a server release —
+// so the default is the newest server release; TANDEM_VERSION pins one
+// (e.g. 0.1.0).
+const BINARY_VERSION = process.env.TANDEM_VERSION?.trim() || "latest";
+
 const apiUrlFromEnv = process.env.API_URL;
 const API_URL = (apiUrlFromEnv ?? DEFAULT_API_URL).replace(/\/$/, "");
 // Public origin for share/claim links. Defaults to the API base, which is
@@ -152,7 +160,7 @@ const gateway = new Gateway({
   // Local-first: when the API is this machine and nothing is listening, the
   // first tool call (or `init`) starts the server rather than failing. Only
   // ever wired for a loopback API_URL — a self-hosted address is never spawned.
-  autoStart: isLocalApiUrl(API_URL) ? () => autoStartLocal(API_URL, nodeDeps(VERSION)) : undefined,
+  autoStart: isLocalApiUrl(API_URL) ? () => autoStartLocal(API_URL, nodeDeps(BINARY_VERSION)) : undefined,
 });
 
 /**
@@ -163,7 +171,7 @@ const gateway = new Gateway({
 async function runLauncherCommand(): Promise<number> {
   const command = UP_MODE ? "up" : OPEN_MODE ? "open" : "down";
   const opts = parseUpArgs(cliArgs.slice(1), process.env, command);
-  const deps = nodeDeps(VERSION);
+  const deps = nodeDeps(BINARY_VERSION);
   if (UP_MODE) return runUp(opts, deps);
   if (OPEN_MODE) return runOpen(opts, deps);
   return runDown(opts, deps);

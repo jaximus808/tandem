@@ -206,7 +206,7 @@ export interface UpDeps {
   env: NodeJS.ProcessEnv;
   platform: string;
   arch: string;
-  /** This package's version — the release tag it tries first. */
+  /** Server release to download: a version like "0.1.0", or "latest" (the default). */
   version: string;
   exists(path: string): boolean;
   mkdirp(path: string): void;
@@ -376,7 +376,7 @@ export async function resolveBinary(
 
 /**
  * Download this platform's raw binary into `dest`. Tries the release tagged
- * with this package's version first, then `latest`; verifies against
+ * `v<version>` (TANDEM_VERSION) first, then `latest`; verifies against
  * SHA256SUMS when the release ships one (a mismatch is fatal — a corrupt or
  * substituted binary must never run; a MISSING sums file only warns).
  */
