@@ -1,6 +1,5 @@
 packages:
   - 'apps/mcp-gateway'
-  - 'apps/server'
   - 'apps/web'
   - 'internal/*'
 
