@@ -1,5 +1,17 @@
 # Changelog — @jaximus/tandem-mcp
 
+## 3.0.1 — 2026-09-15
+
+### `up` no longer finds itself
+
+- **Fixed: `npx @jaximus/tandem-mcp up` started the MCP server instead of the
+  Tandem binary.** 3.0.0 still shipped a `tandem` bin alias for the stdio MCP
+  server, and `up` looks for `tandem` on `PATH` before downloading — under
+  `npx` its own shim was the first hit, so it spawned itself and timed out
+  waiting for `/healthz`. The alias is gone (the command is `tandem-mcp`; the
+  Go server is `tandem`), and PATH resolution now skips anything under
+  `node_modules` or ending in `.js`.
+
 ## 3.0.0 — 2026-09-15
 
 ### Local-first: the gateway starts Tandem on your machine (BREAKING default)

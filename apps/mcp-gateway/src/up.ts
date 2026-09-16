@@ -33,6 +33,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -258,7 +259,15 @@ export function nodeDeps(version: string): UpDeps {
         if (!dir) continue;
         for (const ext of exts) {
           const candidate = join(dir, name + ext);
-          if (existsSync(candidate)) return candidate;
+          if (!existsSync(candidate)) continue;
+          let real = candidate;
+          try {
+            real = realpathSync(candidate);
+          } catch {
+            /* keep the candidate path */
+          }
+          if (isNotTheServerBinary(candidate, real)) continue;
+          return candidate;
         }
       }
       return null;
@@ -350,6 +359,23 @@ export function openBrowser(url: string): void {
 
 export function cachedBinaryPath(dataDir: string, platform: string): string {
   return join(dataDir, "bin", BINARY_NAME + (platform === "win32" ? ".exe" : ""));
+}
+
+/**
+ * A PATH hit named `tandem` that cannot be the Go server: anything npm put on
+ * the PATH (a `node_modules/.bin` shim — which is how `npx` runs THIS package)
+ * or any JavaScript entrypoint. Versions ≤3.0.0 of this package shipped a
+ * `tandem` bin alias for the MCP server itself, so `up` under npx found its own
+ * shim first, spawned the stdio MCP server as "the server", and waited 10s for a
+ * /healthz that never came. Pure so the rule is unit-testable.
+ */
+export function isNotTheServerBinary(candidate: string, realPath: string): boolean {
+  const norm = (p: string) => p.replace(/\\/g, "/");
+  for (const p of [norm(candidate), norm(realPath)]) {
+    if (p.includes("/node_modules/")) return true;
+    if (/\.(c|m)?js$/i.test(p)) return true;
+  }
+  return false;
 }
 
 /**

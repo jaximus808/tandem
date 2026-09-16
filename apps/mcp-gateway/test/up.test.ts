@@ -35,6 +35,7 @@ import {
   sha256Hex,
   type FetchResult,
   type UpDeps,
+  isNotTheServerBinary,
 } from "../src/up.js";
 import { Gateway, isConnectionRefused } from "../src/gateway.js";
 
@@ -528,4 +529,21 @@ test("Gateway: without an autoStart hook (self-hosted / sidecar) a refusal is ju
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test("isNotTheServerBinary: npm shims and JS entrypoints are never the Go server", () => {
+  // The exact 3.0.0 failure: npx puts this package's own bin on PATH first.
+  assert.equal(
+    isNotTheServerBinary(
+      "/Users/j/.npm/_npx/54491715af38ebe3/node_modules/.bin/tandem",
+      "/Users/j/.npm/_npx/54491715af38ebe3/node_modules/@jaximus/tandem-mcp/dist/index.js"
+    ),
+    true
+  );
+  assert.equal(isNotTheServerBinary("/usr/local/bin/tandem", "/opt/tandem/dist/index.mjs"), true);
+  assert.equal(isNotTheServerBinary("C:\\Users\\j\\AppData\\npm\\tandem.cmd", "C:\\Users\\j\\AppData\\npm\\node_modules\\x\\index.js"), true);
+  // Real binaries pass: a bare install, a Homebrew symlink, the cached download.
+  assert.equal(isNotTheServerBinary("/usr/local/bin/tandem", "/usr/local/bin/tandem"), false);
+  assert.equal(isNotTheServerBinary("/opt/homebrew/bin/tandem", "/opt/homebrew/Cellar/tandem/0.1.1/bin/tandem"), false);
+  assert.equal(isNotTheServerBinary("/Users/j/.tandem/bin/tandem", "/Users/j/.tandem/bin/tandem"), false);
 });
