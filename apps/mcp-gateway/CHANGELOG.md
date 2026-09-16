@@ -1,5 +1,21 @@
 # Changelog — @jaximus/tandem-mcp
 
+## 3.1.0 — 2026-09-15
+
+### `tandem-mcp setup` — one-line onboarding
+
+- **New `tandem-mcp setup`.** Registers this package as the `tandem` MCP server
+  with Claude Code at USER scope (`claude mcp add --scope user tandem -- npx -y
+  @jaximus/tandem-mcp`, so the tools exist in every repo; prints the command
+  instead when `claude` isn't on PATH), appends a short idempotent Tandem
+  section to `~/.claude/CLAUDE.md` (so "sprint board" / "task board" / "canvas"
+  mean a Tandem canvas and sessions know the queue loop), then starts the
+  server and opens the board exactly like `up`. `--project` does the same for
+  one repo (`./.mcp.json`, merged, and `./CLAUDE.md`); `--no-claude-md`,
+  `--no-open`, `--port`, `--data-dir` as you'd expect. Safe to re-run.
+- README: the global-install section no longer claims a `tandem` alias
+  (removed in 3.0.1); the command is `tandem-mcp`.
+
 ## 3.0.1 — 2026-09-15
 
 ### `up` no longer finds itself

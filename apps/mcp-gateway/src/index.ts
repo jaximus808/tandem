@@ -36,6 +36,7 @@ import {
   type CanvasHandle,
 } from "./init.js";
 import { ListenUsageError, listenHelp, parseListenArgs, runListen } from "./listen/index.js";
+import { nodeSetupDeps, parseSetupArgs, runSetup } from "./setup.js";
 import {
   UpUsageError,
   autoStartLocal,
@@ -53,6 +54,11 @@ function printHelp() {
       `\n` +
       `Usage:\n` +
       `  tandem-mcp                 Run as an MCP stdio server (default).\n` +
+      `  tandem-mcp setup           One-line onboarding: register this server with\n` +
+      `                             Claude Code (user scope, every repo), teach\n` +
+      `                             ~/.claude/CLAUDE.md the board vocabulary, then\n` +
+      `                             start the server and open the board.\n` +
+      `                             (\`tandem-mcp setup --help\` for its options.)\n` +
       `  tandem-mcp up              Start the local Tandem server (downloading the\n` +
       `                             binary on first run) and open the board.\n` +
       `                             (\`tandem-mcp up --help\` for its options.)\n` +
@@ -111,11 +117,12 @@ const cliArgs = process.argv.slice(2);
 // untouched.
 const INIT_MODE = cliArgs[0] === "init";
 const LISTEN_MODE = cliArgs[0] === "listen";
+const SETUP_MODE = cliArgs[0] === "setup";
 const UP_MODE = cliArgs[0] === "up";
 const OPEN_MODE = cliArgs[0] === "open";
 const DOWN_MODE = cliArgs[0] === "down";
 const LAUNCHER_MODE = UP_MODE || OPEN_MODE || DOWN_MODE;
-const SUBCOMMAND = INIT_MODE || LISTEN_MODE || LAUNCHER_MODE;
+const SUBCOMMAND = INIT_MODE || LISTEN_MODE || SETUP_MODE || LAUNCHER_MODE;
 if (!SUBCOMMAND && (cliArgs.includes("--version") || cliArgs.includes("-v"))) {
   process.stdout.write(`@jaximus/tandem-mcp ${VERSION}\n`);
   process.exit(0);
@@ -178,6 +185,16 @@ async function runLauncherCommand(): Promise<number> {
 }
 
 /**
+ * `setup`: register with Claude Code (user scope), write the CLAUDE.md
+ * snippet, then `up`. Shares `up`'s deps so both agree on which server "the
+ * local one" is.
+ */
+async function runSetupCommand(): Promise<number> {
+  const opts = parseSetupArgs(cliArgs.slice(1), process.env);
+  return runSetup(opts, nodeSetupDeps(nodeDeps(BINARY_VERSION)));
+}
+
+/**
  * `init` (TDM-33): one command from nothing to a wired-up project. Uses the
  * same Gateway plumbing as the server path, so it inherits API_URL, the
  * personal access token, and the claim-link behaviour of canvas_create.
@@ -222,6 +239,9 @@ async function main() {
   if (LAUNCHER_MODE) {
     process.exit(await runLauncherCommand());
   }
+  if (SETUP_MODE) {
+    process.exit(await runSetupCommand());
+  }
   if (INIT_MODE) {
     process.exit(await runInitCommand());
   }
@@ -243,6 +263,13 @@ main().catch((err) => {
     process.stderr.write(`\ntandem ${word}: ${err instanceof Error ? err.message : err}\n`);
     if (err instanceof UpUsageError) {
       process.stderr.write(`Run \`tandem-mcp up --help\` for options.\n`);
+    }
+    process.exit(1);
+  }
+  if (SETUP_MODE) {
+    process.stderr.write(`\ntandem setup: ${err instanceof Error ? err.message : err}\n`);
+    if (err instanceof UpUsageError) {
+      process.stderr.write(`Run \`tandem-mcp setup --help\` for options.\n`);
     }
     process.exit(1);
   }

@@ -15,14 +15,23 @@ The core loop is the **task queue**: one session proposes work as tasks (grouped
 Tandem is a locally run tool: one binary with the web UI embedded and a SQLite database in `~/.tandem`. This package is both the MCP server your agent talks to **and** the launcher for that binary.
 
 ```bash
-npx -y @jaximus/tandem-mcp up          # downloads the binary on first run, starts it, opens the board
-claude mcp add tandem -- npx -y @jaximus/tandem-mcp
+npx -y @jaximus/tandem-mcp setup       # registers the MCP server with Claude Code (every repo),
+                                       # teaches ~/.claude/CLAUDE.md the board vocabulary,
+                                       # downloads the binary, starts it, opens the board
 ```
 
-That's the whole install. `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the latest [GitHub release](https://github.com/jaximus808/tandam/releases) (pin one with `TANDEM_VERSION=0.1.0`) and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
+That's the whole install — restart Claude Code once so it picks up the new server. `setup` is safe to re-run, `--project` scopes it to one repo (`./.mcp.json` + `./CLAUDE.md`), `--no-claude-md` skips the snippet. The pieces are also available separately:
+
+```bash
+npx -y @jaximus/tandem-mcp up          # just the server: downloads the binary on first run, starts it, opens the board
+claude mcp add --scope user tandem -- npx -y @jaximus/tandem-mcp   # just the registration
+```
+
+`up` `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the latest [GitHub release](https://github.com/jaximus808/tandam/releases) (pin one with `TANDEM_VERSION=0.1.0`) and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
 
 | Command                      | Effect                                                                                  |
 | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `tandem-mcp setup`           | Register with Claude Code (user scope) + CLAUDE.md snippet + `up`. `--project` for one repo. |
 | `tandem-mcp up`              | Start the server (detached; logs in `~/.tandem/logs/tandem.log`) and open the board.    |
 | `tandem-mcp up --code AB3XK9QZ` | Same, opening on that canvas. `--no-open` skips the browser, `-f` runs attached.     |
 | `tandem-mcp open [CODE]`     | Open the board (or one canvas), starting the server first if needed.                    |
@@ -82,11 +91,11 @@ This talks to the local server at `http://127.0.0.1:7891` out of the box — no 
 npm install -g @jaximus/tandem-mcp
 # then in MCP config:
 #   "command": "tandem-mcp"
-# and on the CLI, `tandem` is an alias for the same binary:
-#   tandem init
+# and on the CLI:
+#   tandem-mcp setup / up / open / down / init
 ```
 
-(`npx tandem init` will **not** work — `tandem` is an unrelated package on npm. Use the scoped name with npx, or install globally for the short `tandem` command.)
+The command is deliberately `tandem-mcp`, not `tandem`: the Go server binary is called `tandem`, and a same-named npm shim on your PATH is what `up` must not mistake for it. (`npx tandem …` will **not** work either — `tandem` is an unrelated package on npm.)
 
 ### From source
 
