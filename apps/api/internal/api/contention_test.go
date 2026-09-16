@@ -47,6 +47,22 @@ func (f *fenceFakeStore) AppendContentionEvent(_ context.Context, _ uuid.UUID, i
 	return copyAction(a), nil
 }
 
+// awaitRepeats waits until the coalesced (single) entry on the trail has been
+// repeated `want` times — the per-iteration barrier for the coalescing test.
+func awaitRepeats(t *testing.T, fake *fenceFakeStore, id uuid.UUID, want int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	var got []store.ContentionEvent
+	for time.Now().Before(deadline) {
+		got = store.ReadContention(fake.task(id).Payload)
+		if len(got) == 1 && got[0].Repeats() >= want {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("after 2s the trail is %+v, want one entry repeated %d times", got, want)
+}
+
 // contention waits for the DETACHED recording goroutine and returns the trail.
 //
 // Polling rather than a channel because the whole point of the design is that the
@@ -269,8 +285,12 @@ func TestRepeatedFencedWritesCoalesceIntoOneEntry(t *testing.T) {
 		})
 		assertFenced(t, w, fenceCodeOther, "worker-b")
 		// Serialised on purpose: coalescing is about repeats over time, and letting
-		// four goroutines interleave would test the fake's locking instead.
-		awaitContention(t, fake, task.ID, 1)
+		// four goroutines interleave would test the fake's locking instead. Each
+		// write lands on a detached goroutine, so wait for THIS repeat to be
+		// counted — waiting for "one entry" would return as soon as the first had
+		// landed and read the trail before the rest did (which is exactly what
+		// happened on Linux CI).
+		awaitRepeats(t, fake, task.ID, i+1)
 	}
 
 	got := store.ReadContention(fake.task(task.ID).Payload)
