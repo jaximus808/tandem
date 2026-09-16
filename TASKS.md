@@ -97,6 +97,14 @@ Phase 4 — ship
 - [x] T12 Docs: README, CLAUDE.md (build/verify, env, no Supabase), `docs/DEV.md`,
       `docs/ORCHESTRATION.md` local notes, gateway README/CHANGELOG.
 
+Phase 5 — polish + site (after v0.1.1 / gateway 3.0.1 shipped)
+- [x] T13 README: logo, mermaid architecture/loop/state diagrams, one-line
+      onboarding (`tandem-mcp setup`), commands table.
+- [x] T14 Gateway 3.1.0: `tandem-mcp setup` — user-scope `claude mcp add`,
+      idempotent `~/.claude/CLAUDE.md` snippet ("sprint board" → Tandem), `up`.
+- [x] T15 `apps/tandem-next`: Next.js marketing site for Vercel (Root Directory
+      `apps/tandem-next`), landing/features/why/about/mcp ported, local-first CTAs.
+
 ## Status (2026-09-15)
 
 Every task above is committed on `main` (nothing pushed). Verified: `go build
