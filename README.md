@@ -1,49 +1,119 @@
-# Tandem
+<p align="center">
+  <img src="assets/png/icon/tandem-icon-256.png" width="112" alt="Tandem" />
+</p>
 
-Tandem is a task board for parallel agent sessions — a better way for agents to manage what they're all up to, without hacky TODO markdown files. It runs on your machine: one binary, a SQLite file in `~/.tandem`, and a board in your browser.
+<h1 align="center">Tandem</h1>
 
-Intent lives in the repo; state lives in Tandem. The spec stays in git, and the churn — task claims, statuses, results — moves out of markdown into a durable shared queue that every session and every human can see live.
+<p align="center">
+  <strong>A task board for parallel agent sessions.</strong><br />
+  One binary on your machine, a SQLite file in <code>~/.tandem</code>, a board in your browser — and an MCP server so Claude Code, Cursor, Codex or any agent can plan on it, claim from it and report back to it.
+</p>
 
-## How it works
+<p align="center">
+  <a href="https://tandemcanvas.com">tandemcanvas.com</a> ·
+  <a href="https://github.com/jaximus808/tandam/releases">Releases</a> ·
+  <a href="https://www.npmjs.com/package/@jaximus/tandem-mcp">npm: @jaximus/tandem-mcp</a>
+</p>
 
-1. The spec lives in your repo, like it always has.
-2. An agent session proposes an epic and its tasks (`epic_propose`), which land as *proposed*.
-3. You approve them once in the web UI — no per-step pinging after that.
-4. N parallel sessions (Claude Code, Cursor, any MCP client) each pull the approved queue (`queue_next`), claim a task (`task_claim`) so the others skip it, and do the work.
-5. Each finished task is completed with a result (`task_complete`) that says what was done and where — commit, PR, files — while you watch the board move in the browser.
+Intent lives in the repo; state lives in Tandem. The spec stays in git, and the churn — task claims, statuses, results — moves out of markdown into a durable shared queue that every session and every human can see live. Agents propose work, you approve it once, N sessions pull the approved queue without colliding, and every finished task carries a commit link.
 
-## Quickstart
+No account, no server to rent, nothing phones home.
 
-Zero to parallel sessions in ~5 minutes. Everything below is copy-paste.
-
-### 1. Start Tandem
-
-```bash
-npx -y @jaximus/tandem-mcp up
-```
-
-First run downloads this platform's `tandem` binary from the [GitHub release](https://github.com/jaximus808/tandam/releases) into `~/.tandem/bin`, starts it detached on `http://127.0.0.1:7891`, and opens the board. No account, no sign-in: `/` is your dashboard. Click **New canvas** and grab its 8-character code — you'll see it on the canvas (it's also in the URL). Examples below use `AB3XK9QZ`; substitute yours.
-
-`tandem-mcp open AB3XK9QZ` reopens a canvas later; `tandem-mcp down` stops the server.
-
-### 2. Register the MCP server (Claude Code)
+## Install in one line
 
 ```bash
-claude mcp add tandem -- npx -y @jaximus/tandem-mcp
+npx -y @jaximus/tandem-mcp setup
 ```
 
-That's it — the package talks to the local server by default. Verify:
+That does everything a first run needs:
+
+1. Registers the MCP server with Claude Code at **user scope** (`claude mcp add --scope user tandem -- npx -y @jaximus/tandem-mcp`), so every project can reach Tandem. If `claude` isn't on your `PATH`, it prints the command for you to run.
+2. Appends a short **Tandem** snippet to `~/.claude/CLAUDE.md` (idempotent) so plain phrases — "make me a sprint board", "an agent board", "a task board", "a tandem canvas" — map to `canvas_create` + `epic_propose` instead of a markdown file.
+3. Downloads this platform's `tandem` binary from the [latest release](https://github.com/jaximus808/tandam/releases) into `~/.tandem/bin`, starts it on `http://127.0.0.1:7891`, and opens the board.
+
+Restart Claude Code afterwards and check:
 
 ```bash
 claude mcp list
 # tandem: npx -y @jaximus/tandem-mcp - ✓ Connected
 ```
 
-You don't even have to run `up` first: the MCP server starts the backend itself the first time a tool call finds nothing listening locally (`TANDEM_AUTOSTART=0` turns that off; `TANDEM_AUTOSTART_OPEN=1` also opens the browser). Cursor, Codex and any other stdio MCP client spawn the same command.
+Flags: `--project` registers in the current repo's `.mcp.json` instead of user scope; `--no-claude-md` skips the snippet; `--no-open` leaves the browser alone. Cursor, Codex and any other stdio MCP client spawn the same command: `npx -y @jaximus/tandem-mcp`.
 
-### 3. Teach your sessions the loop
+Then, in any Claude Code session: *"make me a sprint board for the auth refactor"* — the board opens with the plan on it, waiting for your approval.
 
-Paste this into your repo's `CLAUDE.md` (replace `AB3XK9QZ` with your canvas code):
+## What it looks like
+
+<p align="center">
+  <a href="apps/web/public/demo/tandem-demo-full.mp4">
+    <img src="apps/web/public/demo/tandem-demo-full-poster.jpg" width="720" alt="The Tandem board: an approved epic fanning out to parallel sessions" />
+  </a>
+  <br /><sub>Click for the full demo clip.</sub>
+</p>
+
+## How it works
+
+Everything runs on one machine. The MCP server is a thin stdio proxy; the binary is the whole product.
+
+```mermaid
+flowchart LR
+  CC[Claude Code / Cursor /<br/>any MCP client]
+  MCP["tandem-mcp<br/>(stdio MCP server)"]
+  T["tandem<br/>127.0.0.1:7891<br/>HTTP + WebSocket"]
+  DB[("~/.tandem/tandem.db<br/>SQLite")]
+  B[Board in your browser]
+
+  CC -- tool calls --> MCP -- HTTP --> T
+  T --- DB
+  B <-- live WebSocket --> T
+```
+
+The loop: an agent plans, you approve once, sessions claim and complete, the board moves as it happens.
+
+```mermaid
+sequenceDiagram
+  actor H as You
+  participant A as Agent session
+  participant T as Tandem
+  participant W as N worker sessions
+
+  H->>A: "plan the auth refactor"
+  A->>T: epic_propose (epic + tasks)
+  T-->>H: board shows the plan as proposed
+  H->>T: approve once (web UI)
+  W->>T: queue_next
+  W->>T: task_claim (atomic — one winner)
+  W->>T: task_progress (heartbeat)
+  W->>T: task_complete + commit link
+  T-->>H: board updates live
+```
+
+A task's life. Approval is the gate; editing an approved task's content sends it back through the gate, and a claim nobody heartbeats expires so another session can take it.
+
+```mermaid
+stateDiagram-v2
+  [*] --> proposed
+  proposed --> approved: human approves
+  proposed --> rejected: human rejects
+  approved --> executing: task_claim
+  executing --> done: task_complete
+  executing --> failed: task_complete (failed)
+  executing --> executing: claim expires (~15 min, no heartbeat) — another session may take it over
+  approved --> proposed: title/body edited (re-enters the gate)
+  done --> approved: reviewer requests changes
+```
+
+Roles are simple: the browser is the human (the owner of every canvas in local mode); anything that connects with a canvas code over MCP is an agent. Agents can propose and claim; only the human can approve, reject or delete.
+
+## Teach your sessions the loop
+
+`setup` gives Claude the phrases. For a repo that has its own board, pin it once:
+
+```bash
+npx -y @jaximus/tandem-mcp init --write
+```
+
+That creates a canvas, writes its code into the repo's `.mcp.json` as `TANDEM_CANVAS_CODE`, and appends the snippet below to `AGENTS.md`/`CLAUDE.md`. If you'd rather paste it yourself, replace `AB3XK9QZ` with your canvas code:
 
 ````markdown
 ## Tandem task queue
@@ -94,18 +164,34 @@ claim a task you won't personally do, and never hand a subagent your
 `session` handle; the canvas code is what travels.
 ````
 
-### 4. Go parallel
+### Go parallel
 
-Seed the queue: in one session, ask Claude to plan (`"read SPEC.md and propose the work on the Tandem canvas"`), then approve the epic once in the web UI — its tasks fan out to approved. Now open two terminals in the same repo:
+In one session, ask Claude to plan (*"read SPEC.md and propose the work on the Tandem canvas"*), approve the epic once in the browser, then open two terminals in the same repo:
 
 ```bash
 # terminal 1 and terminal 2:
 claude "work through the approved Tandem queue until it's empty"
 ```
 
-Both sessions pull the same queue. Each claim has exactly one winner — the loser sees `{ claimed: false, claimedBy: "…" }` and moves to the next task. Watch the board at `http://127.0.0.1:7891`: cards flip to *executing* with the claimant's name, every task carries its `TDM-n` ticket, and results (with commit hashes) land as tasks complete.
+Both pull the same queue. Each claim has exactly one winner — the loser sees `{ claimed: false, claimedBy: "…" }` and moves on. On the board, cards flip to *executing* with the claimant's name, every task carries its `TDM-n` ticket, and results with commit hashes land as tasks complete.
 
-Want approving a task to *launch* the sessions instead of you starting them? Wire a webhook to a local listener — see [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md). Locally that is one step: the server may deliver to `127.0.0.1` out of the box.
+Want approving a task to *launch* the sessions instead of you starting them? `tandem-mcp listen` turns a `task.approved` webhook into a command — see [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md). Locally that is one step: the server may deliver to `127.0.0.1` out of the box.
+
+## Commands
+
+All from `npx -y @jaximus/tandem-mcp <command>` (or `tandem-mcp <command>` after `npm i -g @jaximus/tandem-mcp`).
+
+| Command | What it does |
+|---------|--------------|
+| `setup` | First-run onboarding: register the MCP server with Claude Code, teach it the phrases, download and start the server, open the board. `--project`, `--no-claude-md`, `--no-open`. |
+| `up` | Start the local server (downloading the binary on first run) and open the board. `--port`, `--data-dir`, `--code CODE`, `--no-open`, `--foreground`. |
+| `open [CODE]` | Open the board — or one canvas — in the browser, starting the server first if needed. |
+| `down` | Stop the server `up` started. |
+| `init` | Set up the current repo: create a canvas, write `.mcp.json`, print the agent snippet. `--write` appends it to `AGENTS.md`/`CLAUDE.md`; `--code` wires an existing canvas; `--name`, `--force`. |
+| `listen --exec '…'` | Run a command when work is approved (local webhook listener). |
+| *(no command)* | Run as the stdio MCP server — what your MCP client spawns. |
+
+The MCP server also starts the backend itself the first time a tool call finds nothing listening locally, so a cold machine still works. `TANDEM_AUTOSTART=0` turns that off; `TANDEM_AUTOSTART_OPEN=1` opens the browser too.
 
 ## Where things live
 
@@ -116,19 +202,18 @@ Want approving a task to *launch* the sessions instead of you starting them? Wir
 | `~/.tandem/images/`, `~/.tandem/logs/` | Uploaded images; the detached server's log. |
 | `~/.tandem/bin/tandem` | The downloaded binary. `TANDEM_BIN` or a `tandem` on your `PATH` wins over it. |
 
-`TANDEM_DATA_DIR` moves the whole directory; `PORT` moves the port. Every server setting is documented in [`apps/api/.env.example`](apps/api/.env.example) — none of them is required.
+`TANDEM_DATA_DIR` moves the whole directory; `PORT` moves the port. The server answers `GET /healthz` and `GET /api/config` (`{auth, local, version}`). Every server setting is documented in [`apps/api/.env.example`](apps/api/.env.example) — none is required.
 
-## Monorepo
+## Run from source
 
 | Path | What it is |
 |------|------------|
 | `apps/api` | Go server — HTTP + WebSocket hub, SQLite store (`internal/store/sqlite`, pure-Go `modernc.org/sqlite`), the web bundle embedded at build time |
-| `apps/web` | React + Vite + Tailwind frontend |
-| `apps/mcp-gateway` | `@jaximus/tandem-mcp` — the stdio MCP server, and the `up` / `open` / `down` / `init` / `listen` CLI |
+| `apps/web` | React + Vite + Tailwind board |
+| `apps/mcp-gateway` | `@jaximus/tandem-mcp` — the stdio MCP server and the CLI above |
+| `apps/tandem-next` | The Next.js landing site (tandemcanvas.com, deployed on Vercel) |
 | `internal/shared` | TypeScript types shared by web + gateway |
 | `scripts/build.sh` | Builds the web bundle, embeds it, cross-compiles the binary |
-
-## Run from source
 
 ```bash
 pnpm install
@@ -136,13 +221,11 @@ scripts/build.sh          # → dist/tandem for this machine (--all: every relea
 ./dist/tandem             # local mode, data in ~/.tandem
 ```
 
-Dev loop — Go server plus a live web build, or Vite with HMR proxying to it:
+Dev loop — the Go server plus Vite with HMR proxying to it:
 
 ```bash
-pnpm --filter @agentcanvas/shared build && pnpm --filter web build
-cd apps/api && WEB_DIST_PATH=../../apps/web/dist go run ./cmd/server   # http://localhost:7891
-# or, for HMR on the frontend while that server runs:
-pnpm --filter web dev                                                  # http://localhost:5173 → proxies /api, /ws
+cd apps/api && go run ./cmd/server     # http://localhost:7891
+pnpm --filter web dev                  # http://localhost:5173 → proxies /api, /ws
 ```
 
 Verify before committing:
@@ -153,7 +236,7 @@ cd apps/web && pnpm build
 cd apps/mcp-gateway && pnpm build && pnpm test
 ```
 
-The schema is `apps/api/internal/store/sqlite/schema.sql`, applied by `migrate.go` (a `schema_version` table; bump `schemaVersion` and add a step when it changes). See [docs/DEV.md](docs/DEV.md).
+The schema is `apps/api/internal/store/sqlite/schema.sql`, applied by `migrate.go` (a `schema_version` table; bump `schemaVersion` and add a step when it changes). More in [docs/DEV.md](docs/DEV.md).
 
 ## Self-host with sign-in
 
@@ -170,7 +253,7 @@ Agents then point at it with `API_URL=https://tandem.example.com` (and `TANDEM_T
 
 ## Move your boards over
 
-If you have canvases on the old hosted instance, copy them straight out of its Supabase project into your local database. Nothing goes through the web:
+Canvases on the old hosted instance copy straight out of its Supabase project into your local database:
 
 ```bash
 cd apps/api
@@ -179,32 +262,22 @@ SUPABASE_URL=https://<ref>.supabase.co SUPABASE_KEY=<service_role> \
                                                # --db <path> if it isn't ~/.tandem/tandem.db
 ```
 
-Tasks keep their `TDM-n` tickets, documents and notes come across, and every canvas is re-owned by the local user so the board's owner controls work.
+Tasks keep their `TDM-n` tickets, documents and notes come across, and every canvas is re-owned by the local user.
 
 ## Releases
 
-The version is `apps/api/VERSION`. Tagging it publishes the binaries:
+The server version is `apps/api/VERSION`. Tagging it publishes the binaries:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.1.1 && git push origin v0.1.1
 ```
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) builds darwin / linux / windows × amd64 / arm64 and attaches them (plus `SHA256SUMS`) to the GitHub Release, which is what `tandem-mcp up` downloads. The gateway's npm release is separate and unchanged (`mcp-v*` tags, [`release-mcp-gateway.yml`](.github/workflows/release-mcp-gateway.yml)).
+[`release.yml`](.github/workflows/release.yml) builds darwin / linux / windows × amd64 / arm64 and attaches them (plus `SHA256SUMS`) to the GitHub Release — what `up` downloads (`TANDEM_VERSION` pins one; default latest). The gateway's npm release is separate: `mcp-v*` tags, [`release-mcp-gateway.yml`](.github/workflows/release-mcp-gateway.yml).
 
-## MCP
+## MCP tool surface
 
-Connect an agent session to a canvas with the published MCP server:
-
-```
-npx @jaximus/tandem-mcp
-```
-
-Vendor-neutral by design: anything that speaks MCP can join the same queue.
-
-The default surface is an **18-tool intent facade**, shaped like the work loop rather than the API: `canvas_connect`, `canvas_create`, `agent_register`, `context_get`, `queue_next`, `queue_wait`, `task_find`, `task_get`, `task_claim`, `task_progress`, `task_complete`, `task_propose`, `task_amend`, `task_review`, `epic_propose`, `doc_write`, `doc_read`, `board_status`. The raw CRUD surface (documents, notes, roadmap items, raw actions) is additive and one opt-in away — `TANDEM_FULL_TOOLS=1` or `tandem-mcp --full-tools`. Nothing in the quickstart needs it. See [apps/mcp-gateway/README.md](apps/mcp-gateway/README.md#tools) for the per-tool reference.
-
-`task_review` **replaced** `task_approve` on this manifest rather than joining it, so it cost the surface no slot. `task_approve` stays **callable** with its old behaviour, so sessions and prompts that learned it keep working — it is just no longer advertised, and it only ever did the approve half. New work uses `task_review`.
+The default surface is an **18-tool intent facade** shaped like the work loop: `canvas_connect`, `canvas_create`, `agent_register`, `context_get`, `queue_next`, `queue_wait`, `task_find`, `task_get`, `task_claim`, `task_progress`, `task_complete`, `task_propose`, `task_amend`, `task_review`, `epic_propose`, `doc_write`, `doc_read`, `board_status`. The raw CRUD surface (documents, notes, roadmap items, raw actions) is one opt-in away — `TANDEM_FULL_TOOLS=1` or `--full-tools`. Per-tool reference: [apps/mcp-gateway/README.md](apps/mcp-gateway/README.md#tools).
 
 ## What changed in the local-first move
 
-Tandem used to be hosted (Supabase + GCP, Google sign-in). It is now a tool you run. Along the way the parts that weren't the board were cut: maps / itinerary, sheets, charts, forms and their exports, metrics history, the load-test tool, the stats console and PostHog analytics. What stays is the task queue with its approval gate, documents and notes, roadmap items, the live board and fleet view, webhooks, and — behind `TANDEM_AUTH=google` — accounts and sharing. Each cut is its own `local-first:` commit in the history, so the way back is `git revert`.
+Tandem used to be hosted (Supabase + GCP, Google sign-in). It is now a tool you run. The parts that weren't the board were cut: maps / itinerary, sheets, charts, forms and their exports, metrics history, the load-test tool, the stats console and PostHog analytics. What stays is the task queue with its approval gate, documents and notes, roadmap items, the live board and fleet view, webhooks, and — behind `TANDEM_AUTH=google` — accounts and sharing. Each cut is its own `local-first:` commit, so the way back is `git revert`.
