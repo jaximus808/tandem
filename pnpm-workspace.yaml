@@ -1,5 +1,6 @@
 packages:
   - 'apps/mcp-gateway'
+  - 'apps/tandem-next'
   - 'apps/web'
   - 'internal/*'
 

@@ -1,0 +1,5 @@
+# Tandem — https://tandemcanvas.com
+User-agent: *
+Allow: /
+
+Sitemap: https://tandemcanvas.com/sitemap.xml

@@ -9,6 +9,7 @@
     "dev:gateway": "pnpm --filter mcp-gateway dev",
     "dev:api": "cd apps/api && go run ./cmd/server",
     "dev:full": "concurrently \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:site": "pnpm --filter tandem-next dev",
     "dev:mock": "VITE_MOCK=1 pnpm --filter web dev",
     "dev": "concurrently \"pnpm dev:web\" \"pnpm dev:gateway\""
   },

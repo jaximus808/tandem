@@ -1,0 +1,369 @@
+"use client";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   HeroBoardDemo — the landing hero visual.
+
+   An animated recreation of the demo's Act-2 arc: two Claude Code terminal
+   panes draining a shared Tandem task queue in parallel, next to a live mini
+   board. The narrative climax is the atomic-claim rejection — session-B tries
+   the task session-A just claimed, gets `claimed: false`, and pivots to the
+   next task. Loops forever (~20s), pure CSS/JS timeline, no video.
+
+   Two-column ≥md (terminals left, board right), stacked below. Honors
+   prefers-reduced-motion by rendering a single static end-state frame.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+import { useEffect, useState } from "react";
+import { GitCommitHorizontal, Layers, Zap } from "lucide-react";
+
+const TOTAL = 20_000; // full loop length
+const STATIC_T = 18_000; // frame shown under prefers-reduced-motion (all done)
+
+type LineKind = "cmd" | "ok" | "warn" | "dim";
+
+interface TermLine {
+  start: number;
+  kind: LineKind;
+  text: string;
+  dur?: number;
+}
+
+// Terminal A — session-A. Wins the contested claim.
+const LINES_A: TermLine[] = [
+  { start: 500, kind: "cmd", text: "task_claim TDM-7", dur: 900 },
+  { start: 1_600, kind: "ok", text: "{ claimed: true }  # TDM-7" },
+  { start: 2_100, kind: "dim", text: "→ working: ticket prefix check" },
+  { start: 6_200, kind: "cmd", text: "task_complete TDM-7", dur: 900 },
+  { start: 7_400, kind: "ok", text: "✓ done · TDM-7: prefix check · a3f8c21" },
+  { start: 8_300, kind: "cmd", text: "task_claim TDM-9", dur: 900 },
+  { start: 9_400, kind: "ok", text: "{ claimed: true }  # TDM-9" },
+  { start: 13_900, kind: "cmd", text: "task_complete TDM-9", dur: 950 },
+  { start: 15_000, kind: "ok", text: "✓ done · TDM-9: claim age · c76d1b4" },
+  { start: 17_600, kind: "dim", text: "queue empty — 4/4 done" },
+];
+
+// Terminal B — session-B. Loses the race on TDM-7: THE MONEY SHOT.
+const LINES_B: TermLine[] = [
+  { start: 1_200, kind: "cmd", text: "task_claim TDM-7", dur: 900 },
+  { start: 2_700, kind: "warn", text: "claimed: false" },
+  { start: 2_750, kind: "warn", text: '→ already claimed by "session-A"' },
+  { start: 3_800, kind: "dim", text: "→ claiming TDM-8 instead" },
+  { start: 4_700, kind: "cmd", text: "task_claim TDM-8", dur: 900 },
+  { start: 5_800, kind: "ok", text: "{ claimed: true }  # TDM-8" },
+  { start: 10_300, kind: "cmd", text: "task_complete TDM-8", dur: 950 },
+  { start: 11_500, kind: "ok", text: "✓ done · TDM-8: queue sort · 9d41e07" },
+  { start: 12_300, kind: "cmd", text: "task_claim TDM-10", dur: 950 },
+  { start: 13_400, kind: "ok", text: "{ claimed: true }  # TDM-10" },
+  { start: 15_700, kind: "cmd", text: "task_complete TDM-10", dur: 950 },
+  { start: 16_900, kind: "ok", text: "✓ done · TDM-10: sort tests · 5b2fa9c" },
+];
+
+const MONEY_GLOW: [number, number] = [2_600, 5_600];
+const CONTESTED: [number, number] = [2_700, 4_400];
+
+interface DemoTask {
+  id: string;
+  title: string;
+  claimant: string;
+  hash: string;
+  workAt: number;
+  doneAt: number;
+}
+
+const TASKS: DemoTask[] = [
+  { id: "TDM-7", title: "Prefix check", claimant: "session-A", hash: "a3f8c21", workAt: 1_700, doneAt: 7_500 },
+  { id: "TDM-8", title: "Queue ordering", claimant: "session-B", hash: "9d41e07", workAt: 5_900, doneAt: 11_600 },
+  { id: "TDM-9", title: "Stale claims", claimant: "session-A", hash: "c76d1b4", workAt: 9_500, doneAt: 15_100 },
+  { id: "TDM-10", title: "Queue sort tests", claimant: "session-B", hash: "5b2fa9c", workAt: 13_500, doneAt: 17_000 },
+];
+
+const SESSIONS = [
+  { name: "session-A", activeAt: 1_600 },
+  { name: "session-B", activeAt: 2_700 },
+];
+
+type TaskState = "ready" | "working" | "done";
+
+function taskStateAt(task: DemoTask, t: number): TaskState {
+  if (t >= task.doneAt) return "done";
+  if (t >= task.workAt) return "working";
+  return "ready";
+}
+
+function loopOpacity(t: number): number {
+  if (t < 450) return t / 450;
+  if (t > 19_200) return Math.max(0, 1 - (t - 19_200) / 650);
+  return 1;
+}
+
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+const LINE_CLS: Record<LineKind, string> = {
+  cmd: "text-zinc-100",
+  ok: "text-emerald-400",
+  warn: "text-amber-300 font-medium",
+  dim: "text-zinc-500",
+};
+
+function TerminalPane({
+  name,
+  lines,
+  t,
+  glow,
+  animate,
+  contentOpacity,
+}: {
+  name: string;
+  lines: TermLine[];
+  t: number;
+  glow: boolean;
+  animate: boolean;
+  contentOpacity: number;
+}) {
+  const visible = lines.filter((l) => t >= l.start);
+  const last = visible[visible.length - 1];
+  const typing = !!last && last.kind === "cmd" && !!last.dur && t < last.start + last.dur;
+  return (
+    <div
+      className={[
+        "overflow-hidden rounded-lg border bg-[#101014] transition-colors duration-500",
+        glow ? "border-amber-400/60 ring-1 ring-amber-400/25" : "border-white/10 shadow-sm",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-1.5 border-b border-white/[0.06] px-3 py-1.5">
+        <span className="h-2 w-2 rounded-full bg-[#FF5F57]" />
+        <span className="h-2 w-2 rounded-full bg-[#FEBC2E]" />
+        <span className="h-2 w-2 rounded-full bg-[#28C840]" />
+        <span className="ml-2 truncate font-code text-[10px] text-zinc-500">{name} — claude</span>
+      </div>
+      <div
+        className="flex h-40 flex-col justify-end overflow-hidden px-3 pb-2.5 pt-1 font-code text-[12px] leading-[1.55] sm:h-44 sm:text-[12.5px]"
+        style={{
+          maskImage: "linear-gradient(to bottom, transparent 0, black 28px)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 28px)",
+          opacity: contentOpacity,
+        }}
+      >
+        {visible.map((l) => {
+          const isCmd = l.kind === "cmd";
+          const shown =
+            isCmd && l.dur
+              ? l.text.slice(0, Math.max(1, Math.ceil(((t - l.start) / l.dur) * l.text.length)))
+              : l.text;
+          const isTypingLine = typing && l === last;
+          return (
+            <div key={l.start} className={`whitespace-pre-wrap break-words ${LINE_CLS[l.kind]}`}>
+              {isCmd && <span className="text-indigo-400">❯ </span>}
+              {shown}
+              {isTypingLine && animate && <span className="text-zinc-300">▍</span>}
+            </div>
+          );
+        })}
+        {!typing && (
+          <div className="whitespace-pre text-zinc-100">
+            <span className="text-indigo-400">❯ </span>
+            <span className={animate ? "hero-demo-blink text-zinc-300" : "text-zinc-300"}>▍</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const COLS: { key: TaskState; label: string; dot: string }[] = [
+  { key: "ready", label: "Ready", dot: "#0EA5E9" },
+  { key: "working", label: "Working", dot: "#8B5CF6" },
+  { key: "done", label: "Done", dot: "#10B981" },
+];
+
+function BoardCard({
+  task,
+  state,
+  contested,
+  animate,
+}: {
+  task: DemoTask;
+  state: TaskState;
+  contested: boolean;
+  animate: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "min-w-0 overflow-hidden rounded-lg border bg-surface p-2",
+        animate ? "hero-demo-card-in" : "",
+        contested ? "border-amber-400/70 ring-1 ring-amber-400/25" : "border-ink/10",
+      ].join(" ")}
+    >
+      <div className="min-w-0">
+        <span className="block font-code text-[9.5px] font-medium tracking-tight text-ink/40">{task.id}</span>
+        <span
+          className={`mt-0.5 block text-[11px] font-semibold leading-snug ${state === "done" ? "text-ink/50" : "text-ink"}`}
+          style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+        >
+          {task.title}
+        </span>
+      </div>
+      {state === "working" && (
+        <span className="mt-1 inline-flex min-w-0 max-w-full items-center gap-1 text-[10.5px] font-medium text-violet-600 dark:text-violet-400">
+          <Zap size={10} className="shrink-0" />
+          <span className="truncate">{task.claimant}</span>
+        </span>
+      )}
+      {state === "done" && (
+        <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-[4px] border border-emerald-600/20 bg-emerald-500/10 px-1 py-px font-code text-[9.5px] text-emerald-700 dark:text-emerald-300">
+          <GitCommitHorizontal size={9} className="shrink-0" />
+          <span className="truncate">{task.hash}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function BoardPane({ t, animate, contentOpacity }: { t: number; animate: boolean; contentOpacity: number }) {
+  const states = TASKS.map((task) => ({ task, state: taskStateAt(task, t) }));
+  const done = states.filter((s) => s.state === "done").length;
+  const working = states.filter((s) => s.state === "working").length;
+  const activeSessions = SESSIONS.filter((s) => t >= s.activeAt);
+  return (
+    <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-ink/10 bg-paper p-3 shadow-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="shrink-0 text-[12px] font-semibold text-ink">Board</span>
+        <span className="shrink-0 whitespace-nowrap font-code text-[10px] text-ink/40">4 tasks · 1 epic</span>
+        <span className="ml-auto flex shrink-0 items-center gap-1" style={{ opacity: contentOpacity }}>
+          {activeSessions.map((s) => (
+            <span
+              key={s.name}
+              className="hero-demo-card-in inline-flex items-center gap-1 whitespace-nowrap rounded-[4px] border border-agent/25 bg-agent/10 px-1.5 py-px font-code text-[9.5px] font-medium text-agent"
+            >
+              <span className="h-1.5 w-1.5 rounded-[2px] bg-agent" />
+              {s.name}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="mt-2" style={{ opacity: contentOpacity }}>
+        <div className="flex items-center gap-1.5">
+          <Layers size={11} className="shrink-0 text-ink/45" />
+          <span className="min-w-0 truncate text-[11px] font-medium text-ink/70">Task queue quality-of-life</span>
+          <span className="ml-auto shrink-0 font-code text-[10px] text-ink/45">{done}/4 done</span>
+        </div>
+        <div className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-ink/[0.08]">
+          {done > 0 && (
+            <div
+              className="h-full bg-emerald-500 transition-[width] duration-500"
+              style={{ width: `${(done / TASKS.length) * 100}%` }}
+            />
+          )}
+          {working > 0 && (
+            <div
+              className={`h-full bg-violet-500/80 transition-[width] duration-500 ${animate ? "animate-pulse" : ""}`}
+              style={{ width: `${(working / TASKS.length) * 100}%` }}
+            />
+          )}
+        </div>
+      </div>
+      <div className="mt-2.5 grid min-h-0 flex-1 grid-cols-3 gap-2">
+        {COLS.map((col) => {
+          const cards = states.filter((s) => s.state === col.key);
+          return (
+            <div key={col.key} className="flex min-h-0 flex-col">
+              <div className="mb-1.5 flex items-center gap-1 px-0.5">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: col.dot, opacity: cards.length ? 1 : 0.35 }}
+                />
+                <span className="truncate text-[9px] font-semibold uppercase tracking-[0.1em] text-ink/50">
+                  {col.label}
+                </span>
+                <span className="shrink-0 font-code text-[9px] text-ink/35">{cards.length}</span>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-dashed border-ink/[0.07] p-1">
+                <div className="flex flex-col gap-1.5" style={{ opacity: contentOpacity }}>
+                  {cards.map(({ task, state }) => (
+                    <BoardCard
+                      key={`${task.id}-${state}`}
+                      task={task}
+                      state={state}
+                      contested={task.id === "TDM-7" && t >= CONTESTED[0] && t < CONTESTED[1]}
+                      animate={animate}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function HeroBoardDemo() {
+  const reduced = usePrefersReducedMotion();
+  const [t, setT] = useState(0);
+
+  useEffect(() => {
+    if (reduced) {
+      setT(STATIC_T);
+      return;
+    }
+    let raf = 0;
+    const origin = performance.now();
+    const tick = (now: number) => {
+      const elapsed = (now - origin) % TOTAL;
+      setT(Math.floor(elapsed / 33) * 33);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [reduced]);
+
+  const animate = !reduced;
+  const glowB = animate && t >= MONEY_GLOW[0] && t < MONEY_GLOW[1];
+  const contentOpacity = animate ? loopOpacity(t) : 1;
+
+  return (
+    <div
+      role="img"
+      aria-label='Animated demo: two Claude Code sessions drain a shared Tandem task queue in parallel. Session B tries a task session A already claimed, gets "claimed: false — already claimed by session-A", and takes the next task instead. Completed tasks land on the board with commit hashes.'
+      className="w-full select-none"
+    >
+      <style>{`
+        @keyframes hero-demo-card-in {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .hero-demo-card-in { animation: hero-demo-card-in 0.35s ease; }
+        @keyframes hero-demo-blink { 50% { opacity: 0; } }
+        .hero-demo-blink { animation: hero-demo-blink 1.1s steps(2, jump-none) infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-demo-card-in, .hero-demo-blink { animation: none; }
+        }
+      `}</style>
+      <div aria-hidden="true" className="grid gap-3 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        <div className="flex min-w-0 flex-col gap-3">
+          <TerminalPane name="session-A" lines={LINES_A} t={t} glow={false} animate={animate} contentOpacity={contentOpacity} />
+          <TerminalPane name="session-B" lines={LINES_B} t={t} glow={glowB} animate={animate} contentOpacity={contentOpacity} />
+        </div>
+        <div className="hidden min-w-0 sm:block">
+          <BoardPane t={t} animate={animate} contentOpacity={contentOpacity} />
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-ink/50">
+        Claims are one atomic update in the database — race two sessions or two hundred,{" "}
+        <span className="font-medium text-ink/70">exactly one wins</span>. Zero double-claims, enforced in tests.
+      </p>
+    </div>
+  );
+}
