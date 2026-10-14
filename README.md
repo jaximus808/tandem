@@ -5,31 +5,46 @@
 <h1 align="center">Tandem</h1>
 
 <p align="center">
-  <strong>A task board for parallel agent sessions.</strong><br />
-  One binary on your machine, a SQLite file in <code>~/.tandem</code>, a board in your browser — and an MCP server so Claude Code, Cursor, Codex or any agent can plan on it, claim from it and report back to it.
+  <strong>One task queue for the Claude Code sessions you already run in parallel.</strong><br />
+  Terminals, worktrees, subagents: they claim work from one queue atomically, read one shared briefing, and only pick up what you approved.
 </p>
 
 <p align="center">
   <a href="https://tandemcanvas.com">tandemcanvas.com</a> ·
-  <a href="https://github.com/jaximus808/tandam/releases">Releases</a> ·
+  <a href="https://github.com/jaximus808/tandem/releases">Releases</a> ·
   <a href="https://www.npmjs.com/package/@jaximus/tandem-mcp">npm: @jaximus/tandem-mcp</a>
 </p>
 
-Intent lives in the repo; state lives in Tandem. The spec stays in git, and the churn — task claims, statuses, results — moves out of markdown into a durable shared queue that every session and every human can see live. Agents propose work, you approve it once, N sessions pull the approved queue without colliding, and every finished task carries a commit link.
-
-No account, no server to rent, nothing phones home.
-
-## Install in one line
+<p align="center">
+  <img src="assets/demo/claim-race.gif" width="720" alt="Two agent sessions claim from the same Tandem queue; one claim wins and the other is told who holds the task and moves on" />
+</p>
 
 ```bash
 npx -y @jaximus/tandem-mcp setup
 ```
 
-That does everything a first run needs:
+If you run more than one agent session on a repo, they probably coordinate through a TODO.md that several of them are editing at once, or that each worktree has its own copy of. A file has no notion of who holds what, and no atomic claim. Tandem keeps intent in git and moves the churn (claims, statuses, results) into a queue every session on the machine reads live. Agents propose work, you approve the plan once, N sessions pull the approved queue without colliding, and every finished task carries a commit link.
+
+One Go binary, one SQLite file in `~/.tandem`, a board in your browser. No account, no server to rent, nothing phones home. Any MCP client works: Claude Code, Codex, Cursor, or your own script.
+
+## Zero double-claims, enforced in tests
+
+A claim is one conditional `UPDATE … WHERE state = 'approved'` inside a serialized transaction, so when two sessions go for the same task, exactly one wins and the other gets `{ claimed: false, claimedBy }` naming the holder. Two tests hold that line:
+
+- [`TestClaimRaceHasOneWinner`](https://github.com/jaximus808/tandem/blob/main/apps/api/internal/store/sqlite/sqlite_test.go#L362-L421) — 8 goroutines race one real SQLite row: exactly 1 winner, 7 losers, and every loser is told who holds it.
+- [`TestConcurrentWorkerClaimsProduceOneWinner`](https://github.com/jaximus808/tandem/blob/main/apps/api/internal/api/edge_claim_test.go#L281-L324) — two workers claim the same task concurrently through the HTTP handler: exactly one `200`, one `409`, and the `409` names the winner.
+
+Run them with `cd apps/api && go test ./internal/store/sqlite ./internal/api -run 'ClaimRace|ConcurrentWorkerClaims'`.
+
+Tandem is also planned on its own queue: more than 150 commits in this repo carry a `TDM-n` ticket (`git log --oneline | grep -c TDM-`).
+
+## What `setup` does
+
+The one line at the top does everything a first run needs:
 
 1. Registers the MCP server with Claude Code at **user scope** (`claude mcp add --scope user tandem -- npx -y @jaximus/tandem-mcp`), so every project can reach Tandem. If `claude` isn't on your `PATH`, it prints the command for you to run.
 2. Appends a short **Tandem** snippet to `~/.claude/CLAUDE.md` (idempotent) so plain phrases — "make me a sprint board", "an agent board", "a task board", "a tandem canvas" — map to `canvas_create` + `epic_propose` instead of a markdown file.
-3. Downloads this platform's `tandem` binary from the [latest release](https://github.com/jaximus808/tandam/releases) into `~/.tandem/bin`, starts it on `http://127.0.0.1:7891`, and opens the board.
+3. Downloads this platform's `tandem` binary from the [latest release](https://github.com/jaximus808/tandem/releases) into `~/.tandem/bin`, starts it on `http://127.0.0.1:7891`, and opens the board.
 
 Restart Claude Code afterwards and check:
 
@@ -238,32 +253,6 @@ cd apps/mcp-gateway && pnpm build && pnpm test
 
 The schema is `apps/api/internal/store/sqlite/schema.sql`, applied by `migrate.go` (a `schema_version` table; bump `schemaVersion` and add a step when it changes). More in [docs/DEV.md](docs/DEV.md).
 
-## Self-host with sign-in
-
-Local mode has exactly one user: whoever opens the browser. If a team wants one Tandem on a shared box with accounts, run the same binary with `TANDEM_AUTH=google` — Google sign-in, personal access tokens, per-account sharing and the landing page come back. The [`Dockerfile`](Dockerfile) is the container path:
-
-```bash
-docker build -t tandem --build-arg VITE_GOOGLE_CLIENT_ID=… .
-docker run -p 7891:7891 -v tandem-data:/data \
-  -e TANDEM_AUTH=google -e GOOGLE_CLIENT_ID=… -e PUBLIC_BASE_URL=https://tandem.example.com -e COOKIE_SECURE=true \
-  tandem
-```
-
-Agents then point at it with `API_URL=https://tandem.example.com` (and `TANDEM_TOKEN` for private canvases).
-
-## Move your boards over
-
-Canvases on the old hosted instance copy straight out of its Supabase project into your local database:
-
-```bash
-cd apps/api
-SUPABASE_URL=https://<ref>.supabase.co SUPABASE_KEY=<service_role> \
-  go run ./cmd/import-supabase                 # every canvas; --canvas TEGLQFXR for one
-                                               # --db <path> if it isn't ~/.tandem/tandem.db
-```
-
-Tasks keep their `TDM-n` tickets, documents and notes come across, and every canvas is re-owned by the local user.
-
 ## Releases
 
 The server version is `apps/api/VERSION`. Tagging it publishes the binaries:
@@ -278,6 +267,6 @@ git tag v0.1.1 && git push origin v0.1.1
 
 The default surface is an **18-tool intent facade** shaped like the work loop: `canvas_connect`, `canvas_create`, `agent_register`, `context_get`, `queue_next`, `queue_wait`, `task_find`, `task_get`, `task_claim`, `task_progress`, `task_complete`, `task_propose`, `task_amend`, `task_review`, `epic_propose`, `doc_write`, `doc_read`, `board_status`. The raw CRUD surface (documents, notes, roadmap items, raw actions) is one opt-in away — `TANDEM_FULL_TOOLS=1` or `--full-tools`. Per-tool reference: [apps/mcp-gateway/README.md](apps/mcp-gateway/README.md#tools).
 
-## What changed in the local-first move
+## Sharing one instance with a team
 
-Tandem used to be hosted (Supabase + GCP, Google sign-in). It is now a tool you run. The parts that weren't the board were cut: maps / itinerary, sheets, charts, forms and their exports, metrics history, the load-test tool, the stats console and PostHog analytics. What stays is the task queue with its approval gate, documents and notes, roadmap items, the live board and fleet view, webhooks, and — behind `TANDEM_AUTH=google` — accounts and sharing. Each cut is its own `local-first:` commit, so the way back is `git revert`.
+Everything above is local mode: one machine, one user, no sign-in. Running a shared instance with accounts, importing boards from the old hosted Tandem, and what the local-first move cut are in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
