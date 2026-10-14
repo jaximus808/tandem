@@ -315,4 +315,4 @@ On top of your own environment:
 
 ## License
 
-MIT © Jaxon Parker
+MIT © Jaxon Poentis
