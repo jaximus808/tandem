@@ -1,0 +1,46 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jaximus808/tandem-mcp",
+  "title": "Tandem",
+  "description": "Local task queue + live board so Claude Code, Cursor and Codex sessions stop double-claiming work",
+  "repository": {
+    "url": "https://github.com/jaximus808/tandem",
+    "source": "github",
+    "id": "1247991269",
+    "subfolder": "apps/mcp-gateway"
+  },
+  "version": "3.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@jaximus/tandem-mcp",
+      "version": "3.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TANDEM_CANVAS_CODE",
+          "description": "This project's canvas code (8 characters). Optional: used as the default for canvas_connect.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "API_URL",
+          "description": "Tandem server URL. Leave unset for the local server, which is started automatically.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "http://127.0.0.1:7891"
+        },
+        {
+          "name": "TANDEM_TOKEN",
+          "description": "Personal access token for a self-hosted Tandem with sign-in. Never needed locally.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
