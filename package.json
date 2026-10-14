@@ -1,6 +1,7 @@
 {
   "name": "agentcanvas",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "pnpm --filter @agentcanvas/shared build && pnpm --filter web build && pnpm --filter mcp-gateway build",
     "build:web": "pnpm --filter web build",
