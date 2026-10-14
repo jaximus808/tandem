@@ -9,13 +9,13 @@
     "id": "1247991269",
     "subfolder": "apps/mcp-gateway"
   },
-  "version": "3.1.0",
+  "version": "3.1.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@jaximus/tandem-mcp",
-      "version": "3.1.0",
+      "version": "3.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -1,5 +1,16 @@
 # Changelog — @jaximus/tandem-mcp
 
+## 3.1.1 — 2026-10-14
+
+### Repo moved to `jaximus808/tandem`
+
+- `up` / `setup` download the server binary from `github.com/jaximus808/tandem`
+  releases (was `jaximus808/tandam`, which only kept working through GitHub's
+  rename redirect). `repository`, `homepage` and README links follow.
+- Ships `server.json` for the official MCP registry
+  (`io.github.jaximus808/tandem-mcp`).
+- Author / copyright: Jaxon Poentis.
+
 ## 3.1.0 — 2026-09-15
 
 ### `tandem-mcp setup` — one-line onboarding
