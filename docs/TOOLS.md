@@ -505,7 +505,7 @@ true, epicId, title }`.
 ```json
 { "id": "TDM-208",
   "result": "Wrote docs/TOOLS.md — per-tool reference for all 18 facade tools. Commit abc1234.",
-  "links": ["https://github.com/jaximus808/tandam/commit/abc1234"] }
+  "links": ["https://github.com/jaximus808/tandem/commit/abc1234"] }
 ```
 
 ---

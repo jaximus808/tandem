@@ -1,6 +1,6 @@
 # @jaximus/tandem-mcp
 
-MCP server for [Tandem](https://github.com/jaximus808/tandam) — the shared state layer for teams running parallel agent sessions: a durable task queue any session can claim from without colliding, with a live board humans watch in the browser.
+MCP server for [Tandem](https://github.com/jaximus808/tandem) — the shared state layer for teams running parallel agent sessions: a durable task queue any session can claim from without colliding, with a live board humans watch in the browser.
 
 This is a standard [Model Context Protocol](https://modelcontextprotocol.io) stdio server. It is **not Claude-specific**. Any MCP-aware client — Claude Code, Cursor, Windsurf, Codex CLI, the OpenAI Agents SDK, or a custom orchestrator — can spawn this gateway, connect to a canvas by code, and read or write the same canvas a human is looking at in their browser.
 
@@ -27,7 +27,7 @@ npx -y @jaximus/tandem-mcp up          # just the server: downloads the binary o
 claude mcp add --scope user tandem -- npx -y @jaximus/tandem-mcp   # just the registration
 ```
 
-`up` `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the latest [GitHub release](https://github.com/jaximus808/tandam/releases) (pin one with `TANDEM_VERSION=0.1.0`) and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
+`up` `up` finds the server via `TANDEM_BIN`, then `tandem` on your `PATH`, then its own cached download in `~/.tandem/bin` — otherwise it fetches this platform's binary from the latest [GitHub release](https://github.com/jaximus808/tandem/releases) (pin one with `TANDEM_VERSION=0.1.0`) and verifies it against the release's `SHA256SUMS`. A server already running on the port is reused, never duplicated.
 
 | Command                      | Effect                                                                                  |
 | ---------------------------- | --------------------------------------------------------------------------------------- |
@@ -100,8 +100,8 @@ The command is deliberately `tandem-mcp`, not `tandem`: the Go server binary is 
 ### From source
 
 ```bash
-git clone https://github.com/jaximus808/tandam.git
-cd tandam
+git clone https://github.com/jaximus808/tandem.git
+cd tandem
 pnpm install
 pnpm --filter @jaximus/tandem-mcp build
 # point your client at apps/mcp-gateway/dist/index.js
@@ -226,11 +226,11 @@ Every tool but the two connectors (`canvas_connect`, `canvas_create`) takes the 
 
 Reading a tab is `doc_read`, not a hand-built HTTP call: `context_get` lists the tabs, `doc_read` returns one tab's notes. Keep the `noteId` of anything you plan to revise — `doc_write` without it appends a second note instead of updating the one you read.
 
-`task_review` **replaced** `task_approve` on this manifest (it cost the surface no slot). `task_approve` stays **callable** with its old behaviour and response shape, so sessions and prompts that learned it keep working — it is just no longer advertised, and it only ever did the approve half. New work uses `task_review`. The review loop itself, including what it deliberately refuses to do, is documented in [`docs/ORCHESTRATION.md` §5](https://github.com/jaximus808/tandam/blob/main/docs/ORCHESTRATION.md).
+`task_review` **replaced** `task_approve` on this manifest (it cost the surface no slot). `task_approve` stays **callable** with its old behaviour and response shape, so sessions and prompts that learned it keep working — it is just no longer advertised, and it only ever did the approve half. New work uses `task_review`. The review loop itself, including what it deliberately refuses to do, is documented in [`docs/ORCHESTRATION.md` §5](https://github.com/jaximus808/tandem/blob/main/docs/ORCHESTRATION.md).
 
 ### The full CRUD surface
 
-Behind `TANDEM_FULL_TOOLS=1` (or `tandem-mcp --full-tools`) the gateway **also** advertises the ~40-tool CRUD surface — documents, notes, roadmap items, agent registration, epics — each with `add` / `update` / `delete` and `_batch` variants, plus `canvas_state_read`. It is additive: you get the facade *and* CRUD. Full schemas come back from the MCP `tools/list` request, or see [`src/tools.ts`](https://github.com/jaximus808/tandam/blob/main/apps/mcp-gateway/src/tools.ts).
+Behind `TANDEM_FULL_TOOLS=1` (or `tandem-mcp --full-tools`) the gateway **also** advertises the ~40-tool CRUD surface — documents, notes, roadmap items, agent registration, epics — each with `add` / `update` / `delete` and `_batch` variants, plus `canvas_state_read`. It is additive: you get the facade *and* CRUD. Full schemas come back from the MCP `tools/list` request, or see [`src/tools.ts`](https://github.com/jaximus808/tandem/blob/main/apps/mcp-gateway/src/tools.ts).
 
 Those tools stay **callable** either way — the flag decides what's *advertised*, so existing prompts that name `canvas_task_list` keep working against the default manifest.
 

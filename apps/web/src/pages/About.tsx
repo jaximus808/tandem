@@ -77,7 +77,7 @@ const LINKEDIN_URL = "https://www.linkedin.com/in/jaxon-poentis/";
 const GITHUB_URL = "https://github.com/jaximus808";
 
 // Tandem's own source, and the public board it's planned on.
-const REPO_URL = "https://github.com/jaximus808/tandam";
+const REPO_URL = "https://github.com/jaximus808/tandem";
 const BOARD_CODE = "TEGLQFXR";
 const LIVE_BOARD_URL = `https://tandemcanvas.com/c/${BOARD_CODE}`;
 

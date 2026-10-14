@@ -67,7 +67,7 @@ const INSTALL_METHODS: Tab[] = [
       {
         code: `# macOS (Apple silicon) — pick your file on the releases page
 curl -L -o /usr/local/bin/tandem \\
-  https://github.com/jaximus808/tandam/releases/latest/download/tandem_darwin_arm64
+  https://github.com/jaximus808/tandem/releases/latest/download/tandem_darwin_arm64
 chmod +x /usr/local/bin/tandem
 tandem            # serves http://127.0.0.1:7891, data in ~/.tandem`,
       },
@@ -81,13 +81,13 @@ tandem            # serves http://127.0.0.1:7891, data in ~/.tandem`,
       {
         text: "Clone and build the single binary (web bundle embedded):",
         code: `git clone ${REPO_URL}.git
-cd tandam
+cd tandem
 pnpm install
 scripts/build.sh          # → dist/tandem`,
       },
       {
         text: "Point the MCP server at your build instead of the release download:",
-        code: `"env": { "TANDEM_BIN": "/abs/path/to/tandam/dist/tandem" }`,
+        code: `"env": { "TANDEM_BIN": "/abs/path/to/tandem/dist/tandem" }`,
       },
     ],
   },

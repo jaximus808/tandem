@@ -7,7 +7,7 @@ only tells people how to install it.
 
 ## Deploy on Vercel
 
-Import the `jaximus808/tandam` repo and set:
+Import the `jaximus808/tandem` repo and set:
 
 | Setting          | Value                       |
 | ---------------- | --------------------------- |

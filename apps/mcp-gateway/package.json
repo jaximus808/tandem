@@ -39,14 +39,14 @@
   ],
   "author": "Jaxon Parker (https://www.jaxonp.com)",
   "license": "MIT",
-  "homepage": "https://github.com/jaximus808/tandam#readme",
+  "homepage": "https://github.com/jaximus808/tandem#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jaximus808/tandam.git",
+    "url": "git+https://github.com/jaximus808/tandem.git",
     "directory": "apps/mcp-gateway"
   },
   "bugs": {
-    "url": "https://github.com/jaximus808/tandam/issues"
+    "url": "https://github.com/jaximus808/tandem/issues"
   },
   "engines": {
     "node": ">=18"

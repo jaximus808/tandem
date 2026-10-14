@@ -45,7 +45,7 @@ import { delimiter, join, resolve } from "node:path";
 export const DEFAULT_PORT = 7891;
 export const DEFAULT_DATA_DIR_NAME = ".tandem";
 export const BINARY_NAME = "tandem";
-export const RELEASE_REPO = "jaximus808/tandam";
+export const RELEASE_REPO = "jaximus808/tandem";
 export const PID_FILE = "tandem.pid";
 export const LOG_FILE = join("logs", "tandem.log");
 /** How long `up` waits for /healthz after spawning before giving up. */

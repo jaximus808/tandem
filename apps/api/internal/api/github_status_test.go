@@ -136,8 +136,8 @@ func TestParseGitHubRef(t *testing.T) {
 		wantErr   string
 	}{
 		{
-			name: "commit", url: "https://github.com/jaximus808/tandam/commit/B7F1A2C3D4E5",
-			wantKind: refCommit, wantOwner: "jaximus808", wantRepo: "tandam", wantRef: "b7f1a2c3d4e5",
+			name: "commit", url: "https://github.com/jaximus808/tandem/commit/B7F1A2C3D4E5",
+			wantKind: refCommit, wantOwner: "jaximus808", wantRepo: "tandem", wantRef: "b7f1a2c3d4e5",
 		},
 		{
 			name: "commit with trailing segments", url: "https://github.com/o/r/commit/abc1234#diff-9",

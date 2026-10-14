@@ -5,7 +5,7 @@
 
 export const SITE_URL = "https://tandemcanvas.com";
 
-export const REPO_URL = "https://github.com/jaximus808/tandam";
+export const REPO_URL = "https://github.com/jaximus808/tandem";
 export const RELEASES_URL = `${REPO_URL}/releases`;
 export const COMMITS_URL = `${REPO_URL}/commits/main`;
 export const NPM_URL = "https://www.npmjs.com/package/@jaximus/tandem-mcp";

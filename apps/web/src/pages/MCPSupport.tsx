@@ -90,8 +90,8 @@ const INSTALL_METHODS: InstallMethod[] = [
       {
         text: "Clone, install, build:",
         lang: "bash",
-        code: `git clone https://github.com/jaximus808/tandam.git
-cd tandam
+        code: `git clone https://github.com/jaximus808/tandem.git
+cd tandem
 pnpm install
 pnpm --filter mcp-gateway build`,
       },
@@ -102,7 +102,7 @@ pnpm --filter mcp-gateway build`,
   "mcpServers": {
     "tandem": {
       "command": "node",
-      "args": ["/abs/path/to/tandam/apps/mcp-gateway/dist/index.js"],
+      "args": ["/abs/path/to/tandem/apps/mcp-gateway/dist/index.js"],
       "env": { "API_URL": "http://localhost:7891" }
     }
   }
@@ -120,7 +120,7 @@ pnpm --filter mcp-gateway build`,
       {
         text: "Once available, you'll be able to do:",
         lang: "bash",
-        code: `curl -fsSL https://github.com/jaximus808/tandam/releases/latest/download/install.sh | sh`,
+        code: `curl -fsSL https://github.com/jaximus808/tandem/releases/latest/download/install.sh | sh`,
       },
     ],
   },
@@ -939,7 +939,7 @@ export default function MCPSupport({
           <p className="text-sm text-ink/60 leading-relaxed">
             Source lives in{" "}
             <a
-              href="https://github.com/jaximus808/tandam/tree/main/apps/mcp-gateway"
+              href="https://github.com/jaximus808/tandem/tree/main/apps/mcp-gateway"
               target="_blank"
               rel="noopener noreferrer"
               className="font-code text-xs text-sky-600 underline hover:text-sky-700"

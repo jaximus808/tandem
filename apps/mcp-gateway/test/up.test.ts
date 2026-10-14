@@ -199,11 +199,11 @@ test("releaseAssetName mirrors scripts/build.sh's matrix", () => {
 test("releaseAssetUrl: v<version> tag, or latest", () => {
   assert.equal(
     releaseAssetUrl("3.0.0", "tandem_linux_amd64"),
-    "https://github.com/jaximus808/tandam/releases/download/v3.0.0/tandem_linux_amd64"
+    "https://github.com/jaximus808/tandem/releases/download/v3.0.0/tandem_linux_amd64"
   );
   assert.equal(
     releaseAssetUrl("latest", "SHA256SUMS"),
-    "https://github.com/jaximus808/tandam/releases/latest/download/SHA256SUMS"
+    "https://github.com/jaximus808/tandem/releases/latest/download/SHA256SUMS"
   );
 });
 

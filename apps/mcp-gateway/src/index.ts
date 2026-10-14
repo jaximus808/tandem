@@ -107,7 +107,7 @@ function printHelp() {
       `\n` +
       `This binary is normally spawned by an MCP client (Claude Code, Cursor,\n` +
       `Codex, OpenAI Agents SDK, …) over stdio. See:\n` +
-      `  https://github.com/jaximus808/tandam#readme\n`
+      `  https://github.com/jaximus808/tandem#readme\n`
   );
 }
 
