@@ -1,0 +1,192 @@
+# Fresh-box setup smoke test: does the one-line install actually work?
+#
+# On a clean macOS, Linux and Windows runner — Node only, NO Go toolchain, no
+# checkout of this repo — run exactly what a new user runs:
+#
+#   npx -y @jaximus/tandem-mcp up --no-open
+#
+# then prove the server it downloaded is real: poll GET /api/config until it
+# says {local:true}, create a canvas through the API and read it back, and stop
+# it again with `tandem-mcp down`. A failure here means a stranger following the
+# README gets a broken first run on that OS.
+#
+# What it exercises end to end (apps/mcp-gateway/src/up.ts): the npm package,
+# release-asset naming per platform, the GitHub Release download + SHA256SUMS
+# check, detached spawn + pid file, /healthz wait, and `down`'s pid-file stop.
+#
+# Triggers:
+#   - Actions → "Setup smoke test" → Run workflow (optionally pin versions).
+#   - After "Release Tandem binaries" (release.yml) finishes a TAG push
+#     successfully. This is a workflow_run trigger rather than
+#     `release: published` on purpose: release.yml publishes with the default
+#     GITHUB_TOKEN, and events created by GITHUB_TOKEN never start other
+#     workflows, so `release: published` would silently never fire. A manual
+#     run of release.yml publishes nothing, so it is skipped here.
+
+name: Setup smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      tandem_version:
+        description: 'Server release to install (TANDEM_VERSION), e.g. 0.1.1 — or "latest"'
+        required: false
+        default: latest
+      gateway_version:
+        description: 'npm version of @jaximus/tandem-mcp to run, e.g. 3.1.0 — or "latest"'
+        required: false
+        default: latest
+  workflow_run:
+    workflows: ['Release Tandem binaries']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: setup-smoke-${{ github.event_name }}-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Fresh box (${{ matrix.os }})
+    # From release.yml: only a successful TAG push (a real, published release).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    defaults:
+      run:
+        # Git Bash on windows-latest, so one script serves all three OSes.
+        shell: bash
+
+    env:
+      SMOKE_PORT: '7891'
+      # Never let a stray browser opener run on a headless runner.
+      TANDEM_AUTOSTART_OPEN: '0'
+
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Which server release and which gateway to test. After a release the
+      # server is pinned to the tag that was just published, and the run also
+      # asserts that version is what actually came up — up.ts silently falls
+      # back to `latest` on a 404, which would otherwise mask a missing asset.
+      - name: Resolve versions
+        env:
+          INPUT_TANDEM: ${{ github.event.inputs.tandem_version }}
+          INPUT_GATEWAY: ${{ github.event.inputs.gateway_version }}
+          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            tandem="${RELEASE_TAG#v}"
+          else
+            tandem="${INPUT_TANDEM:-latest}"
+            tandem="${tandem#v}"
+          fi
+          gateway="${INPUT_GATEWAY:-latest}"
+          # A throwaway data dir: the database, logs, pid file and the downloaded
+          # binary (<dir>/bin) all land here, never in ~/.tandem.
+          {
+            echo "TANDEM_DATA_DIR=${RUNNER_TEMP}/tandem-smoke"
+            echo "TANDEM_VERSION=${tandem}"
+            echo "GATEWAY_SPEC=@jaximus/tandem-mcp@${gateway}"
+          } >> "$GITHUB_ENV"
+          echo "server release: ${tandem}  gateway: @jaximus/tandem-mcp@${gateway}"
+          node --version
+          if command -v go >/dev/null 2>&1; then
+            echo "note: a Go toolchain is on this runner's PATH ($(go version)); up.ts never uses it."
+          fi
+
+      - name: tandem-mcp up
+        run: |
+          set -euo pipefail
+          npx -y "$GATEWAY_SPEC" up --no-open --port "$SMOKE_PORT"
+          test -f "$TANDEM_DATA_DIR/tandem.pid" || { echo "::error::up did not write $TANDEM_DATA_DIR/tandem.pid"; exit 1; }
+          ls -la "$TANDEM_DATA_DIR/bin"
+
+      - name: Poll /api/config until local
+        run: |
+          set -euo pipefail
+          base="http://127.0.0.1:${SMOKE_PORT}"
+          for _ in $(seq 1 60); do
+            if body="$(curl -fsS --max-time 3 "$base/api/config")"; then
+              echo "/api/config → $body"
+              if BODY="$body" node -e '
+                const c = JSON.parse(process.env.BODY);
+                if (c.local !== true) { console.error("local is not true"); process.exit(1); }
+                const want = process.env.TANDEM_VERSION;
+                if (want && want !== "latest" && c.version !== want) {
+                  console.error("server reports version " + c.version + ", expected " + want);
+                  process.exit(2);
+                }
+              '; then
+                exit 0
+              elif [ $? -eq 2 ]; then
+                echo "::error::the server that came up is not the release under test"
+                exit 1
+              fi
+            fi
+            sleep 1
+          done
+          echo "::error::/api/config never answered {local:true} on $base"
+          exit 1
+
+      - name: Create a canvas and read it back
+        run: |
+          set -euo pipefail
+          base="http://127.0.0.1:${SMOKE_PORT}"
+          created="$(curl -fsS --max-time 10 -X POST "$base/api/canvases" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"setup smoke"}')"
+          echo "POST /api/canvases → $created"
+          code="$(BODY="$created" node -e '
+            const c = JSON.parse(process.env.BODY);
+            if (!/^[A-Z0-9]{8}$/.test(c.code ?? "")) { console.error("no 8-char code in response"); process.exit(1); }
+            process.stdout.write(c.code);
+          ')"
+          fetched="$(curl -fsS --max-time 10 "$base/api/canvases/$code")"
+          BODY="$fetched" CODE="$code" node -e '
+            const c = JSON.parse(process.env.BODY);
+            if (c.code !== process.env.CODE || c.name !== "setup smoke") {
+              console.error("read-back mismatch:", JSON.stringify(c));
+              process.exit(1);
+            }
+          '
+          echo "canvas $code created and read back"
+
+      - name: tandem-mcp down
+        run: |
+          set -euo pipefail
+          npx -y "$GATEWAY_SPEC" down --port "$SMOKE_PORT"
+          base="http://127.0.0.1:${SMOKE_PORT}"
+          for _ in $(seq 1 20); do
+            if ! curl -fsS --max-time 2 "$base/healthz" >/dev/null 2>&1; then
+              echo "server stopped"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "::error::server still answering on $base after down"
+          exit 1
+
+      - name: Server log (on failure)
+        if: failure()
+        run: |
+          cat "$TANDEM_DATA_DIR/logs/tandem.log" 2>/dev/null || echo "no server log at $TANDEM_DATA_DIR/logs/tandem.log"
+
+      - name: Cleanup
+        if: always()
+        run: npx -y "$GATEWAY_SPEC" down --port "$SMOKE_PORT" || true
