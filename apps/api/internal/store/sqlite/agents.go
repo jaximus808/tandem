@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -90,6 +91,82 @@ func (s *Store) RegisterAgent(ctx context.Context, canvasID uuid.UUID, a *store.
 		return err
 	})
 	return v, err
+}
+
+// maxAgentNameAttempts bounds the fresh-name search. 32^4 ≈ 1M suffixes per
+// base name, so needing more than a couple of tries means something is wrong.
+const maxAgentNameAttempts = 16
+
+// RegisterAgentDistinct: see store.Store. Looks up the row holding the
+// requested name (and the session's own row), applies store.ResolveAgentName,
+// then either runs the ordinary upsert or inserts under the first unused
+// suffixed name, all inside one transaction.
+func (s *Store) RegisterAgentDistinct(ctx context.Context, canvasID uuid.UUID, a *store.Agent, in store.AgentRegisterIntent) (int, error) {
+	if in.LiveAfter.IsZero() && s.claimTTL > 0 {
+		in.LiveAfter = time.Now().Add(-s.claimTTL)
+	}
+	v := 0
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		var existing, sessionAgent *store.Agent
+		var err error
+		if a.Name != "" {
+			if existing, err = agentByName(ctx, tx, canvasID, a.Name); err != nil {
+				return err
+			}
+		}
+		if !in.NameGiven && in.SessionAgentID != nil {
+			sessionAgent, err = scanAgent(tx.QueryRowContext(ctx, `SELECT `+agentCols+` FROM agents WHERE id = ? AND canvas_id = ?`,
+				in.SessionAgentID.String(), canvasID.String()))
+			if errors.Is(err, sql.ErrNoRows) {
+				sessionAgent, err = nil, nil
+			}
+			if err != nil {
+				return err
+			}
+		}
+		name, decision := store.ResolveAgentName(a, in, existing, sessionAgent)
+		a.Name = name
+		if decision == store.DistinctAgent {
+			fresh, err := unusedAgentName(ctx, tx, canvasID, name)
+			if err != nil {
+				return err
+			}
+			a.Name = fresh
+		}
+		saved, err := upsertAgentByName(ctx, tx, canvasID, a)
+		if err != nil {
+			return err
+		}
+		*a = *saved
+		v, err = s.bumpVersion(ctx, tx, canvasID)
+		return err
+	})
+	return v, err
+}
+
+// agentByName returns the row holding name on the canvas, or nil.
+func agentByName(ctx context.Context, q dbtx, canvasID uuid.UUID, name string) (*store.Agent, error) {
+	a, err := scanAgent(q.QueryRowContext(ctx, `SELECT `+agentCols+` FROM agents WHERE canvas_id = ? AND name = ?`, canvasID.String(), name))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return a, err
+}
+
+// unusedAgentName returns the first SuffixedAgentName(base) no agent on the
+// canvas holds.
+func unusedAgentName(ctx context.Context, q dbtx, canvasID uuid.UUID, base string) (string, error) {
+	for i := 0; i < maxAgentNameAttempts; i++ {
+		candidate := store.SuffixedAgentName(base)
+		held, err := agentByName(ctx, q, canvasID, candidate)
+		if err != nil {
+			return "", err
+		}
+		if held == nil {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("no unused agent name derived from %q after %d attempts", base, maxAgentNameAttempts)
 }
 
 func (s *Store) GetAgent(ctx context.Context, canvasID, id uuid.UUID) (*store.Agent, error) {

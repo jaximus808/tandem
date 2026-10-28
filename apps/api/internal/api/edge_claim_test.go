@@ -148,6 +148,15 @@ func (f *edgeClaimFakeStore) RegisterAgent(_ context.Context, _ uuid.UUID, a *st
 	return 1, nil
 }
 
+// RegisterAgentDistinct: TDM-22's naming policy over this fake's rows, then
+// the same upsert as RegisterAgent.
+func (f *edgeClaimFakeStore) RegisterAgentDistinct(ctx context.Context, canvasID uuid.UUID, a *store.Agent, in store.AgentRegisterIntent) (int, error) {
+	f.mu.Lock()
+	resolveAgentNameTDM22(a, in, f.registered)
+	f.mu.Unlock()
+	return f.RegisterAgent(ctx, canvasID, a)
+}
+
 func (f *edgeClaimFakeStore) GetAgent(_ context.Context, _ uuid.UUID, id uuid.UUID) (*store.Agent, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

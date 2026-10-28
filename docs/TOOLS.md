@@ -96,7 +96,7 @@ request (`requireTaskId`), with a message naming both accepted forms.
 |---|---|
 | `code` | **Required.** The canvas code the human gave you, e.g. `TEGLQFXR`. |
 | `role` | `planner` \| `executor`. Passing it is what REGISTERS you — `planner` if you dispatch to subagents, `executor` if you claim and work tasks yourself. |
-| `name` | Agent name shown on the board, e.g. `opus-executor-3`. Defaults to the role. Re-registering the same name refreshes the SAME agent, never a duplicate. |
+| `name` | Agent name shown on the board, e.g. `opus-executor-3`. Omit it and you get a distinct `<role>-<4 chars>` one, so nameless subagents never merge. A name already held by a different agent (another planner's worker, or a live sibling under your parent) gets a suffix; the result's `name` is the one you claim under. |
 | `model` | Self-asserted model id. Matters only on canvases with cross-model review turned on. |
 | `parentAgentId` | The orchestrator's `agentId`, so the fleet view nests you under it. |
 
@@ -171,8 +171,12 @@ connect-time one, on every later call.
 
 - Prefer registering in `canvas_connect`. A separate registration call is a step
   a subagent can skip, and then the fleet tree never forms.
-- Re-registering the same `name` refreshes the SAME agent (same `agentId`) — it
-  is the fix for a rejected `parentAgentId`, a wrong `model`, or a role switch.
+- Re-registering from the same session refreshes the SAME agent (same `agentId`)
+  — it is the fix for a rejected `parentAgentId`, a wrong `model`, or a role
+  switch. "Same session" is the agent the session handle already carries; a
+  fresh `canvas_connect` carries none, so a second connect with the same `name`
+  under the same parent, while the first is still live, comes back suffixed
+  (`renamedFrom` says so). Don't reconnect: keep passing your `session` handle.
 - Skipping registration entirely still works (pass `agentName` on `task_claim` /
   `task_complete`), but you lose fleet grouping and `queue_next`'s handoffs ship
   a placeholder parent instead of your id.

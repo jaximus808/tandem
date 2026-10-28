@@ -797,6 +797,13 @@ type Store interface {
 	// refreshes role/model/parent_agent_id/status/last_seen_at on the existing
 	// row and KEEPS its id. On return a.ID is the surviving row's real id.
 	RegisterAgent(ctx context.Context, canvasID uuid.UUID, a *Agent) (int, error)
+	// RegisterAgentDistinct is the register ROUTE's write (TDM-22): the same
+	// upsert, except that a name held by a DIFFERENT agent (or no name at all) is
+	// resolved to a fresh "<name>-<4 chars>" name instead of merging into the
+	// holder — see ResolveAgentName for the rules. Lookup and write share one
+	// transaction, so two siblings registering at once cannot both claim the
+	// name. On return a carries the surviving row (its real id and FINAL name).
+	RegisterAgentDistinct(ctx context.Context, canvasID uuid.UUID, a *Agent, in AgentRegisterIntent) (int, error)
 	// GetAgent fetches one agent scoped to a canvas (parentAgentId validation).
 	GetAgent(ctx context.Context, canvasID, id uuid.UUID) (*Agent, error)
 	// ListAgents returns every registered agent on a canvas, oldest first — the

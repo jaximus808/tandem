@@ -24,6 +24,16 @@ import (
 // flat display, exactly as before. Re-registering a name is idempotent (TDM-8):
 // the store upserts on (canvas_id, name), so the SAME agentId comes back with
 // its fields refreshed — never a duplicate row.
+//
+// TDM-22: idempotent for the agent that HOLDS the name, not for anyone who
+// sends it. A registration with no name gets "<role>-<4 chars>" (it used to get
+// the bare role, so every nameless subagent merged into one "executor"), and a
+// subagent whose name is held by an agent under a different parent, or by a
+// live sibling under the same one, gets a suffixed name. "Same session" is the
+// optional body agentId (the gateway sends the id its session already holds) or
+// the X-Tandem-Agent identity naming the holder; either keeps the refresh. The
+// rules live in store.ResolveAgentName. The response carries the FINAL `name`,
+// plus `renamedFrom` when it differs from the one asked for.
 func (h *Handler) RegisterAgent(w http.ResponseWriter, r *http.Request) {
 	canvasID := CanvasIDFromCtx(r.Context())
 	var body struct {
@@ -31,6 +41,9 @@ func (h *Handler) RegisterAgent(w http.ResponseWriter, r *http.Request) {
 		Role          string     `json:"role"`
 		Model         *string    `json:"model"`
 		ParentAgentID *uuid.UUID `json:"parentAgentId"`
+		// AgentID is the agent this caller's session already is (TDM-22). Parsed
+		// leniently: garbage just means "no session agent", never a failed register.
+		AgentID string `json:"agentId"`
 	}
 	if err := decode(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -40,8 +53,13 @@ func (h *Handler) RegisterAgent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "role must be 'planner' or 'executor'")
 		return
 	}
-	if body.Name == "" {
-		body.Name = body.Role
+	body.Name = strings.TrimSpace(body.Name)
+	intent := store.AgentRegisterIntent{NameGiven: body.Name != ""}
+	if id, err := uuid.Parse(body.AgentID); err == nil {
+		intent.SessionAgentID = &id
+	}
+	if identity, ok := assertedAgent(r); ok {
+		intent.SessionIdentity = identity
 	}
 	// A parent must be a registered agent on THIS canvas: the DB FK is not
 	// canvas-scoped, so without this check a cross-canvas id would insert fine
@@ -61,12 +79,15 @@ func (h *Handler) RegisterAgent(w http.ResponseWriter, r *http.Request) {
 		Name: body.Name, Role: body.Role, Model: body.Model,
 		ParentAgentID: body.ParentAgentID,
 	}
-	if _, err := h.store.RegisterAgent(r.Context(), canvasID, agent); err != nil {
+	if _, err := h.store.RegisterAgentDistinct(r.Context(), canvasID, agent, intent); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	broadcastStateAsync(r.Context(), h.store, h.hub, canvasID)
-	resp := map[string]any{"agentId": agent.ID.String()}
+	resp := map[string]any{"agentId": agent.ID.String(), "name": agent.Name}
+	if intent.NameGiven && agent.Name != body.Name {
+		resp["renamedFrom"] = body.Name
+	}
 	if agent.ParentAgentID != nil {
 		resp["parentAgentId"] = agent.ParentAgentID.String()
 	}

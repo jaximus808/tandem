@@ -146,20 +146,52 @@ function readAgentIdentity(args: Args): {
 async function registerAgentIdentity(
   gateway: Gateway,
   identity: AgentIdentity
-): Promise<{ agentId?: string; parentAgentId?: string }> {
+): Promise<RegisteredAgent> {
   const res = (await gateway.post("/api/canvas/agents", {
     name: identity.name,
     role: identity.role,
     model: identity.model,
     parentAgentId: identity.parentAgentId,
-  })) as { agentId?: string; parentAgentId?: string };
+    // TDM-22: the agent this session ALREADY is, if it registered before. It is
+    // how the API tells "this session re-registering" (refresh its agent) from
+    // "a different agent asking for the same name" (give it a distinct one).
+    // A fresh canvas_connect has none, so it never inherits anybody.
+    agentId: gateway.getSession().agentId,
+  })) as RegisteredAgent;
   if (res?.agentId) {
-    // Mirror the server's default (name falls back to role) so a nameless
-    // registration still claims as "executor", not a raw UUID — the board's
-    // claimant chips and filter read this string.
-    gateway.setAgentId(res.agentId, identity.name ?? identity.role);
+    // The server picks the FINAL name (TDM-22: a nameless registration gets
+    // "<role>-<4 chars>", a colliding one a suffix), and claims must present
+    // exactly that string — the board's claimant chips and filter read it. An
+    // older API returns no name; mirror its old default (name, else role).
+    gateway.setAgentId(res.agentId, res.name ?? identity.name ?? identity.role);
   }
   return res;
+}
+
+/** The API's register answer. `name`/`renamedFrom` arrive from TDM-22 on. */
+interface RegisteredAgent {
+  agentId?: string;
+  parentAgentId?: string;
+  name?: string;
+  renamedFrom?: string;
+}
+
+/**
+ * The connect-result fields naming who you registered as (TDM-22). When the
+ * server had to give you a different name than you asked for, say so: the name
+ * belongs to another agent, and claiming under the old one would be refused.
+ */
+function registeredNameFields(res: RegisteredAgent, asked: string | undefined, role: string): Args {
+  const name = res.name ?? asked ?? role;
+  if (!res.renamedFrom) return { name };
+  return {
+    name,
+    renamedFrom: res.renamedFrom,
+    nameNote:
+      `"${res.renamedFrom}" already names a different agent on this canvas (another planner's ` +
+      `worker, or a live sibling under yours), so you are registered as "${name}" instead of ` +
+      `merging into it. Your claims and completions run under "${name}".`,
+  };
 }
 
 /**
@@ -203,7 +235,7 @@ async function registerOnConnect(gateway: Gateway, args: Args): Promise<Args | u
     return {
       registered: true,
       agentId: res.agentId,
-      name: name ?? role,
+      ...registeredNameFields(res, name, role),
       role,
       ...(res.parentAgentId ? { parentAgentId: res.parentAgentId } : {}),
     };
@@ -217,7 +249,7 @@ async function registerOnConnect(gateway: Gateway, args: Args): Promise<Args | u
         return {
           registered: true,
           agentId: res.agentId,
-          name: name ?? role,
+          ...registeredNameFields(res, name, role),
           role,
           parentAgentId: null,
           problem:
@@ -1047,8 +1079,11 @@ export const AGENT_IDENTITY_PROPS = {
   name: {
     type: "string",
     description:
-      "Human-readable agent name shown on the board (e.g. 'opus-executor-3'). Defaults to the " +
-      "role. Re-registering the same name refreshes the SAME agent, never a duplicate.",
+      "Human-readable agent name shown on the board (e.g. 'opus-executor-3'). Omit it and you " +
+      "get a distinct one, '<role>-<4 chars>'. This session re-registering its name refreshes " +
+      "the SAME agent; a name already held by a different agent (another planner's worker, or " +
+      "a live sibling under the same parent) gets a suffix instead of merging — use the `name` " +
+      "the result returns.",
   },
   model: { type: "string", description: "Optional model id, e.g. 'claude-opus-4-8'." },
   parentAgentId: {
@@ -1114,7 +1149,7 @@ const RAW_TOOLS = [
           ...AGENT_IDENTITY_PROPS.name,
           description:
             "YOUR agent name shown on the board (e.g. 'opus-orchestrator') — distinct from " +
-            "`name`, which names the canvas. Defaults to the role.",
+            "`name`, which names the canvas. Omit it for a distinct '<role>-<4 chars>' one.",
         },
         model: AGENT_IDENTITY_PROPS.model,
         parentAgentId: AGENT_IDENTITY_PROPS.parentAgentId,
@@ -1656,8 +1691,9 @@ const RAW_TOOLS = [
       "or switch role. Returns an agentId that is recorded as the author (provenance) " +
       "of actions this session proposes, plus an UPDATED `session` handle carrying " +
       "this identity — pass that handle (not the connect-time one) on all later calls. " +
-      "Re-registering a name refreshes the SAME agent (same agentId) rather than " +
-      "creating a duplicate. Multi-agent fleets: an orchestrator registers as role " +
+      "Re-registering from the same session refreshes the SAME agent (same agentId) rather " +
+      "than creating a duplicate; with no `name` you get a distinct '<role>-<4 chars>' one, so " +
+      "nameless subagents never merge. Multi-agent fleets: an orchestrator registers as role " +
       "'planner' and threads its returned agentId into each subagent's spawn prompt; " +
       "each subagent then registers role 'executor' with parentAgentId = that id, so " +
       "the board shows the fleet grouped under the orchestrator.",

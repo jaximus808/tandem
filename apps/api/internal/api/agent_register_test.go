@@ -52,6 +52,16 @@ func (f *agentFakeStore) RegisterAgent(_ context.Context, _ uuid.UUID, a *store.
 	return 1, nil
 }
 
+// RegisterAgentDistinct models the store's TDM-22 register: the shared
+// store.ResolveAgentName policy (resolveAgentNameTDM22) picks the name, then the
+// same upsert as RegisterAgent runs under it.
+func (f *agentFakeStore) RegisterAgentDistinct(ctx context.Context, canvasID uuid.UUID, a *store.Agent, in store.AgentRegisterIntent) (int, error) {
+	f.touchMu.Lock()
+	resolveAgentNameTDM22(a, in, f.registered)
+	f.touchMu.Unlock()
+	return f.RegisterAgent(ctx, canvasID, a)
+}
+
 // agentNamed returns the registered agent with the given name, mutex-guarded —
 // the detached claim goroutines mutate registered concurrently with test
 // assertions.
