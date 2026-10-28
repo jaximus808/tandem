@@ -293,7 +293,7 @@ export default function AgentWatch({ code, agentId, agentName, model, active }: 
   const sub = info?.subagent;
   const lastModel = sub?.model || [...events].reverse().find((e) => e.model)?.model;
   return (
-    <div className="flex min-h-0 flex-col rounded-md border border-ink/10 bg-surface">
+    <div className="flex min-h-0 flex-1 flex-col rounded-md border border-ink/10 bg-surface">
       <header className="flex shrink-0 flex-col gap-0.5 border-b border-ink/10 px-2.5 py-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <span
@@ -326,11 +326,13 @@ export default function AgentWatch({ code, agentId, agentName, model, active }: 
         {netError && <ErrorLine message={netError} />}
       </header>
 
-      <div className="relative min-h-0">
+      {/* Fills whatever height the host gives it (the agent detail pane hands
+          it the rest of the pane, TDM-25); 220px is the floor in a short host. */}
+      <div className="relative flex min-h-[220px] flex-1 flex-col">
         <div
           ref={scrollerRef}
           onScroll={onScroll}
-          className="h-[min(60vh,560px)] min-h-[220px] overflow-y-auto px-2.5 py-2"
+          className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2"
           role="log"
           aria-label={`${agentName} live session`}
         >
@@ -463,13 +465,13 @@ function LiveDot({ live }: { live: boolean }) {
 
 function Notice({ title, live, children }: { title: string; live?: boolean; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-dashed border-ink/15 px-3 py-3">
+    <div className="shrink-0 rounded-md border border-dashed border-ink/15 px-2.5 py-2">
       <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink/75">
         <Terminal size={13} className="shrink-0 text-ink/40" />
         <span className="min-w-0 flex-1">{title}</span>
         {live !== undefined && <LiveDot live={live} />}
       </p>
-      <div className="mt-1 text-[12px] leading-relaxed text-ink/55">{children}</div>
+      <div className="mt-0.5 text-[12px] leading-snug text-ink/55">{children}</div>
     </div>
   );
 }

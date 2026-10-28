@@ -43,8 +43,9 @@ import ActivityFeed from "./ActivityFeed";
    WATCHING ONE AGENT (the hook TDM-19 fills). Clicking an agent's identity line
    selects it — `watchedAgentId` / `onWatchAgent` are lifted to App so any other
    surface can open the same agent — and a detail pane opens beside the roster:
-   identity, every claim with its full progress log, and a slot for the live
-   Claude Code transcript. That slot renders `renderAgentWatch(agent)` when App
+   identity, every claim with its newest progress line (earlier ones behind a
+   "Show N earlier" disclosure), and a slot for the live Claude Code transcript
+   that takes the rest of the pane's height (TDM-25). That slot renders `renderAgentWatch(agent)` when App
    provides one, and a placeholder until then. Only registered agents (those
    with an id) can be watched; an unregistered claimant has no session to read.
    ──────────────────────────────────────────────────────────────────────────── */
@@ -58,8 +59,6 @@ const RECENT_DONE_MS = 45 * 60_000;
 // Ages re-render on this cadence so "12m" doesn't freeze while the surface is up.
 const TICK_MS = 30_000;
 const MAX_DEPTH = 4;
-// How many progress entries the detail pane lists per claim.
-const DETAIL_PROGRESS = 6;
 
 export type FleetRosterState = ReturnType<typeof useFleetRoster>;
 
@@ -979,9 +978,15 @@ function DoneLine({
 
 // ── detail pane (the TDM-19 hook) ────────────────────────────────────────────
 
-/* The watched agent: identity, every claim with its recent progress log, and the
+/* The watched agent: identity, every claim with its newest progress line, and the
    live-session slot. TDM-19 renders the Claude Code transcript into that slot by
-   passing `renderAgentWatch` from App; until then it shows a placeholder. */
+   passing `renderAgentWatch` from App; until then it shows a placeholder.
+
+   Layout (TDM-25): the transcript is the pane's main content. The body below the
+   header is a non-scrolling flex column; the Holding section is capped at 40% of
+   it and scrolls on its own, and the Live session section flex-fills the rest
+   (so it never gets less than ~60%), handing AgentWatch a bounded height so its
+   own log scroller, auto-scroll and Jump-to-latest keep working. */
 function AgentDetail({
   agent,
   claims,
@@ -998,6 +1003,16 @@ function AgentDetail({
   renderAgentWatch?: (agent: FleetAgent) => ReactNode;
 }) {
   const vendor = vendorOf(agent);
+  // Claims whose earlier progress lines are disclosed. Keyed by task id, so a
+  // stale entry from a previously watched agent is harmless.
+  const [openLogs, setOpenLogs] = useState<Set<string>>(() => new Set());
+  const toggleLog = (id: string) =>
+    setOpenLogs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   return (
     <aside
       aria-label={`${agent.name} detail`}
@@ -1034,8 +1049,8 @@ function AgentDetail({
         </button>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <section className="shrink-0 border-b border-ink/10 px-3 py-3 sm:px-4">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <section className="max-h-[40%] min-h-0 shrink-0 overflow-y-auto border-b border-ink/10 px-3 py-3 sm:px-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
             Holding {claims.length > 0 ? claims.length : ""}
           </h3>
@@ -1047,9 +1062,10 @@ function AgentDetail({
             <ul className="mt-1.5 flex flex-col gap-3">
               {claims.map((c) => {
                 const lease = deriveLease(c.action, now);
-                const log = [...c.progress]
-                  .sort((x, y) => (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))
-                  .slice(0, DETAIL_PROGRESS);
+                const log = [...c.progress].sort((x, y) => (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0));
+                const logOpen = openLogs.has(c.id);
+                const earlier = log.length - 1;
+                const shown = logOpen ? log : log.slice(0, 1);
                 return (
                   <li key={c.id} className="min-w-0">
                     <button
@@ -1074,7 +1090,7 @@ function AgentDetail({
                     )}
                     {log.length > 0 && (
                       <ol className="mt-1.5 flex flex-col gap-1 border-l border-ink/10 pl-2.5">
-                        {log.map((e, i) => (
+                        {shown.map((e, i) => (
                           <li key={`${e.at}-${i}`} className="flex items-baseline gap-2">
                             <span className="min-w-0 flex-1 text-[12px] leading-snug text-ink/70">{e.note}</span>
                             <span className="shrink-0 font-code text-[10.5px] text-ink/40" title={fullDate(e.at)}>
@@ -1083,6 +1099,15 @@ function AgentDetail({
                           </li>
                         ))}
                       </ol>
+                    )}
+                    {earlier > 0 && (
+                      <button
+                        onClick={() => toggleLog(c.id)}
+                        aria-expanded={logOpen}
+                        className="-mx-1 mt-1 rounded px-1 py-px text-[11.5px] text-ink/50 transition-colors hover:bg-ink/[0.04] hover:text-ink/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      >
+                        {logOpen ? "Hide earlier" : `Show ${earlier} earlier`}
+                      </button>
                     )}
                   </li>
                 );
@@ -1093,11 +1118,11 @@ function AgentDetail({
 
         {/* TDM-19 slot: the live Claude Code transcript for this agent. */}
         <section className="flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4" data-agent-watch-slot={agent.id}>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">Live session</h3>
+          <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-ink/45">Live session</h3>
           {renderAgentWatch ? (
             <div className="mt-1.5 flex min-h-0 flex-1 flex-col">{renderAgentWatch(agent)}</div>
           ) : (
-            <div className="mt-1.5 rounded border border-dashed border-ink/15 px-3 py-4 text-[12.5px] leading-relaxed text-ink/50">
+            <div className="mt-1.5 rounded border border-dashed border-ink/15 px-2.5 py-2 text-[12px] leading-snug text-ink/50">
               The agent's live session transcript will appear here.
             </div>
           )}
