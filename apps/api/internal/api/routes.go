@@ -344,6 +344,9 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 			r.Post("/api/canvas/actions/batch", h.ProposeActionsBatch)
 			r.Post("/api/canvas/actions/batch-delete", h.DeleteActionsBatch)
 			r.Post("/api/canvas/actions/approve-batch", h.ApproveActionsBatch)
+			// Bulk reject (TDM-14): proposed AND approved-unclaimed tasks, per-id
+			// outcomes, human-only. See task_reject.go.
+			r.Post("/api/canvas/actions/reject-batch", h.RejectActionsBatch)
 			// Ticket refs work on every action route below (see ticket_ref.go), so a
 			// caller holding "TDM-21" can approve, claim, move or complete it without
 			// resolving the uuid first.

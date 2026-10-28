@@ -250,9 +250,10 @@ type taskEventReturned struct {
 
 // taskEventRejected is the discriminator on task.rejected: who said no, and why.
 type taskEventRejected struct {
-	// From is the state the task was rejected OUT of — "proposed" today, and the
-	// field exists (as it does on `returned`) so it can stay honest if the state
-	// machine ever grows a second door into 'rejected'.
+	// From is the state the task was rejected OUT of: "proposed" for a proposal
+	// the gate turned down, or "approved" for ready, unclaimed work a human pulled
+	// back out of the queue (TDM-14 — the second door into 'rejected' this field
+	// was kept honest for).
 	From string `json:"from"`
 	// By is server-derived provenance, the same vocabulary as authoredBy:
 	// "human" for the signed-in person who pressed reject, "anonymous" on a

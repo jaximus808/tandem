@@ -892,7 +892,8 @@ func (h *Handler) ApproveActionsBatch(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-// POST /api/canvas/actions/{id}/reject  — human gate: proposed → rejected.
+// POST /api/canvas/actions/{id}/reject  — human gate: proposed → rejected, and
+// (TDM-14) approved → rejected for a task nobody has claimed.
 func (h *Handler) RejectAction(w http.ResponseWriter, r *http.Request) {
 	// The other exit from the human gate (TDM-129): rejecting is a human decision
 	// on proposed work, refused for anyone the server can't see as a human — an
@@ -908,6 +909,22 @@ func (h *Handler) RejectAction(w http.ResponseWriter, r *http.Request) {
 		Reason string `json:"reason"`
 	}
 	_ = decode(r, &body)
+	// TDM-14: a TASK in the ready queue (approved, so unclaimed) can be rejected
+	// too, through the conditional write in task_reject.go; a task that is being
+	// worked or already ran is refused with a coded reason rather than the bare
+	// "illegal transition". Proposals (and epics) keep the path below, unchanged.
+	if id, err := uuid.Parse(chi.URLParam(r, "id")); err == nil {
+		if current, gerr := h.store.GetAction(r.Context(), CanvasIDFromCtx(r.Context()), id); gerr == nil && current.Type == "task" {
+			if current.State == "approved" {
+				h.rejectApprovedTask(w, r, current, body.Reason)
+				return
+			}
+			if ref := rejectRefusalFor(current); ref != nil {
+				writeRejectRefusal(w, ref)
+				return
+			}
+		}
+	}
 	var reason *string
 	if body.Reason != "" {
 		reason = &body.Reason

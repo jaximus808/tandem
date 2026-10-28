@@ -250,7 +250,14 @@ func (h *Handler) MoveAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"action": current})
 		return
 	}
-	move, ok := humanMoveFor(current.State, body.To)
+	// Undoing a rejection puts the task back where it WAS (TDM-14): a task
+	// rejected out of 'approved' is restored to 'approved' — whether the client
+	// asked for the reconsider (to:"proposed", the board's Undo) or named the
+	// state — instead of being sent back through the gate it already passed.
+	move, ok := resolveRejectedRewind(current, body.To)
+	if !ok {
+		move, ok = humanMoveFor(current.State, body.To)
+	}
 	if !ok {
 		msg := fmt.Sprintf("a task in %q cannot be moved to %q", current.State, body.To)
 		if current.State == "proposed" {
