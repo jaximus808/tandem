@@ -14,7 +14,7 @@ import (
 	"github.com/agentcanvas/api/internal/store"
 )
 
-const actionCols = `id, type, state, payload, proposed_by, approved_by, claimed_by, claimed_at, result, error, ticket, authored_by, created_at, updated_at`
+const actionCols = `id, type, state, payload, proposed_by, approved_by, claimed_by, claimed_at, result, error, ticket, authored_by, created_at, updated_at, claimed_by_agent_id`
 
 // actionRow is one actions row as read; claimedAtRaw keeps the exact stored
 // text so a follow-up predicate can match it byte for byte.
@@ -28,9 +28,10 @@ func scanActionRow(r rowScanner) (*actionRow, error) {
 		a                                                             store.Action
 		id, payload, createdAt, updatedAt                             string
 		approvedBy, claimedBy, claimedAt, result, errText, authoredBy sql.NullString
+		claimedByAgentID                                              sql.NullString
 		ticket                                                        sql.NullInt64
 	)
-	if err := r.Scan(&id, &a.Type, &a.State, &payload, &a.ProposedBy, &approvedBy, &claimedBy, &claimedAt, &result, &errText, &ticket, &authoredBy, &createdAt, &updatedAt); err != nil {
+	if err := r.Scan(&id, &a.Type, &a.State, &payload, &a.ProposedBy, &approvedBy, &claimedBy, &claimedAt, &result, &errText, &ticket, &authoredBy, &createdAt, &updatedAt, &claimedByAgentID); err != nil {
 		return nil, err
 	}
 	a.ID = mustUUID(id)
@@ -41,6 +42,7 @@ func scanActionRow(r rowScanner) (*actionRow, error) {
 	}
 	a.ApprovedBy = strPtr(approvedBy)
 	a.ClaimedBy = strPtr(claimedBy)
+	a.ClaimedByAgentID = strPtr(claimedByAgentID)
 	a.ClaimedAt = parseTimePtr(claimedAt)
 	a.Result = strPtr(result)
 	a.Error = strPtr(errText)
@@ -243,9 +245,13 @@ func (s *Store) ClaimAction(ctx context.Context, canvasID, id uuid.UUID, claimed
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		now := time.Now().UTC()
 		nowRaw := fmtTime(now)
-		res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'executing', claimed_by = ?, claimed_at = ?, updated_at = ?
+		agentID, err := claimantAgentID(ctx, tx, canvasID, claimedBy)
+		if err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'executing', claimed_by = ?, claimed_by_agent_id = ?, claimed_at = ?, updated_at = ?
 			WHERE id = ? AND canvas_id = ? AND state = 'approved' AND type = 'task'`,
-			claimedBy, nowRaw, nowRaw, id.String(), canvasID.String())
+			claimedBy, agentID, nowRaw, nowRaw, id.String(), canvasID.String())
 		if err != nil {
 			return err
 		}
@@ -321,9 +327,13 @@ func (s *Store) ClaimAction(ctx context.Context, canvasID, id uuid.UUID, claimed
 func (s *Store) takeOverExpiredClaim(ctx context.Context, tx *sql.Tx, canvasID, id uuid.UUID, claimedBy string, now time.Time) (*store.Action, store.ClaimOutcome, bool, error) {
 	cutoff := fmtTime(now.Add(-s.claimTTL))
 	nowRaw := fmtTime(now)
-	res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'executing', claimed_by = ?, claimed_at = ?, updated_at = ?
+	agentID, err := claimantAgentID(ctx, tx, canvasID, claimedBy)
+	if err != nil {
+		return nil, store.ClaimOutcome{}, false, err
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'executing', claimed_by = ?, claimed_by_agent_id = ?, claimed_at = ?, updated_at = ?
 		WHERE id = ? AND canvas_id = ? AND state = 'executing' AND type = 'task' AND claimed_at < ?`,
-		claimedBy, nowRaw, nowRaw, id.String(), canvasID.String(), cutoff)
+		claimedBy, agentID, nowRaw, nowRaw, id.String(), canvasID.String(), cutoff)
 	if err != nil {
 		return nil, store.ClaimOutcome{}, false, err
 	}
@@ -344,6 +354,29 @@ func (s *Store) takeOverExpiredClaim(ctx context.Context, tx *sql.Tx, canvasID, 
 		return nil, store.ClaimOutcome{}, false, &store.AlreadyClaimedError{ClaimedBy: *fresh.ClaimedBy}
 	}
 	return nil, store.ClaimOutcome{}, false, nil
+}
+
+// claimantAgentID resolves a claim identity to the registered agent row it
+// names, so the claim can carry a stable agent id alongside the display name
+// (TDM-16). The claimant is the registered NAME (unique per canvas since 0036)
+// or an agent id, the same grammar touchAgent accepts. No match is not an error:
+// an unregistered claimant (a CI job, a session that never ran agent_register,
+// the human board controls) stores NULL, and readers fall back to the name. The
+// generic "agent" identity names nobody, so it never resolves.
+func claimantAgentID(ctx context.Context, q dbtx, canvasID uuid.UUID, claimant string) (any, error) {
+	if claimant == "" || claimant == "agent" {
+		return nil, nil
+	}
+	var id string
+	err := q.QueryRowContext(ctx, `SELECT id FROM agents WHERE canvas_id = ? AND (name = ? OR id = ?) ORDER BY name = ? DESC LIMIT 1`,
+		canvasID.String(), claimant, claimant, claimant).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return id, nil
 }
 
 // stampClaimRecord mints the fencing token (TDM-98) for the lease that just
@@ -445,7 +478,7 @@ func (s *Store) conditionalMove(ctx context.Context, canvasID, id uuid.UUID, que
 // cleared). Releasing an already-released task is an idempotent success.
 func (s *Store) ReleaseAction(ctx context.Context, canvasID, id uuid.UUID) (*store.Action, int, error) {
 	return s.conditionalMove(ctx, canvasID, id,
-		`UPDATE actions SET state = 'approved', claimed_by = NULL, claimed_at = NULL, error = NULL, updated_at = ?
+		`UPDATE actions SET state = 'approved', claimed_by = NULL, claimed_by_agent_id = NULL, claimed_at = NULL, error = NULL, updated_at = ?
 		 WHERE id = ? AND canvas_id = ? AND state = 'executing' AND type = 'task'`,
 		[]any{nowStr(), id.String(), canvasID.String()}, "task", "approved",
 		func(e *store.Action) error {
@@ -460,7 +493,7 @@ func (s *Store) ReleaseAction(ctx context.Context, canvasID, id uuid.UUID) (*sto
 // error AND result cleared). Idempotent on a task already in 'approved'.
 func (s *Store) RequeueAction(ctx context.Context, canvasID, id uuid.UUID) (*store.Action, int, error) {
 	return s.conditionalMove(ctx, canvasID, id,
-		`UPDATE actions SET state = 'approved', claimed_by = NULL, claimed_at = NULL, error = NULL, result = NULL, updated_at = ?
+		`UPDATE actions SET state = 'approved', claimed_by = NULL, claimed_by_agent_id = NULL, claimed_at = NULL, error = NULL, result = NULL, updated_at = ?
 		 WHERE id = ? AND canvas_id = ? AND state = 'failed' AND type = 'task'`,
 		[]any{nowStr(), id.String(), canvasID.String()}, "task", "approved",
 		func(e *store.Action) error {
@@ -474,7 +507,7 @@ func (s *Store) RequeueAction(ctx context.Context, canvasID, id uuid.UUID) (*sto
 // ReopenAction is the human rewind out of a terminal-ish state (done →
 // approved, rejected → proposed). (from, to) is the caller's validated pair.
 func (s *Store) ReopenAction(ctx context.Context, canvasID, id uuid.UUID, from, to string) (*store.Action, int, error) {
-	set := `state = ?, claimed_by = NULL, claimed_at = NULL, result = NULL, error = NULL, updated_at = ?`
+	set := `state = ?, claimed_by = NULL, claimed_by_agent_id = NULL, claimed_at = NULL, result = NULL, error = NULL, updated_at = ?`
 	if to == "proposed" {
 		set += `, approved_by = NULL`
 	}
@@ -539,7 +572,7 @@ func (s *Store) ResubmitAction(ctx context.Context, canvasID, id uuid.UUID, payl
 		if err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'proposed', payload = ?, approved_by = NULL, claimed_by = NULL,
+		res, err := tx.ExecContext(ctx, `UPDATE actions SET state = 'proposed', payload = ?, approved_by = NULL, claimed_by = NULL, claimed_by_agent_id = NULL,
 			claimed_at = NULL, error = NULL, result = NULL, updated_at = ?
 			WHERE id = ? AND canvas_id = ? AND state = 'rejected' AND type = 'task'`,
 			string(next), nowStr(), id.String(), canvasID.String())
@@ -639,7 +672,7 @@ func (s *Store) UpdateActionPayload(ctx context.Context, canvasID, id uuid.UUID,
 			out.Version, err = s.bumpVersion(ctx, tx, canvasID)
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE actions SET payload = ?, state = 'proposed', claimed_by = NULL, claimed_at = NULL,
+		res, err := tx.ExecContext(ctx, `UPDATE actions SET payload = ?, state = 'proposed', claimed_by = NULL, claimed_by_agent_id = NULL, claimed_at = NULL,
 			approved_by = NULL, updated_at = ? WHERE id = ? AND canvas_id = ? AND state = ?`,
 			string(next), nowStr(), id.String(), canvasID.String(), current.State)
 		if err != nil {

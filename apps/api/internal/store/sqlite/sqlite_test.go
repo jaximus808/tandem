@@ -69,8 +69,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 		t.Fatalf("id mismatch after reopen: %s vs %s", got.ID, c.ID)
 	}
 	var v int
-	if err := s2.DB().QueryRow(`SELECT COUNT(*) FROM schema_version`).Scan(&v); err != nil || v != 1 {
-		t.Fatalf("schema_version rows = %d (err %v), want 1", v, err)
+	if err := s2.DB().QueryRow(`SELECT COUNT(*) FROM schema_version`).Scan(&v); err != nil || v != schemaVersion {
+		t.Fatalf("schema_version rows = %d (err %v), want %d", v, err, schemaVersion)
 	}
 }
 

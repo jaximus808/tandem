@@ -289,7 +289,15 @@ func buildRoster(
 		}
 		claims++
 		name := *act.ClaimedBy
-		entry := byName[name]
+		// The agent id the claim stored (TDM-16) is the authoritative key; the
+		// name / id-string match is the fallback for rows without one.
+		var entry *rosterAgent
+		if act.ClaimedByAgentID != nil {
+			entry = byID[*act.ClaimedByAgentID]
+		}
+		if entry == nil {
+			entry = byName[name]
+		}
 		if entry == nil {
 			entry = byID[name]
 		}

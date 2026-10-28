@@ -253,10 +253,16 @@ type Action struct {
 	ApprovedBy *string         `json:"approvedBy,omitempty"`
 	// ClaimedBy/ClaimedAt record which agent holds the executing claim (set by
 	// ClaimAction, cleared by ReleaseAction). Migration 0032.
-	ClaimedBy *string    `json:"claimedBy,omitempty"`
-	ClaimedAt *time.Time `json:"claimedAt,omitempty"`
-	Result    *string    `json:"result,omitempty"`
-	Error     *string    `json:"error,omitempty"`
+	ClaimedBy *string `json:"claimedBy,omitempty"`
+	// ClaimedByAgentID is the registered agent row the claimant resolved to at
+	// claim time (TDM-16): the stable key presence views attribute a claim by,
+	// since a display name can be shared or reused. nil = the claimant was not a
+	// registered agent on this canvas, or the row predates the column — readers
+	// fall back to matching ClaimedBy by name. Set and cleared with ClaimedBy.
+	ClaimedByAgentID *string    `json:"claimedByAgentId,omitempty"`
+	ClaimedAt        *time.Time `json:"claimedAt,omitempty"`
+	Result           *string    `json:"result,omitempty"`
+	Error            *string    `json:"error,omitempty"`
 	// Ticket is the per-canvas sequential task number (type "task" only; nil
 	// for other action types). Only the integer is stored — the "TDM-<n>"
 	// display form is added at serialization time (see MarshalJSON).

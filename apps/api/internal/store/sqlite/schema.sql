@@ -128,6 +128,11 @@ CREATE TABLE IF NOT EXISTS actions (
   proposed_by    TEXT NOT NULL DEFAULT 'agent',
   approved_by    TEXT,
   claimed_by     TEXT,
+  -- The registered agent the claimant resolved to at claim time (TDM-16).
+  -- NULL for unregistered claimants and pre-v2 rows; readers fall back to the
+  -- claimed_by name. Plain TEXT, no FK: a deleted agent leaves a dangling id
+  -- that simply matches nobody, exactly like a dangling claimed_by name.
+  claimed_by_agent_id TEXT,
   claimed_at     TEXT,
   result         TEXT,
   error          TEXT,

@@ -53,6 +53,18 @@ export interface AgentShowcase extends CursorShowcase {
   mode: CanvasMode;
 }
 
+// One executing task an agent holds: action id, display label ("TDM-7 Make
+// claiming atomic"), display ticket, its epic (if any), and when the claim was
+// taken — everything the click-through ("following them = seeing their task")
+// needs.
+export interface AgentTask {
+  id: string;
+  label: string;
+  ticketId?: string;
+  epicId?: string;
+  claimedAt?: string;
+}
+
 export interface PresentAgent {
   id: string;
   name: string;
@@ -61,12 +73,15 @@ export interface PresentAgent {
   // The registered parent (orchestrator) agent id — the structural link the
   // swarm tree groups on. Absent = unparented, renders flat.
   parentId?: string;
-  // "TDM-7 Make claiming atomic" — the executing task whose claimedBy matches
-  // this agent's name (or id). Absent when the agent holds no claim.
+  // EVERY executing task this agent holds, newest claim first (TDM-16). Matched
+  // by the claim's stored agent id; rows from before that column existed (or
+  // whose claimant was never registered) fall back to claimedBy = name / id.
+  // Empty when the agent holds no claim.
+  tasks: AgentTask[];
+  // The single-task view, mirrored from tasks[0] (the most recent claim) for
+  // consumers that show one chip — the header mini-chip follows the newest
+  // claimant. Absent when the agent holds no claim.
   taskLabel?: string;
-  // The claimed task itself, for click-through ("following them = seeing their
-  // task"): action id, display ticket ("TDM-7"), its epic (if any), and when
-  // the claim was taken (the header mini-chip follows the newest claimant).
   taskId?: string;
   taskTicket?: string;
   taskEpicId?: string;
@@ -160,8 +175,8 @@ function resolveAgent(state: CanvasState | null): PresentAgent {
     /claude/i.test(a.model ?? "") || /claude/i.test(a.name ?? "");
   const online = state ? Object.values(state.agents).filter((a) => a.status === "online") : [];
   const pick = online.find(claudey) ?? online[0];
-  if (pick) return { id: pick.id, name: pick.name || "Agent", isClaude: claudey(pick) };
-  return { id: "live", name: "Claude", isClaude: true };
+  if (pick) return { id: pick.id, name: pick.name || "Agent", isClaude: claudey(pick), tasks: [] };
+  return { id: "live", name: "Claude", isClaude: true, tasks: [] };
 }
 
 /**
@@ -375,37 +390,62 @@ export function useAgentActivity(
 
   const agents = useMemo<PresentAgent[]>(() => {
     const all = state ? Object.values(state.agents) : [];
-    // Task attribution: claimant identity (task_start stamps the registered
-    // agent NAME, id as fallback) → the executing task it holds: display label
-    // ("TDM-7 <title>") plus the id/ticket/epic the click-through needs.
-    type Claim = { id: string; label: string; ticketId?: string; epicId?: string; claimedAt?: string };
-    const claims = new Map<string, Claim>();
+    // Task attribution (TDM-16): every executing task goes to the agent whose
+    // id the claim stored — a display name can be shared, and one agent can hold
+    // several claims, so neither a name key nor one slot per agent is enough.
+    // Claims without a stored id (rows from before the column, or a claimant
+    // that never registered) fall back to the old match: claimedBy against the
+    // agent's name, then its id. So does a stored id that names no agent on
+    // this canvas any more, rather than letting the task vanish from presence.
+    const byAgentId = new Map<string, AgentTask[]>();
+    const byClaimant = new Map<string, AgentTask[]>();
+    const push = (m: Map<string, AgentTask[]>, k: string, t: AgentTask) => {
+      const list = m.get(k);
+      if (list) list.push(t);
+      else m.set(k, [t]);
+    };
     for (const act of Object.values(state?.actions ?? {})) {
       if (act.type !== "task" || act.state !== "executing" || !act.claimedBy) continue;
       const p = act.payload as { title?: string; epicId?: string };
-      claims.set(act.claimedBy, {
+      const task: AgentTask = {
         id: act.id,
         label: [act.ticketId, p.title].filter(Boolean).join(" ") || "a task",
         ticketId: act.ticketId,
         epicId: p.epicId,
         claimedAt: act.claimedAt,
-      });
+      };
+      if (act.claimedByAgentId && state?.agents[act.claimedByAgentId]) {
+        push(byAgentId, act.claimedByAgentId, task);
+      } else {
+        push(byClaimant, act.claimedBy, task);
+      }
     }
+    const claimedMs = (t: AgentTask) => Date.parse(t.claimedAt ?? "") || 0;
+    const tasksOf = (a: (typeof all)[number]): AgentTask[] => {
+      const tasks = [
+        ...(byAgentId.get(a.id) ?? []),
+        ...(a.name ? byClaimant.get(a.name) ?? [] : []),
+        ...(a.name !== a.id ? byClaimant.get(a.id) ?? [] : []),
+      ];
+      return tasks.sort((x, y) => claimedMs(y) - claimedMs(x));
+    };
     const claudey = (a: { name?: string; model?: string }) =>
       /claude/i.test(a.model ?? "") || /claude/i.test(a.name ?? "");
     const present = (a: (typeof all)[number]): PresentAgent => {
-      const claim = claims.get(a.name) ?? claims.get(a.id);
+      const tasks = tasksOf(a);
+      const latest = tasks[0];
       return {
         id: a.id,
         name: a.name || "Agent",
         isClaude: claudey(a),
         role: a.role,
         parentId: a.parentAgentId,
-        taskLabel: claim?.label,
-        taskId: claim?.id,
-        taskTicket: claim?.ticketId,
-        taskEpicId: claim?.epicId,
-        taskClaimedAt: claim?.claimedAt,
+        tasks,
+        taskLabel: latest?.label,
+        taskId: latest?.id,
+        taskTicket: latest?.ticketId,
+        taskEpicId: latest?.epicId,
+        taskClaimedAt: latest?.claimedAt,
       };
     };
     const live = new Map<string, PresentAgent>();
@@ -416,7 +456,7 @@ export function useAgentActivity(
       const fresh = nowMs - Date.parse(a.lastSeen) < staleMs;
       // An executing claim counts as alive regardless of last_seen — a long
       // task is quiet by nature. Stale AND claimless = ghost: drop it.
-      if (p.taskLabel === undefined && !fresh) continue;
+      if (p.tasks.length === 0 && !fresh) continue;
       live.set(a.id, p);
     }
     // An orchestrator may go quiet while its subagents work — keep a stale
@@ -437,7 +477,7 @@ export function useAgentActivity(
     }
     const list = [...live.values()];
     // No agent has formally registered, but we just saw it read/write — show it.
-    if (list.length === 0 && online) list.push({ id: "live", name: "Claude", isClaude: true });
+    if (list.length === 0 && online) list.push({ id: "live", name: "Claude", isClaude: true, tasks: [] });
     return list;
   }, [state, online, nowMs]);
 

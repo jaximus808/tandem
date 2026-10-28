@@ -14,7 +14,12 @@ var schemaSQL string
 // migrate(), when the shape changes; the file itself always describes the
 // CURRENT shape (a fresh database applies it once and lands at the latest
 // version), and the steps are only for databases that already exist.
-const schemaVersion = 1
+const schemaVersion = 2
+
+// Version history:
+//
+//	1  the local-first baseline (schema.sql as first shipped)
+//	2  actions.claimed_by_agent_id (TDM-16): claims keyed by agent id
 
 // migrate brings the database to schemaVersion. Idempotent: reopening an
 // up-to-date file runs nothing. Every step runs inside one transaction so a
@@ -45,10 +50,33 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			if _, err := tx.ExecContext(ctx, schemaSQL); err != nil {
 				return fmt.Errorf("apply schema v1: %w", err)
 			}
+		case 2:
+			// A fresh database already has the column (step 1 applied the
+			// CURRENT schema.sql), so the ALTER is conditional — every step has
+			// to be a no-op on a database step 1 just created.
+			if err := addColumnIfMissing(ctx, tx, "actions", "claimed_by_agent_id", "TEXT"); err != nil {
+				return fmt.Errorf("migrate v2: %w", err)
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_version (version, applied_at) VALUES (?, ?)`, v, nowStr()); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
+}
+
+// addColumnIfMissing adds table.column unless it is already there. Steps that add
+// a column use it because schema.sql always describes the latest shape: on a
+// brand-new database the column arrived with step 1, and a bare ALTER would
+// fail with "duplicate column name".
+func addColumnIfMissing(ctx context.Context, tx *sql.Tx, table, column, decl string) error {
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `ALTER TABLE `+table+` ADD COLUMN `+column+` `+decl)
+	return err
 }

@@ -277,6 +277,10 @@ export interface Action {
   // "agent:<identity>" grammar as authoredBy, on purpose.
   approvedBy?: string;
   claimedBy?: string;        // agent holding the executing claim (task_start)
+  // The registered agent id that claim resolved to at claim time (TDM-16) —
+  // the key presence views attribute claims by, since a name can be shared.
+  // Absent for unregistered claimants and older rows: match claimedBy by name.
+  claimedByAgentId?: string;
   claimedAt?: string;        // when the claim was taken
   result?: string;           // execution outcome summary
   // Failure detail — AND the reason a human gave when rejecting it (TDM-161).
