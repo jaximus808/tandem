@@ -1401,7 +1401,7 @@ export default function App() {
       <div className="relative flex h-app flex-col items-center justify-center overflow-hidden bg-paper text-ink">
         <TandemLogo size={56} />
         <p className="relative mt-6 text-sm font-medium text-ink/70">Joining canvas</p>
-        <p className="relative mt-2 rounded-[4px] border border-ink/10 bg-surface px-2.5 py-1 font-code text-xs tracking-[0.3em] text-ink/50">
+        <p className="relative mt-2 rounded border border-ink/10 bg-surface px-2.5 py-1 font-code text-xs tracking-[0.3em] text-ink/50">
           {canvasCode}
         </p>
       </div>
@@ -1521,11 +1521,11 @@ export default function App() {
             has room. The desktop left dock is `hidden sm:flex`. */}
         <button
           onClick={() => handleJoin("")}
-          className="group flex items-center gap-1.5 text-sm shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+          className="group flex items-center gap-1.5 text-sm shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
           title="Back to home"
         >
           <TandemLogo size={28} animate={false} />
-          <span className={`${HEADER_DROP.wordmark} font-semibold tracking-tight text-ink transition-colors group-hover:text-accent`}>
+          <span className={`${HEADER_DROP.wordmark} font-semibold tracking-tight text-ink transition-colors group-hover:text-ink/70`}>
             Tandem
           </span>
         </button>
@@ -1543,7 +1543,7 @@ export default function App() {
             <button
               onClick={showMyCanvases}
               title="Your canvases"
-              className={`${HEADER_DROP.userCrumb} max-w-[8rem] shrink-0 truncate rounded-md text-sm font-medium text-ink/60 transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
+              className={`${HEADER_DROP.userCrumb} max-w-[8rem] shrink-0 truncate rounded text-sm font-medium text-ink/60 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
             >
               {crumbName(me)}
             </button>
@@ -1584,13 +1584,13 @@ export default function App() {
             }}
           />
           {/* Ladder rank 2. */}
-          <span className={`${HEADER_DROP.canvasCode} rounded-[3px] border border-ink/10 bg-surface px-1.5 py-px font-code text-[10px] tracking-[0.14em] text-ink/40 shrink-0`}>
+          <span className={`${HEADER_DROP.canvasCode} rounded-sm border border-ink/10 bg-surface px-1.5 py-px font-code text-[10px] tracking-[0.14em] text-ink/50 shrink-0`}>
             {canvas.code}
           </span>
           {/* Ladder rank 1 — the first thing the header gives up. */}
           {canvas.yourRole === "read" && (
             <span
-              className={`${HEADER_DROP.viewOnlyChip} items-center gap-1 rounded-[4px] bg-ink/5 px-1.5 py-px text-[11px] font-medium text-ink/60 shrink-0`}
+              className={`${HEADER_DROP.viewOnlyChip} items-center gap-1 rounded-sm bg-ink/5 px-1.5 py-px text-[11px] font-medium text-ink/60 shrink-0`}
               title="You have view-only access to this canvas"
             >
               <span className="h-1 w-1 rounded-full bg-ink/35" />
@@ -1680,7 +1680,7 @@ export default function App() {
               is `shrink-0`: they must never be squeezed into a two-line label,
               which is what would silently blow up the header's height. */}
           {config.local ? null : claiming ? (
-            <span className="inline-flex h-9 shrink-0 items-center rounded-md border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/60 sm:h-8">
+            <span className="inline-flex h-9 shrink-0 items-center rounded border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/60 sm:h-8">
               <span className="sm:hidden">Saving…</span>
               <span className="hidden sm:inline">Saving to your account…</span>
             </span>
@@ -1691,7 +1691,7 @@ export default function App() {
               <button
                 onClick={handleCopyToAccount}
                 disabled={copying}
-                className="inline-flex h-9 shrink-0 items-center rounded-md border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/80 transition-colors hover:border-ink/25 hover:bg-ink/[0.03] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
+                className="inline-flex h-9 shrink-0 items-center rounded border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/80 transition-colors hover:border-ink/25 hover:bg-ink/[0.04] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
                 title="Save a copy of this canvas to your account so it shows up in My canvases on every device"
               >
                 {copying ? "Copying…" : (
@@ -1712,7 +1712,7 @@ export default function App() {
               <button
                 onClick={handleSignedOutCopyClick}
                 disabled={copying}
-                className="inline-flex h-9 shrink-0 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-white transition-[filter] hover:brightness-[0.94] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
+                className="inline-flex h-9 shrink-0 items-center rounded bg-primary px-3 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
                 title="Sign in and get your own editable copy of this canvas"
               >
                 {copying ? "Copying…" : (
@@ -1729,7 +1729,7 @@ export default function App() {
               onClick={() => setShareOpen(true)}
               // h-9 below sm like the copy CTA beside it — this button is
               // visible at every width, so it needs the taller phone target.
-              className="inline-flex h-9 shrink-0 items-center rounded-md border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/80 transition-colors hover:border-ink/25 hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
+              className="inline-flex h-9 shrink-0 items-center rounded border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink/80 transition-colors hover:border-ink/25 hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8"
               title="Control who can open and edit this canvas"
             >
               Share
@@ -1738,7 +1738,7 @@ export default function App() {
           {/* Ladder rank 6 — the reasoning is on HEADER_DROP.connectButton. */}
           <button
             onClick={() => setConnectOpen(true)}
-            className={`${HEADER_DROP.connectButton} h-8 shrink-0 items-center rounded-md bg-accent px-3.5 text-[13px] font-medium text-white transition-[filter] hover:brightness-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper`}
+            className={`${HEADER_DROP.connectButton} h-8 shrink-0 items-center rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper`}
           >
             Connect
           </button>
@@ -1779,7 +1779,7 @@ export default function App() {
 
       {claimNotice && (
         <div className="pointer-events-none fixed inset-x-0 top-16 z-50 flex justify-center">
-          <div className="pointer-events-auto rounded-lg bg-ink px-4 py-2 text-sm font-medium text-paper shadow-lg">
+          <div className="pointer-events-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-lg">
             {claimNotice} ✓
           </div>
         </div>
@@ -1852,10 +1852,10 @@ export default function App() {
             aria-label="Toggle document list"
             aria-pressed={sidebarView === "documents" && sidebarOpen}
             className={[
-              "mr-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:flex",
+              "mr-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:flex",
               sidebarView === "documents" && sidebarOpen
-                ? "bg-accent/[0.08] text-accent"
-                : "text-ink/40 hover:bg-ink/5 hover:text-ink/70",
+                ? "bg-ink/[0.06] text-ink"
+                : "text-ink/50 hover:bg-ink/[0.05] hover:text-ink",
             ].join(" ")}
           >
             <PanelLeft size={15} strokeWidth={1.75} />
@@ -2021,13 +2021,13 @@ export default function App() {
         {!boardOverlayOpen && (
           <button
             onClick={() => setMobileNavOpen(true)}
-            className="tandem-float-br fixed z-30 flex h-12 w-12 items-center justify-center rounded-full border border-ink/10 bg-surface text-ink shadow-lg active:translate-y-px sm:hidden"
+            className="tandem-float-br fixed z-30 flex h-12 w-12 items-center justify-center rounded-md border border-ink/10 bg-surface text-ink shadow-lg active:translate-y-px sm:hidden"
             title="Menu"
             aria-label="Open navigation"
           >
             <Menu size={20} strokeWidth={1.75} />
             {proposedTaskCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-agent px-1 text-[9px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-sm bg-state-proposed px-1 text-[10px] font-semibold tabular-nums text-paper">
                 {proposedTaskCount}
               </span>
             )}
@@ -2121,7 +2121,7 @@ export default function App() {
             if (returnTo.docId) setActiveDocId(returnTo.docId);
             setReturnTo(null);
           }}
-          className="tandem-toast-in tandem-float-bl fixed z-[75] inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-surface/95 px-3 py-1.5 text-[12px] font-medium text-ink/70 shadow-lg backdrop-blur transition-colors hover:border-ink/25 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="tandem-toast-in tandem-float-bl fixed z-[75] inline-flex items-center gap-1.5 rounded-md border border-ink/10 bg-surface px-3 py-1.5 text-[12px] font-medium text-ink/70 shadow-lg transition-colors hover:border-ink/25 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           title="Follow moved you here — go back to what you were looking at"
         >
           <span aria-hidden="true">←</span>

@@ -5,18 +5,19 @@ interface Props {
   action?: { label: string; onClick: () => void };
 }
 
-/* An empty mode: a quiet dashed placeholder card waiting for someone (or some
-   agent) to fill it. */
+/* An empty mode: a quiet dashed placeholder waiting for someone (or some agent)
+   to fill it. Hairline only, no shadow; the one action is the view's primary
+   button (DESIGN.md v3). */
 export default function EmptyState({ title, hint, action }: Props) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
-      <div className="max-w-sm rounded-lg border border-dashed border-ink/20 bg-surface px-9 py-8 text-center">
-        <p className="text-lg font-semibold tracking-tight text-ink">{title}</p>
-        {hint && <p className="mt-1.5 text-sm leading-relaxed text-ink/55">{hint}</p>}
+      <div className="max-w-sm rounded-md border border-dashed border-ink/20 bg-surface px-8 py-7 text-center">
+        <p className="text-base font-semibold tracking-tight text-ink">{title}</p>
+        {hint && <p className="mt-1.5 text-[13px] leading-relaxed text-ink/60">{hint}</p>}
         {action && (
           <button
             onClick={action.onClick}
-            className="mt-4 rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="mt-4 inline-flex h-8 items-center rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
             {action.label}
           </button>

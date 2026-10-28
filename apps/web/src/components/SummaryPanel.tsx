@@ -34,9 +34,9 @@ export default function SummaryPanel({
         <header className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Gauge size={18} strokeWidth={1.75} className="text-ink/45" />
-            <h2 className="text-[15px] font-semibold tracking-tight text-ink/85">Summary</h2>
+            <h2 className="text-base font-semibold tracking-tight text-ink">Summary</h2>
           </div>
-          <p className="text-[13px] text-ink/50">
+          <p className="text-[13px] text-ink/55">
             Where this canvas stands — read-only, and live as the board changes.
           </p>
         </header>

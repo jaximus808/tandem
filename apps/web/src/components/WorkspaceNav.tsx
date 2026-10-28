@@ -7,7 +7,8 @@ import { SURFACE_ITEMS, type Surface } from "../lib/sidebar";
    Two kinds of things live here, visually separated:
 
    · Top: the SURFACES — Board, Documents, Summary — icon + label, one active
-     (left accent bar + accent ink, matching the active-tab idiom). Clicking
+     (ink label on an ink/[0.06] wash, plus a 2px accent bar at the rail edge —
+     DESIGN.md v3 nav/chrome). Clicking
      switches the whole content area; it never toggles panels.
    · Bottom: Settings — secondary chrome. It opens/closes the settings side
      panel (a toggle, hence aria-pressed), styled quieter than the surfaces.
@@ -43,23 +44,23 @@ export default function WorkspaceNav({
           return (
             <div key={item.id} className="relative">
               {isActive && (
-                <span className="absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r bg-accent" />
+                <span className="absolute left-0 top-1/2 h-8 w-0.5 -translate-y-1/2 bg-accent" />
               )}
               <button
                 onClick={() => onSelectSurface(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "relative mx-1.5 flex w-[calc(100%-0.75rem)] flex-col items-center gap-1 rounded-md py-2 transition-colors",
+                  "relative mx-1.5 flex w-[calc(100%-0.75rem)] flex-col items-center gap-1 rounded py-2 transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                   isActive
-                    ? "bg-accent/[0.08] text-accent"
-                    : "text-ink/45 hover:bg-ink/5 hover:text-ink/75",
+                    ? "bg-ink/[0.06] text-ink"
+                    : "text-ink/50 hover:bg-ink/[0.05] hover:text-ink",
                 ].join(" ")}
               >
                 <span className="relative">
                   <Icon size={19} strokeWidth={isActive ? 2 : 1.75} />
                   {badge > 0 && (
-                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-agent px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-state-proposed px-1 text-[10px] font-semibold tabular-nums text-paper">
                       {badge}
                     </span>
                   )}
@@ -85,11 +86,11 @@ export default function WorkspaceNav({
           aria-label="Canvas settings"
           aria-pressed={settingsOpen}
           className={[
-            "mx-1.5 flex flex-col items-center gap-1 rounded-md py-2 transition-colors",
+            "mx-1.5 flex flex-col items-center gap-1 rounded py-2 transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
             settingsOpen
-              ? "bg-accent/[0.08] text-accent"
-              : "text-ink/40 hover:bg-ink/5 hover:text-ink/70",
+              ? "bg-ink/[0.06] text-ink"
+              : "text-ink/50 hover:bg-ink/[0.05] hover:text-ink",
           ].join(" ")}
         >
           <Settings size={18} strokeWidth={1.75} />

@@ -56,7 +56,10 @@ function modesOf(c: CanvasMeta): CanvasMode[] {
   return ALL_MODES.filter((m) => enabled.includes(m));
 }
 
-const VIEW_KEY = "tandem.dashboard.view";
+// v2 key (TDM-13): the dashboard's default became the dense list, and the old
+// key had "grid" persisted for everyone who ever loaded the page, so the new
+// default would never have been seen. Grid stays one click away.
+const VIEW_KEY = "tandem.dashboard.view.v2";
 
 function timeAgo(iso: string): string {
   const then = Date.parse(iso);
@@ -104,7 +107,7 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
   const [sortKey, setSortKey] = useState<SortKey>("updated");
   const [modeFilter, setModeFilter] = useState<CanvasMode | "all">("all");
   const [view, setView] = useState<View>(
-    () => (localStorage.getItem(VIEW_KEY) as View) || "grid",
+    () => (localStorage.getItem(VIEW_KEY) as View) || "list",
   );
   const [launcherOpen, setLauncherOpen] = useState(false);
   // The canvas queued for deletion (drives the confirm modal), plus in-flight +
@@ -201,21 +204,25 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
     <div className="flex min-h-screen flex-col bg-paper text-ink">
       {/* Top chrome — breadcrumb, inbox, account, primary "New canvas" CTA. */}
       <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-ink/10 bg-paper px-4 py-3 sm:px-6">
-        <button onClick={onHome} className="group flex items-center gap-1.5" title="Back to home">
+        <button
+          onClick={onHome}
+          className="group flex items-center gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+          title="Back to home"
+        >
           <TandemLogo size={28} animate={false} />
-          <span className="hidden font-semibold tracking-tight transition-colors group-hover:text-accent sm:inline">
+          <span className="hidden font-semibold tracking-tight transition-colors group-hover:text-ink/70 sm:inline">
             Tandem
           </span>
         </button>
         <span className="text-ink/20">/</span>
-        <span className="text-[15px] font-medium">{config.local ? "Canvases" : "Dashboard"}</span>
+        <span className="text-sm font-medium">{config.local ? "Canvases" : "Dashboard"}</span>
         <div className="ml-auto flex items-center gap-2">
           {load.status === "ready" && (
             <button
               onClick={() => setLauncherOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">New canvas</span>
             </button>
           )}
@@ -223,28 +230,30 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         {load.status === "loading" && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="overflow-hidden rounded-md border border-ink/10 bg-surface">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-28 animate-pulse rounded-lg border border-ink/10 bg-surface/60"
-              />
+                className={`flex h-10 items-center px-3 ${i > 0 ? "border-t border-ink/[0.07]" : ""}`}
+              >
+                <div className="h-3 w-48 animate-pulse rounded-sm bg-ink/[0.06]" />
+              </div>
             ))}
           </div>
         )}
 
         {load.status === "signedOut" && (
-          <div className="mx-auto max-w-md rounded-lg border border-ink/10 bg-surface px-8 py-10 text-center">
-            <p className="text-lg font-semibold tracking-tight">Sign in to see your canvases</p>
+          <div className="mx-auto max-w-md rounded-md border border-ink/10 bg-surface px-6 py-8 text-center">
+            <p className="text-base font-semibold tracking-tight">Sign in to see your canvases</p>
             <p className="mt-1.5 text-sm text-ink/55">
               Canvases you create while signed in are saved to your account and show up here on every
               device.
             </p>
             <button
               onClick={onHome}
-              className="mt-5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="mt-4 inline-flex h-8 items-center rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Back to home
             </button>
@@ -252,17 +261,17 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
         )}
 
         {load.status === "error" && (
-          <p className="text-sm text-rose-600 dark:text-rose-400">{load.message}</p>
+          <p className="text-[13px] text-state-failed">{load.message}</p>
         )}
 
         {load.status === "ready" && (
           <>
             {/* Title + count */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold tracking-tight">
+            <div className="mb-4 flex items-baseline gap-2">
+              <h1 className="text-xl font-semibold tracking-tight">
                 {firstName ? `${firstName}'s canvases` : "Your canvases"}
               </h1>
-              <p className="mt-1 text-sm text-ink/55">
+              <p className="text-[13px] tabular-nums text-ink/55">
                 {owned.length} {owned.length === 1 ? "canvas" : "canvases"}
                 {config.local ? " on this machine" : " saved to your account"}
               </p>
@@ -285,21 +294,21 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
                 />
 
                 {visible.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-ink/20 bg-surface/60 px-8 py-12 text-center">
-                    <p className="text-base font-semibold tracking-tight">No canvases match</p>
-                    <p className="mt-1 text-sm text-ink/55">Try a different search or filter.</p>
+                  <div className="rounded-md border border-dashed border-ink/20 bg-surface px-6 py-10 text-center">
+                    <p className="text-sm font-semibold tracking-tight">No canvases match</p>
+                    <p className="mt-1 text-[13px] text-ink/55">Try a different search or filter.</p>
                     <button
                       onClick={() => {
                         setQuery("");
                         setModeFilter("all");
                       }}
-                      className="mt-4 rounded-md border border-ink/15 bg-surface px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-ink/5"
+                      className="mt-4 inline-flex h-8 items-center rounded border border-ink/15 bg-surface px-3 text-[13px] font-medium text-ink transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                     >
                       Clear filters
                     </button>
                   </div>
                 ) : view === "grid" ? (
-                  <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {visible.map((c) => (
                       <CanvasCard key={c.id} c={c} onOpen={onOpenCanvas} onDelete={setPendingDelete} />
                     ))}
@@ -312,17 +321,15 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
 
             {/* Shared with you — canvases other owners granted you access to. */}
             {load.shared.length > 0 && (
-              <section className="mt-12">
-                <h2 className="text-lg font-semibold tracking-tight">Shared with you</h2>
-                <p className="mt-1 text-sm text-ink/55">
-                  {load.shared.length} {load.shared.length === 1 ? "canvas" : "canvases"} others gave
-                  you access to
-                </p>
-                <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {sortCanvases(load.shared, "updated").map((c) => (
-                    <CanvasCard key={c.id} c={c} onOpen={onOpenCanvas} role={c.yourRole} />
-                  ))}
-                </ul>
+              <section className="mt-10">
+                <div className="mb-3 flex items-baseline gap-2">
+                  <h2 className="text-base font-semibold tracking-tight">Shared with you</h2>
+                  <p className="text-[13px] tabular-nums text-ink/55">
+                    {load.shared.length} {load.shared.length === 1 ? "canvas" : "canvases"} others gave
+                    you access to
+                  </p>
+                </div>
+                <CanvasTable canvases={sortCanvases(load.shared, "updated")} onOpen={onOpenCanvas} shared />
               </section>
             )}
           </>
@@ -330,7 +337,7 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
       </main>
 
       {config.local && (
-        <footer className="mx-auto w-full max-w-6xl px-4 pb-6 text-[11px] text-ink/35 sm:px-6">
+        <footer className="mx-auto w-full max-w-6xl px-4 pb-6 text-[11px] text-ink/50 sm:px-6">
           Tandem{config.version ? ` v${config.version}` : ""} · running locally
         </footer>
       )}
@@ -379,8 +386,8 @@ function CanvasMenu({ onDelete, label }: { onDelete: () => void; label: string }
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className={`flex h-7 w-7 items-center justify-center rounded-md text-ink/40 transition-colors hover:bg-ink/10 hover:text-ink focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ink/20 ${
-          open ? "bg-ink/10 opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        className={`flex h-7 w-7 items-center justify-center rounded text-ink/50 transition-colors hover:bg-ink/[0.06] hover:text-ink focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+          open ? "bg-ink/[0.06] opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         }`}
       >
         <MoreVertical className="h-4 w-4" />
@@ -398,7 +405,7 @@ function CanvasMenu({ onDelete, label }: { onDelete: () => void; label: string }
           />
           <div
             role="menu"
-            className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-ink/10 bg-surface py-1 shadow-lg"
+            className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-ink/10 bg-surface py-1 shadow-lg"
           >
             <button
               role="menuitem"
@@ -407,9 +414,9 @@ function CanvasMenu({ onDelete, label }: { onDelete: () => void; label: string }
                 setOpen(false);
                 onDelete();
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-state-failed transition-colors hover:bg-state-failed/10 focus-visible:bg-state-failed/10 focus-visible:outline-none"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
               Delete
             </button>
           </div>
@@ -443,23 +450,23 @@ function Toolbar({
   onView: (v: View) => void;
 }) {
   return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
       {/* search */}
       <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" />
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder="Search by name or code…"
-          className="w-full rounded-md border border-ink/15 bg-surface py-2 pl-9 pr-8 text-sm placeholder:text-ink/35 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+          className="h-8 w-full rounded border border-ink/15 bg-surface pl-8 pr-8 text-[13px] placeholder:text-ink/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
         />
         {query && (
           <button
             onClick={() => onQuery("")}
             aria-label="Clear search"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/35 hover:text-ink/70"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-ink/40 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
@@ -481,26 +488,26 @@ function Toolbar({
           options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
         />
         {/* view toggle */}
-        <div className="flex shrink-0 overflow-hidden rounded-md border border-ink/15 bg-surface">
+        <div className="flex shrink-0 overflow-hidden rounded border border-ink/15 bg-surface">
           <button
             onClick={() => onView("grid")}
             aria-label="Grid view"
             aria-pressed={view === "grid"}
-            className={`flex h-[38px] w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
-              view === "grid" ? "bg-accent text-white" : "text-ink/45 hover:bg-ink/5"
+            className={`flex h-[30px] w-8 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
+              view === "grid" ? "bg-ink/[0.08] text-ink" : "text-ink/50 hover:bg-ink/[0.04] hover:text-ink"
             }`}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onView("list")}
             aria-label="List view"
             aria-pressed={view === "list"}
-            className={`flex h-[38px] w-9 items-center justify-center border-l border-ink/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
-              view === "list" ? "bg-accent text-white" : "text-ink/45 hover:bg-ink/5"
+            className={`flex h-[30px] w-8 items-center justify-center border-l border-ink/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
+              view === "list" ? "bg-ink/[0.08] text-ink" : "text-ink/50 hover:bg-ink/[0.04] hover:text-ink"
             }`}
           >
-            <ListIcon className="h-4 w-4" />
+            <ListIcon className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -523,7 +530,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-[38px] cursor-pointer appearance-none rounded-md border border-ink/15 bg-surface py-2 pl-3 pr-8 text-sm font-medium text-ink/70 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+        className="h-8 cursor-pointer appearance-none rounded border border-ink/15 bg-surface pl-2.5 pr-7 text-[13px] font-medium text-ink/70 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -531,7 +538,7 @@ function Select({
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" />
     </div>
   );
 }
@@ -540,17 +547,17 @@ function Select({
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-lg border border-dashed border-ink/20 bg-surface/60 px-8 py-14 text-center">
-      <p className="text-lg font-semibold tracking-tight">No canvases yet</p>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-ink/55">
+    <div className="rounded-md border border-dashed border-ink/20 bg-surface px-6 py-10 text-center">
+      <p className="text-base font-semibold tracking-tight">No canvases yet</p>
+      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink/60">
         Create a canvas while signed in and it’ll live here. Already have an anonymous canvas? Open it
         and hit <span className="font-medium">Copy to my account</span>.
       </p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="mt-4 inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
         Create a canvas
       </button>
     </div>
@@ -563,7 +570,7 @@ function VisibilityBadge({ c }: { c: CanvasMeta }) {
   const isPrivate = c.visibility === "private";
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] font-medium text-ink/45"
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-ink/60"
       title={isPrivate ? "Private — only people you invite can open this" : "Public — anyone with the code can open this"}
     >
       {isPrivate ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
@@ -574,8 +581,8 @@ function VisibilityBadge({ c }: { c: CanvasMeta }) {
 
 /* ── mode chips ─────────────────────────────────────────────────────────────── */
 
-// The modes a canvas has enabled, as quiet neutral chips (Design v2: no per-mode
-// rainbow accents in chrome). Caps at `max` chips and rolls the rest into a "+N"
+// The modes a canvas has enabled, as quiet neutral chips (no per-mode rainbow
+// accents in chrome; 3px chips per DESIGN.md v3). Caps at `max` chips and rolls the rest into a "+N"
 // so a canvas using every mode can't blow out the card.
 function ModeBadges({ modes, max = 2 }: { modes: CanvasMode[]; max?: number }) {
   const shown = modes.slice(0, max);
@@ -585,14 +592,14 @@ function ModeBadges({ modes, max = 2 }: { modes: CanvasMode[]; max?: number }) {
       {shown.map((m) => (
         <span
           key={m}
-          className="rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-medium capitalize text-ink/60"
+          className="rounded-sm bg-ink/5 px-1.5 py-px text-[11px] font-medium capitalize text-ink/60"
         >
           {m}
         </span>
       ))}
       {rest > 0 && (
         <span
-          className="rounded-full border border-ink/15 bg-ink/10 px-1.5 py-0.5 text-[10px] font-medium text-ink/70"
+          className="rounded-sm bg-ink/5 px-1.5 py-px text-[11px] font-medium tabular-nums text-ink/60"
           title={modes.join(", ")}
         >
           +{rest}
@@ -624,23 +631,23 @@ function CanvasCard({
 }) {
   const modes = modesOf(c);
   return (
-    <li className="group relative overflow-hidden rounded-lg border border-ink/10 bg-surface transition-all hover:border-ink/20 hover:shadow-sm">
+    <li className="group relative overflow-hidden rounded-md border border-ink/10 bg-surface transition-colors hover:border-ink/20">
       {/* Stretched click target — transparent, covers the whole tile. */}
       <button
         onClick={() => onOpen(c.code)}
         aria-label={`Open ${c.name || "canvas"}`}
-        className="absolute inset-0"
+        className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
       />
       {/* Content sits above the stretched button (same stacking level, later in
           DOM), so it must not eat its clicks — the options menu opts back in. */}
-      <div className="pointer-events-none relative p-4">
+      <div className="pointer-events-none relative p-3">
         <div className="flex items-start justify-between gap-3">
-          <span className="text-base font-semibold leading-snug tracking-tight text-ink">
+          <span className="text-sm font-semibold leading-snug tracking-tight text-ink">
             {c.name || "Untitled canvas"}
           </span>
           <div className="flex shrink-0 items-center gap-1">
             {role ? (
-              <span className="rounded-full border border-ink/15 bg-ink/[0.03] px-2 py-0.5 text-[11px] font-medium text-ink/50">
+              <span className="rounded-sm bg-ink/5 px-1.5 py-px text-[11px] font-medium text-ink/60">
                 {role === "write" ? "Edit" : "View"}
               </span>
             ) : (
@@ -649,7 +656,7 @@ function CanvasCard({
             {onDelete && <CanvasMenu label={c.name || "canvas"} onDelete={() => onDelete(c)} />}
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink/40">
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-ink/55">
           <span className="font-code">{c.code}</span>
           <div className="flex items-center gap-2">
             {!role && <VisibilityBadge c={c} />}
@@ -663,28 +670,36 @@ function CanvasCard({
 
 /* ── list / table view ──────────────────────────────────────────────────────── */
 
+// The dashboard's default view (TDM-13): one dense, single-line row per canvas —
+// name, code, modes, access, dates — so a long list scans like a file table
+// instead of a wall of tiles. The same table serves "Shared with you": pass
+// `shared` and the Access column shows your role there instead of visibility.
 function CanvasTable({
   canvases,
   onOpen,
   onDelete,
+  shared = false,
 }: {
   canvases: CanvasMeta[];
   onOpen: (code: string) => void;
   onDelete?: (c: CanvasMeta) => void;
+  shared?: boolean;
 }) {
   // The modes column is wide enough for two chips + a "+N" overflow.
-  const cols = "sm:grid-cols-[1fr_10rem_6rem_8rem_6rem_2.5rem]";
+  const cols =
+    "sm:grid-cols-[minmax(0,1fr)_6rem_9.5rem_5rem_2rem] lg:grid-cols-[minmax(0,1fr)_6rem_9.5rem_5rem_7rem_5rem_2rem]";
   return (
-    <div className="overflow-hidden rounded-lg border border-ink/10 bg-surface">
+    <div className="overflow-hidden rounded-md border border-ink/10 bg-surface">
       {/* header row (desktop only) */}
       <div
-        className={`hidden gap-3 border-b border-ink/10 bg-paper px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-ink/50 sm:grid ${cols}`}
+        className={`hidden h-8 items-center gap-3 border-b border-ink/10 bg-paper px-3 text-[11px] font-medium uppercase tracking-wide text-ink/50 sm:grid ${cols}`}
       >
         <span>Name</span>
+        <span>Code</span>
         <span>Modes</span>
         <span>Access</span>
-        <span>Created</span>
-        <span className="text-right">Updated</span>
+        <span className="hidden lg:block">Created</span>
+        <span className="hidden text-right lg:block">Updated</span>
         <span aria-hidden />
       </div>
       <ul>
@@ -693,7 +708,7 @@ function CanvasTable({
           return (
             <li
               key={c.id}
-              className={`group relative transition-colors hover:bg-paper ${
+              className={`group relative transition-colors hover:bg-ink/[0.03] ${
                 i > 0 ? "border-t border-ink/[0.07]" : ""
               }`}
             >
@@ -701,25 +716,23 @@ function CanvasTable({
               <button
                 onClick={() => onOpen(c.code)}
                 aria-label={`Open ${c.name || "canvas"}`}
-                className="absolute inset-0"
+                className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
               />
               <div
-                className={`pointer-events-none relative grid grid-cols-1 gap-1 px-4 py-3 sm:items-center sm:gap-3 ${cols}`}
+                className={`pointer-events-none relative grid grid-cols-1 gap-1 px-3 py-2 sm:min-h-10 sm:items-center sm:gap-3 sm:py-1.5 ${cols}`}
               >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-ink">{c.name || "Untitled canvas"}</div>
-                    <div className="font-code text-[11px] text-ink/35">{c.code}</div>
-                  </div>
-                </div>
+                <span className="truncate text-[13px] font-medium text-ink">
+                  {c.name || "Untitled canvas"}
+                </span>
+                <span className="hidden font-code text-[11px] text-ink/50 sm:block">{c.code}</span>
                 <span className="hidden sm:block">
                   <ModeBadges modes={modes} />
                 </span>
                 <span className="hidden sm:block">
-                  <VisibilityBadge c={c} />
+                  {shared ? <RoleLabel role={c.yourRole} /> : <VisibilityBadge c={c} />}
                 </span>
-                <span className="hidden text-xs text-ink/45 sm:block">{shortDate(c.createdAt)}</span>
-                <span className="hidden text-right text-xs text-ink/45 sm:block">
+                <span className="hidden text-xs tabular-nums text-ink/55 lg:block">{shortDate(c.createdAt)}</span>
+                <span className="hidden text-right text-xs tabular-nums text-ink/55 lg:block">
                   {timeAgo(c.updatedAt)}
                 </span>
                 {/* options menu (owned canvases) — trailing column on desktop */}
@@ -727,16 +740,16 @@ function CanvasTable({
                   {onDelete && <CanvasMenu label={c.name || "canvas"} onDelete={() => onDelete(c)} />}
                 </div>
                 {/* mobile meta line */}
-                <div className="flex items-center gap-2 text-xs text-ink/40 sm:hidden">
-                  <ModeBadges modes={modes} />
-                  <span>·</span>
+                <div className="flex items-center gap-2 text-xs text-ink/55 sm:hidden">
+                  <span className="font-code text-[11px] text-ink/50">{c.code}</span>
+                  <span aria-hidden>·</span>
                   <span>{timeAgo(c.updatedAt)}</span>
                   {onDelete ? (
                     <div className="ml-auto">
                       <CanvasMenu label={c.name || "canvas"} onDelete={() => onDelete(c)} />
                     </div>
                   ) : (
-                    <ArrowRight className="ml-auto h-3.5 w-3.5 text-ink/25" />
+                    <ArrowRight className="ml-auto h-3.5 w-3.5 text-ink/40" />
                   )}
                 </div>
               </div>
@@ -745,5 +758,12 @@ function CanvasTable({
         })}
       </ul>
     </div>
+  );
+}
+
+/** Your access on a shared canvas, worded like the grid card's role chip. */
+function RoleLabel({ role }: { role?: "read" | "write" | "none" }) {
+  return (
+    <span className="text-[11px] font-medium text-ink/60">{role === "write" ? "Edit" : "View"}</span>
   );
 }

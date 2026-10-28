@@ -114,8 +114,8 @@ export default function DocumentTabs({
               }
             }}
             className={[
-              "group flex items-center gap-1.5 rounded-md pl-2.5 pr-1.5 py-1 text-[13px] font-medium shrink-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-              active ? "bg-accent/[0.08] text-accent" : "text-ink/55 hover:bg-ink/5 hover:text-ink/80",
+              "group flex items-center gap-1.5 rounded pl-2.5 pr-1.5 py-1 text-[13px] font-medium shrink-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+              active ? "bg-ink/[0.06] text-ink" : "text-ink/55 hover:bg-ink/[0.05] hover:text-ink",
             ].join(" ")}
             title={isBriefing ? `${DOC_TYPE_LABEL[doc.type]} · this canvas's briefing` : DOC_TYPE_LABEL[doc.type]}
           >
@@ -143,7 +143,7 @@ export default function DocumentTabs({
                   if (e.key === "Enter") commitRename(doc.id);
                   if (e.key === "Escape") setRenamingId(null);
                 }}
-                className="w-24 bg-surface rounded px-1 py-0 text-[13px] text-ink outline-none ring-2 ring-accent/40"
+                className="w-24 bg-surface rounded-sm px-1 py-0 text-[13px] text-ink outline-none ring-2 ring-accent/40"
               />
             ) : (
               <span
@@ -160,7 +160,7 @@ export default function DocumentTabs({
                   e.stopPropagation();
                   onClose(doc.id);
                 }}
-                className="flex h-4 w-4 items-center justify-center rounded text-current/50 opacity-0 hover:bg-ink/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100"
+                className="flex h-4 w-4 items-center justify-center rounded-sm text-current/50 opacity-0 hover:bg-ink/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100"
                 title="Close tab"
                 aria-label={`Close ${doc.name}`}
               >
@@ -176,7 +176,7 @@ export default function DocumentTabs({
         <div className="relative shrink-0">
           <button
             onClick={() => setAddOpen((o) => !o)}
-            className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-md text-ink/45 hover:bg-ink/5 hover:text-ink/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="ml-0.5 flex h-7 w-7 items-center justify-center rounded text-ink/50 hover:bg-ink/[0.05] hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             title="New document"
             aria-haspopup="menu"
             aria-expanded={addOpen}
@@ -188,9 +188,9 @@ export default function DocumentTabs({
               <div className="fixed inset-0 z-10" onClick={() => setAddOpen(false)} />
               <div
                 role="menu"
-                className="absolute left-0 mt-1.5 z-20 min-w-[11rem] rounded-lg bg-surface border border-ink/10 shadow-lg py-1"
+                className="absolute left-0 mt-1.5 z-20 min-w-[11rem] rounded-md bg-surface border border-ink/10 shadow-lg py-1"
               >
-                <div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-ink/45">
+                <div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-ink/50">
                   New document
                 </div>
                 {CREATABLE_DOC_TYPES.map((type) => (
@@ -201,7 +201,7 @@ export default function DocumentTabs({
                       onCreate(type);
                       setAddOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-ink/70 hover:bg-ink/5 hover:text-ink"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-ink/70 hover:bg-ink/[0.05] hover:text-ink focus-visible:bg-ink/[0.05] focus-visible:outline-none"
                   >
                     <span className="h-2 w-2 rounded-full shrink-0 bg-ink/25" />
                     {DOC_TYPE_LABEL[type]}

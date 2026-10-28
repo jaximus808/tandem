@@ -88,27 +88,27 @@ export default function CanvasLauncher({ initialMode, onJoin, onClose, onOpenMCP
         role="dialog"
         aria-modal="true"
         aria-labelledby="launcher-title"
-        className="w-full max-w-md overflow-hidden rounded-[10px] border border-ink/10 bg-surface shadow-lg"
+        className="w-full max-w-md overflow-hidden rounded-md border border-ink/10 bg-surface shadow-lg"
       >
         {/* header */}
-        <div className="flex items-center gap-2 border-b border-ink/10 bg-paper px-6 py-4">
-          <TandemLogo size={28} animate={false} />
-          <span id="launcher-title" className="text-lg font-semibold tracking-tight text-ink">
+        <div className="flex items-center gap-2 border-b border-ink/10 bg-paper px-4 py-3">
+          <TandemLogo size={24} animate={false} />
+          <span id="launcher-title" className="text-base font-semibold tracking-tight text-ink">
             Open a canvas
           </span>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-ink/40 transition-colors hover:bg-ink/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="ml-auto flex h-7 w-7 items-center justify-center rounded text-ink/50 transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             <X size={15} />
           </button>
         </div>
 
-        <div className="space-y-5 p-6">
+        <div className="space-y-4 p-4">
           {/* Create */}
-          <form onSubmit={handleCreate} className="space-y-2">
-            <label className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          <form onSubmit={handleCreate} className="space-y-1.5">
+            <label className="block text-xs font-medium text-ink/60">
               Start something new
             </label>
             <input
@@ -119,26 +119,26 @@ export default function CanvasLauncher({ initialMode, onJoin, onClose, onOpenMCP
                 setError("");
               }}
               placeholder="Name a canvas — anything at all"
-              className="w-full rounded-md border border-ink/15 bg-surface px-4 py-3 text-sm focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="h-8 w-full rounded border border-ink/15 bg-surface px-2.5 text-[13px] placeholder:text-ink/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
             />
             <button
               type="submit"
               disabled={creating}
-              className="w-full rounded-md bg-accent px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
+              className="inline-flex h-8 w-full items-center justify-center rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-50"
             >
               {creating ? "Creating…" : "Create canvas →"}
             </button>
           </form>
 
-          <div className="flex items-center gap-3 text-[10px] font-medium uppercase tracking-wide text-ink/30">
+          <div className="flex items-center gap-3 text-[11px] font-medium text-ink/50">
             <span className="h-px flex-1 bg-ink/10" />
             or
             <span className="h-px flex-1 bg-ink/10" />
           </div>
 
           {/* Join */}
-          <form onSubmit={handleJoin} className="space-y-2">
-            <label className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          <form onSubmit={handleJoin} className="space-y-1.5">
+            <label className="block text-xs font-medium text-ink/60">
               Join with a code
             </label>
             <div className="flex gap-2">
@@ -151,22 +151,22 @@ export default function CanvasLauncher({ initialMode, onJoin, onClose, onOpenMCP
                 }}
                 placeholder="TOKYO7X3K"
                 maxLength={8}
-                className="flex-1 rounded-md border border-ink/15 bg-surface px-4 py-3 font-code text-sm uppercase tracking-widest focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                className="h-8 min-w-0 flex-1 rounded border border-ink/15 bg-surface px-2.5 font-code text-[13px] uppercase tracking-widest placeholder:text-ink/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
               />
               <button
                 type="submit"
-                className="shrink-0 rounded-md border border-ink/15 bg-surface px-5 py-3 text-sm font-medium text-ink transition-colors hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="inline-flex h-8 shrink-0 items-center rounded border border-ink/15 bg-surface px-3.5 text-[13px] font-medium text-ink transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 Open
               </button>
             </div>
           </form>
 
-          {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+          {error && <p className="text-[13px] text-state-failed">{error}</p>}
 
           <button
             onClick={onOpenMCP}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-4 py-2.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="flex w-full items-center justify-center gap-1.5 border-t border-ink/10 pt-3 text-[12px] font-medium text-accent hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             Connecting an AI agent instead? See the guide →
           </button>

@@ -36,11 +36,11 @@ export default function SiteHeader({
     <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-ink/10 bg-paper px-4 py-3 sm:px-6">
       <button
         onClick={onHome}
-        className="group flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+        className="group flex items-center gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
         title="Back to home"
       >
         <TandemLogo size={28} animate={false} />
-        <span className="hidden font-semibold tracking-tight transition-colors group-hover:text-accent sm:inline">
+        <span className="hidden font-semibold tracking-tight transition-colors group-hover:text-ink/70 sm:inline">
           Tandem
         </span>
       </button>
@@ -54,7 +54,7 @@ export default function SiteHeader({
         {onOpenMCP && (
           <button
             onClick={onOpenMCP}
-            className="hidden h-8 items-center rounded-md px-3 text-[13px] font-medium text-ink/70 transition-colors hover:bg-ink/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:inline-flex"
+            className="hidden h-8 items-center rounded px-3 text-[13px] font-medium text-ink/70 transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:inline-flex"
           >
             Connect an agent
           </button>
