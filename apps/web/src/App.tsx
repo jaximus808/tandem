@@ -36,6 +36,7 @@ import AgentCursor from "./components/AgentCursor";
 import AgentPresence from "./components/AgentPresence";
 import FollowControl from "./components/FollowControl";
 import FleetView, { activeFleetSummary } from "./components/FleetView";
+import AgentWatch from "./components/AgentWatch";
 import NotificationBell from "./components/NotificationBell";
 import AgentToasts from "./components/AgentToasts";
 import TaskBoard from "./components/TaskBoard";
@@ -1973,9 +1974,10 @@ export default function App() {
             reads the roster App already holds plus live canvas actions, so WS
             pushes keep every row current.
 
-            TDM-19 HOOK: pass `renderAgentWatch={(agent) => <Transcript… />}`
-            to put the live Claude Code transcript in the detail pane; the
-            watched agent is `watchedAgentId` / `setWatchedAgentId` above. */}
+            The detail pane's "Live session" slot is AgentWatch (TDM-19): the
+            watched agent's Claude Code transcript, polled only while this
+            surface is on screen. Keyed by agent so switching agents starts a
+            fresh tail instead of appending one session onto another. */}
         {(surface === "agents" || agentsVisited) && (
           <div
             className={
@@ -1995,6 +1997,18 @@ export default function App() {
               onConnect={() => setConnectOpen(true)}
               watchedAgentId={watchedAgentId}
               onWatchAgent={setWatchedAgentId}
+              renderAgentWatch={(agent) =>
+                agent.id ? (
+                  <AgentWatch
+                    key={agent.id}
+                    code={canvas.code}
+                    agentId={agent.id}
+                    agentName={agent.name}
+                    model={agent.model}
+                    active={surface === "agents"}
+                  />
+                ) : null
+              }
             />
           </div>
         )}

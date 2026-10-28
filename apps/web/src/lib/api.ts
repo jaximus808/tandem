@@ -264,6 +264,101 @@ export async function fetchAgentRoster(code: string): Promise<FleetRoster> {
   return (await res.json()) as FleetRoster;
 }
 
+// ── Agent transcript (TDM-18 server, TDM-19 web) ─────────────────────────────
+// GET /api/canvas/agents/{agentId}/transcript — the agent's Claude Code session,
+// read off the host's disk (local mode only). Paged by BYTE OFFSET: open with
+// `tail`, then follow with `after=<previous next>&transcript=<id>`; when the
+// agent's newest file is no longer the one being tailed the answer says
+// `reset:true` and starts from 0.
+
+export type TranscriptEventKind = "user" | "text" | "tool_use" | "tool_result";
+
+export type TranscriptEvent = {
+  id: string;
+  offset: number;
+  kind: TranscriptEventKind;
+  ts?: string;
+  text?: string;
+  tool?: string;
+  /** One-line summary of the tool call (≤ 240 bytes). */
+  input?: string;
+  toolUseId?: string;
+  isError?: boolean;
+  /** Set when `text` was cut (tool results at 2KB, prose at 8KB); `length` is the original size. */
+  truncated?: boolean;
+  length?: number;
+  model?: string;
+};
+
+export type TranscriptInfo = {
+  id: string;
+  kind: "session" | "subagent";
+  path: string;
+  project: string;
+  sessionId: string;
+  subagentId?: string;
+  modifiedAt: string;
+  size: number;
+  subagent?: { agentType?: string; description?: string; model?: string; finished?: boolean };
+};
+
+export type AgentTranscriptPage = {
+  type: "agent.transcript";
+  agentId: string;
+  /** False: the agent has no linked Claude Code transcript (yet). A normal 200. */
+  found: boolean;
+  transcript?: TranscriptInfo;
+  events: TranscriptEvent[];
+  next: number;
+  size: number;
+  more: boolean;
+  reset: boolean;
+};
+
+/** A refusal from the transcript route, with its stable code kept. */
+export class TranscriptError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "TranscriptError";
+  }
+}
+
+export async function fetchAgentTranscript(
+  code: string,
+  agentId: string,
+  q: { after?: number; tail?: number; limit?: number; transcript?: string },
+): Promise<AgentTranscriptPage> {
+  const params = new URLSearchParams();
+  if (q.tail !== undefined) params.set("tail", String(q.tail));
+  else if (q.after !== undefined) params.set("after", String(q.after));
+  if (q.limit !== undefined) params.set("limit", String(q.limit));
+  if (q.transcript) params.set("transcript", q.transcript);
+  const qs = params.toString();
+  const res = await authedFetchRaw(
+    code,
+    `/api/canvas/agents/${encodeURIComponent(agentId)}/transcript${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    let errCode = "";
+    let msg = detail;
+    try {
+      const j = JSON.parse(detail) as { error?: string; message?: string };
+      errCode = j.error ?? "";
+      msg = j.message ?? j.error ?? detail;
+    } catch {
+      /* not json */
+    }
+    throw new TranscriptError(res.status, errCode, msg || "Could not load the transcript");
+  }
+  return (await res.json()) as AgentTranscriptPage;
+}
+
 // ── Activity feed (TDM-48) ───────────────────────────────────────────────────
 // GET /api/canvas/activity — "what has the fleet done here, newest first".
 //

@@ -8,12 +8,15 @@ import { createContext, useContext } from "react";
  * dashboard at "/", no landing page; "google" is the hosted/self-hosted shape
  * with accounts, sharing and the marketing surfaces. `local` mirrors it as a
  * boolean for the common `if (config.local)` guard. `version` is the binary's
- * version string (empty when the server doesn't report one).
+ * version string (empty when the server doesn't report one). `transcripts` says
+ * whether GET /api/canvas/agents/{id}/transcript is served (TDM-18: local mode
+ * and not TANDEM_TRANSCRIPTS=off) — false on a server that doesn't report it.
  */
 export interface AppConfig {
   auth: "none" | "google";
   local: boolean;
   version: string;
+  transcripts: boolean;
 }
 
 /**
@@ -21,7 +24,7 @@ export interface AppConfig {
  * so a web bundle deployed ahead of its API regresses nothing — sign-in, the
  * landing page and the account chrome all keep working exactly as before.
  */
-export const HOSTED_FALLBACK: AppConfig = { auth: "google", local: false, version: "" };
+export const HOSTED_FALLBACK: AppConfig = { auth: "google", local: false, version: "", transcripts: false };
 
 let cached: AppConfig | null = null;
 let inflight: Promise<AppConfig> | null = null;
@@ -33,7 +36,8 @@ function normalize(raw: unknown): AppConfig {
   // reports auth:"none" is local whether or not it also set the boolean.
   const local = typeof r.local === "boolean" ? r.local : auth === "none";
   const version = typeof r.version === "string" ? r.version : "";
-  return { auth, local, version };
+  const transcripts = r.transcripts === true;
+  return { auth, local, version, transcripts };
 }
 
 /** Fetch /api/config once; every later call shares the same promise. */
