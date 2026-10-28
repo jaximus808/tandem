@@ -6,7 +6,7 @@ import { SURFACE_ITEMS, type Surface } from "../lib/sidebar";
 
    Two kinds of things live here, visually separated:
 
-   · Top: the SURFACES — Board, Documents, Summary — icon + label, one active
+   · Top: the SURFACES — Board, Agents, Documents, Summary — icon + label, one active
      (ink label on an ink/[0.06] wash, plus a 2px accent bar at the rail edge —
      DESIGN.md v3 nav/chrome). Clicking
      switches the whole content area; it never toggles panels.

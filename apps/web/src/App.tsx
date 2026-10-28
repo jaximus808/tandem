@@ -35,7 +35,7 @@ import AccountMenu from "./components/AccountMenu";
 import AgentCursor from "./components/AgentCursor";
 import AgentPresence from "./components/AgentPresence";
 import FollowControl from "./components/FollowControl";
-import FleetView from "./components/FleetView";
+import FleetView, { activeFleetSummary } from "./components/FleetView";
 import NotificationBell from "./components/NotificationBell";
 import AgentToasts from "./components/AgentToasts";
 import TaskBoard from "./components/TaskBoard";
@@ -44,6 +44,7 @@ import TicketView from "./components/TicketView";
 import ConnectionStatus from "./components/ConnectionStatus";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useAgentActivity, type CursorShowcase } from "./lib/useAgentActivity";
+import { useFleetRoster } from "./lib/useFleetRoster";
 import { useAgentNotifications } from "./lib/useAgentNotifications";
 import { useFollowStyle } from "./lib/followStyle";
 import { useFollowPrefs } from "./lib/followAgents";
@@ -225,13 +226,13 @@ function setMCPInURL() {
      `min-w-0 overflow-hidden` on the block, and a huge `shrink` factor on
      the zone that carries it, so this is the first thing in the row to give
      up space — before the canvas name starts truncating. It's allowed to be
-     clipped because it's pure status: the same facts are one click away in
-     the fleet panel and on the board. It clips from the right, so its DOM
-     order IS its collapse order — the live status word goes first, then the
-     ticket chip, and the avatars ("agents are here") survive longest.
+     clipped because it's pure status: the same facts are one click away on
+     the Agents surface (the rail) and on the board. It clips from the right,
+     so its DOM order IS its collapse order — the live edit/read chip goes
+     first, and the avatar stack + count ("agents are here") survives longest.
 
    ZONE 3 · CONTROLS — never clipped, never squeezed; drops whole or not at
-     all.  (bell, follow, fleet, the copy/Share CTA, Connect, account)
+     all.  (bell, follow, the copy/Share CTA, Connect, account)
      Every member is `shrink-0`. Two reasons, and the second is the one that
      bites: (a) they are the only way to DO anything from here, and (b) the
      bell, follow, fleet and account controls each render an
@@ -264,17 +265,19 @@ function setMCPInURL() {
      2. Canvas code chip ......... below lg   HEADER_DROP.canvasCode
      3. Follow control's label ... below lg   (·) components/FollowControl.tsx
      4. Follow control ........... below md   (·) components/FollowControl.tsx
-     5. Agent presence block ..... below sm   (·) components/AgentPresence.tsx
+     5. Agent presence stack ..... below sm   (·) components/AgentPresence.tsx
+                                              (the Agents surface it opens is
+                                              in the mobile nav drawer)
      6. "Connect" ................ below sm   HEADER_DROP.connectButton
                                               (lives in the mobile nav drawer)
-     7. Fleet chip's label ....... below sm   (·) components/FleetView.tsx
-                                              (collapses to gauge + count)
+     7. (retired) ................ —          the fleet chip became the Agents
+                                              surface in the rail (TDM-17)
      8. The breadcrumb trail ..... below sm   HEADER_DROP.wordmark / .breadcrumbSlash
         ("Tandem", the "/"s, and the                / .userCrumb
         signed-in user crumb)
    NEVER DROPPED, at any width: the canvas name (it truncates instead), the
-   bell, the fleet chip, whichever of Copy/Share is showing, and the account
-   control. Those five are the floor — if the row still doesn't fit once the
+   bell, whichever of Copy/Share is showing, and the account control. Those
+   four are the floor — if the row still doesn't fit once the
    ladder is exhausted, the answer is to move something into the mobile nav
    drawer, not to add a rank 9.
    ──────────────────────────────────────────────────────────────────────── */
@@ -411,8 +414,11 @@ export default function App() {
   const proposedTaskCount = Object.values(canvasState?.actions ?? {}).filter(
     (a) => a.type === "task" && a.state === "proposed",
   ).length;
-  // The fleet roster popover (header chip + the presence cluster both open it).
-  const [fleetOpen, setFleetOpen] = useState(false);
+  // The Agents surface's watched agent (TDM-17): the registered agent id whose
+  // detail pane is open beside the roster, or null. Lifted here rather than
+  // kept inside FleetView so any other door — the header stack, a card's
+  // claimant, TDM-19's transcript pane — can open the same agent.
+  const [watchedAgentId, setWatchedAgentId] = useState<string | null>(null);
   // Set when this canvas can't be opened (private, no access) or our access was
   // revoked live. Drives the access-denied screen instead of an endless spinner.
   const [accessError, setAccessError] = useState<AccessStatus | null>(null);
@@ -463,6 +469,12 @@ export default function App() {
   const [summaryVisited, setSummaryVisited] = useState(false);
   useEffect(() => {
     if (surface === "summary") setSummaryVisited(true);
+  }, [surface]);
+  // Agents keep-alive (TDM-17): same contract — mount on first visit, then hide
+  // with CSS so the roster's scroll and the open detail pane survive a switch.
+  const [agentsVisited, setAgentsVisited] = useState(false);
+  useEffect(() => {
+    if (surface === "agents") setAgentsVisited(true);
   }, [surface]);
   // TDM-14: one-shot focus handoff — clicking an agent's task in the header
   // presence (avatar / mini-chip / swarm tree) opens the Board centred on that
@@ -981,6 +993,22 @@ export default function App() {
     reading: agentReading,
     lastAction: agentAction,
   } = useAgentActivity(canvas?.id, canvasState, lastChangeByRef);
+
+  // The fleet roster (GET /api/canvas/agents), read ONCE here and handed to both
+  // the header's avatar stack and the Agents surface, so "3 agents" in the
+  // header is literally the three rows the surface lists. Refetched on WS
+  // lifecycle pings; polled only while the Agents surface is showing.
+  const fleet = useFleetRoster(
+    canvas?.code,
+    surface === "agents",
+    Object.keys(canvasState?.agents ?? {}).length,
+  );
+  const fleetSummary = useMemo(
+    () => activeFleetSummary(fleet.roster?.agents ?? [], canvasState?.actions ?? {}),
+    [fleet.roster, canvasState?.actions],
+  );
+  // Another canvas's agent ids mean nothing here.
+  useEffect(() => setWatchedAgentId(null), [canvas?.code]);
 
   // Notification center: turns agent actions into transient toasts + a bell log.
   const notify = useAgentNotifications(agentAction);
@@ -1616,7 +1644,7 @@ export default function App() {
         />
 
         {/* ZONE 3 · CONTROLS — with ZONE 2 (the presence block) riding at its
-            head, because that's where the fleet readout it belongs beside sits.
+            head, beside the follow control it belongs with.
             `shrink-[999]` rather than the `shrink-0` this had: the zone yields
             BEFORE the canvas name does, and the only thing in it that can
             actually give ground is the presence block, which is contained and
@@ -1625,8 +1653,8 @@ export default function App() {
             freezes it there and pushes the rest of the deficit back onto Zone 1
             instead of squeezing a button.
             Deliberately NO `min-w-0` (it would defeat that freeze) and
-            deliberately NO `overflow-hidden`: FollowControl, FleetView and
-            AccountMenu each render their panel as an absolutely-positioned
+            deliberately NO `overflow-hidden`: FollowControl and AccountMenu
+            each render their panel as an absolutely-positioned
             child of this subtree, and containment here would clip the open
             panel, not just its trigger. */}
         <div className="ml-auto flex items-center gap-2 shrink-[999]">
@@ -1637,7 +1665,8 @@ export default function App() {
               what makes clipping it safe. Ladder rank 5 (below sm) lives there
               too. */}
           <AgentPresence
-            agents={agentList}
+            agents={fleetSummary.active}
+            working={fleetSummary.working}
             edit={agentEdit}
             reading={agentReading}
             // Jumping to the agent means watching it edit documents — make
@@ -1646,8 +1675,9 @@ export default function App() {
               setSurface("documents");
               setActiveDocId(null);
             }}
-            onOpenTask={openBoardTask}
-            onOpenFleet={() => setFleetOpen(true)}
+            // The stack + count is a door into the Agents surface (TDM-17).
+            onOpenAgents={() => setSurface("agents")}
+            current={surface === "agents"}
           />
           {/* The camera switch: follow the whole fleet, or just the agents you
               care about. Sits beside the roster because "who is working" and
@@ -1659,21 +1689,9 @@ export default function App() {
             paused={guard.busy}
             pending={followPending}
           />
-          {/* The fleet readout — who's on this canvas, what they hold, what
-              they're waiting on. Replaced the "Follow agent" toggle (TDM-47):
-              a camera that trails ONE agent through the document tabs answers
-              the wrong question once a team is working the board. */}
-          <FleetView
-            code={canvas.code}
-            actions={canvasState?.actions ?? {}}
-            agentCount={Object.keys(canvasState?.agents ?? {}).length}
-            proposedCount={proposedTaskCount}
-            open={fleetOpen}
-            onOpenChange={setFleetOpen}
-            onOpenTask={openBoardTask}
-            onOpenBoard={openBoard}
-            onConnect={() => setConnectOpen(true)}
-          />
+          {/* The fleet readout used to sit here as a popover chip (TDM-47).
+              It is the Agents surface in the rail now (TDM-17); the presence
+              stack above is the header's door into it. */}
           {/* The copy/claim CTA and Share below it are Zone 3 with NO ladder
               rank — they're the whole point of the page for the visitor who
               sees them, and only one of the three ever renders at a time. Each
@@ -1948,6 +1966,36 @@ export default function App() {
             }
           >
             <SummaryPanel code={canvas.code} state={canvasState} />
+          </div>
+        )}
+        {/* The Agents surface (TDM-17) — the fleet roster, promoted from a
+            header popover. Same keep-alive contract as Board and Summary. It
+            reads the roster App already holds plus live canvas actions, so WS
+            pushes keep every row current.
+
+            TDM-19 HOOK: pass `renderAgentWatch={(agent) => <Transcript… />}`
+            to put the live Claude Code transcript in the detail pane; the
+            watched agent is `watchedAgentId` / `setWatchedAgentId` above. */}
+        {(surface === "agents" || agentsVisited) && (
+          <div
+            className={
+              surface === "agents"
+                ? "relative isolate flex flex-1 min-h-0 min-w-0"
+                : "hidden"
+            }
+          >
+            <FleetView
+              code={canvas.code}
+              fleet={fleet}
+              actions={canvasState?.actions ?? {}}
+              proposedCount={proposedTaskCount}
+              visible={surface === "agents"}
+              onOpenTask={openBoardTask}
+              onOpenBoard={openBoard}
+              onConnect={() => setConnectOpen(true)}
+              watchedAgentId={watchedAgentId}
+              onWatchAgent={setWatchedAgentId}
+            />
           </div>
         )}
         {(["welcome", "docs", "roadmap"] as CanvasMode[]).map((m) => {

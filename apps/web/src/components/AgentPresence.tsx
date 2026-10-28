@@ -1,21 +1,21 @@
-import { Zap } from "lucide-react";
 import type { CanvasMode } from "../types";
-import type { AgentEdit, PresentAgent } from "../lib/useAgentActivity";
-import { STATE_CHIP } from "../lib/stateChips";
+import type { AgentEdit } from "../lib/useAgentActivity";
+import type { FleetAgent } from "../lib/api";
+import { vendorOf } from "./FleetView";
 
 interface Props {
-  agents: PresentAgent[];
+  /** The ACTIVE fleet — the same rows the Agents surface lists (isActiveFleetAgent),
+   *  so the header count and the surface can never disagree. */
+  agents: FleetAgent[];
+  /** How many of them hold a claim right now. */
+  working: number;
   edit: AgentEdit | null;
   reading: boolean;
   onJump: (mode: CanvasMode) => void;
-  // Follow an agent to its task: opens the Board focused on the given task
-  // (scope → epic, detail slide-over open). Fired from any presence surface
-  // where an agent shows a claimed task.
-  onOpenTask: (taskId: string) => void;
-  // Open the fleet roster (components/FleetView.tsx) — the cluster is the
-  // second door into it, since "who are these agents?" is exactly the question
-  // the cluster raises.
-  onOpenFleet: () => void;
+  /** Open the Agents surface (components/FleetView.tsx). */
+  onOpenAgents: () => void;
+  /** Whether the Agents surface is the one showing — lights the chip. */
+  current: boolean;
 }
 
 const MODE_LABEL: Record<CanvasMode, string> = {
@@ -24,130 +24,91 @@ const MODE_LABEL: Record<CanvasMode, string> = {
   roadmap: "Roadmap",
 };
 
-/**
- * Header presence: who's in the room right now (agents), and — when one is
- * mid-edit — a live "editing {Mode}" chip you can click to jump to where it's
- * working. This surface answers "is something happening on my canvas"; the
- * roster question ("who are they, what do they hold, what's blocked") belongs
- * to the fleet panel, which the cluster opens. The swarm tree that used to drop
- * out of this cluster was retired into that panel (TDM-47) rather than shipping
- * two overlapping popovers a few pixels apart.
- */
-export default function AgentPresence({ agents, edit, reading, onJump, onOpenTask, onOpenFleet }: Props) {
-  if (agents.length === 0) return null;
-  // Editing takes precedence over reading — if a cursor is live, show where.
-  const showReading = !edit && reading;
+// Avatars drawn before the stack folds the rest into "+n".
+const MAX_AVATARS = 4;
 
-  // "Following them = seeing their task": the most recent claimant among the
-  // present agents gets a compact Zap TDM-n chip beside the cluster that clicks
-  // through to the task on the Board. Working-violet, matching the board's
-  // executing treatment.
-  const followed = [...agents]
-    .filter((a) => a.taskId)
-    // Numeric compare, not string: RFC3339Nano strips trailing zeros, so a
-    // lexicographic sort misorders same-second claims (".5Z" < "Z").
-    .sort(
-      (x, y) =>
-        (Date.parse(y.taskClaimedAt ?? "") || 0) - (Date.parse(x.taskClaimedAt ?? "") || 0),
-    )[0];
+/**
+ * Header presence (TDM-17): a compact avatar stack + count that opens the
+ * Agents surface. It answers "is anyone here, and is anything running" at a
+ * glance; WHO is doing WHAT lives on the Agents surface, one row per agent with
+ * every ticket it holds. The old single-ticket chip is gone — it could only
+ * ever show one claimant, which on a fleet was the wrong one more often than not.
+ *
+ * When an agent is mid-edit on a document, a live "editing {Mode}" chip still
+ * rides beside the stack and jumps to where it's writing.
+ */
+export default function AgentPresence({ agents, working, edit, reading, onJump, onOpenAgents, current }: Props) {
+  if (agents.length === 0) return null;
+  const showReading = !edit && reading;
+  const shown = agents.slice(0, MAX_AVATARS);
+  const extra = agents.length - shown.length;
+  const total = agents.length;
+  const label = `${total} agent${total === 1 ? "" : "s"}${working > 0 ? ` · ${working} working` : ""}`;
 
   // ZONE 2 · AMBIENT of the canvas header's collapse contract — the block
   // comment above `HEADER_DROP` in App.tsx is the whole rule; this is the one
   // element in the header's right-hand zone that is allowed to give up space.
   // `min-w-0 overflow-hidden` is what makes that safe: the block collapses and
   // CLIPS inside its own box instead of spilling out over a neighbour (the
-  // failure TDM-152 fixed for the identity group). Two things earn it the job:
-  // it is pure status, re-readable in the fleet panel and on the board; and it
-  // holds no popover of its own, so nothing that must escape the box lives in
-  // here — don't add one.
+  // failure TDM-152 fixed for the identity group). It holds no popover of its
+  // own — the Agents surface it opens is a page, not a panel — so nothing that
+  // must escape the box lives in here; don't add one.
   // Because it clips from the RIGHT, the DOM order below IS the collapse order:
-  // the live status word goes first, then the ticket chip, and the avatars —
-  // the "agents are here" signal — survive longest. Keep that order.
-  // `px-1 -mx-1` re-opens the 4px the focus rings on the avatar cluster and the
-  // chips bleed outward, so containment doesn't shave them; it nets to the same
-  // outer geometry. `hidden ... sm:flex` is ladder rank 5.
+  // the live edit/read chip goes first, and the stack + count — the "agents are
+  // here" signal — survives longest. Keep that order.
+  // `px-1 -mx-1` re-opens the 4px focus ring so containment doesn't shave it.
+  // `hidden ... sm:flex` is ladder rank 5; below sm the Agents surface is in
+  // the mobile nav drawer.
   return (
     <div className="relative hidden min-w-0 items-center gap-2 overflow-hidden px-1 -mx-1 sm:flex">
-      {/* Avatar cluster — agents are square terracotta chips, like their tags.
-          A scan-line sweeps across them while the agent is reading. Clicking
-          anywhere but a mid-task chip opens the fleet roster. */}
-      <div
-        // shrink-0, like every sibling in this block: the block yields by being
-        // CLIPPED from the right, not by squashing its contents. Without it the
-        // avatars would compress into slivers before anything disappeared.
-        className="flex shrink-0 -space-x-1 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        role="button"
-        tabIndex={0}
-        onClick={onOpenFleet}
-        onKeyDown={(e) => {
-          // Enter/Space on the cluster itself only — the nested avatar buttons
-          // keep their own activation.
-          if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-            e.preventDefault();
-            onOpenFleet();
-          }
-        }}
-        aria-label="Open the fleet roster"
-        title="Open the fleet"
+      <button
+        onClick={onOpenAgents}
+        aria-current={current ? "page" : undefined}
+        aria-label={`Open Agents — ${label}`}
+        title={agents
+          .map((a) => `${a.name}${a.tasks.length > 0 ? ` — ${a.tasks.map((t) => t.ticketId ?? "task").join(", ")}` : ""}`)
+          .join("\n")}
+        className={[
+          "inline-flex h-8 shrink-0 items-center gap-2 rounded px-1.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          current ? "bg-ink/[0.06] text-ink" : "text-ink/60 hover:bg-ink/[0.05] hover:text-ink",
+        ].join(" ")}
       >
-        {agents.map((a) => {
-          const title = [a.isClaude ? `${a.name} (Claude)` : a.name, a.taskLabel && `working ${a.taskLabel}`]
-            .filter(Boolean)
-            .join(" — ");
-          // Agent identity is the ONE place terracotta survives (muted, via the
-          // `agent` token); non-Claude sessions get a fixed neutral.
-          const cls = `relative grid h-6 w-6 place-items-center overflow-hidden rounded-[5px] ring-2 ring-paper ${
-            a.isClaude ? "bg-agent" : "bg-zinc-800"
-          }`;
-          // Mid-task agents click through to their task on the Board
-          // (stopPropagation so the cluster's swarm-panel toggle doesn't fire).
-          return a.taskId ? (
-            <button
-              key={a.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenTask(a.taskId!);
-              }}
-              title={`${title} — open on the Board`}
-              aria-label={`Open ${a.name}'s task ${a.taskTicket ?? ""} on the Board`}
-              className={`${cls} cursor-pointer`}
-            >
-              <Sparkle />
-              {showReading && <span aria-hidden="true" className="tandem-scan absolute inset-0" />}
-            </button>
-          ) : (
-            <span key={a.id} title={title} className={cls}>
-              <Sparkle />
-              {showReading && <span aria-hidden="true" className="tandem-scan absolute inset-0" />}
+        <span className="flex shrink-0 -space-x-1" aria-hidden="true">
+          {shown.map((a) => {
+            const isClaude = vendorOf(a).kind === "claude";
+            const busy = a.tasks.length > 0;
+            return (
+              <span
+                key={a.id ?? a.name}
+                className={`relative grid h-5 w-5 place-items-center overflow-hidden rounded-[4px] ring-2 ring-paper ${
+                  isClaude ? "bg-agent" : "bg-zinc-700"
+                }`}
+              >
+                <Sparkle />
+                {showReading && <span className="tandem-scan absolute inset-0" />}
+                {/* Working agents carry a state-executing tick in the corner. */}
+                {busy && (
+                  <span className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-tl-[2px] bg-state-executing" />
+                )}
+              </span>
+            );
+          })}
+          {extra > 0 && (
+            <span className="relative grid h-5 min-w-5 place-items-center rounded-[4px] bg-ink/10 px-1 font-code text-[10px] font-medium text-ink/70 ring-2 ring-paper">
+              +{extra}
             </span>
-          );
-        })}
-      </div>
+          )}
+        </span>
+        <span className="shrink-0 tabular-nums">{label}</span>
+      </button>
 
-      {/* Mid-task mini-chip — the most recent claimant's ticket, one click from
-          the task itself. Sits beside the cluster, styled like the header's
-          other status chips. */}
-      {followed?.taskId && (
-        <button
-          onClick={() => onOpenTask(followed.taskId!)}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-violet-500/10 px-2 py-1 font-code text-[10.5px] font-medium ring-1 ring-inset ring-violet-500/20 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${STATE_CHIP.executing.text}`}
-          title={`${followed.name} is working ${followed.taskLabel ?? "a task"} — open it on the Board`}
-          aria-label={`Open ${followed.name}'s task ${followed.taskTicket ?? ""} on the Board`}
-        >
-          <Zap size={11} className="shrink-0" />
-          {followed.taskTicket ?? "task"}
-        </button>
-      )}
-
-      {/* Live status chip. Priority: editing (where it's writing) → reading
-          (it's looking at the canvas) → idle ("here"). Agent activity is
-          terracotta EVERYWHERE (the `agent` token) — the chip names the mode
-          in words instead of borrowing the mode's content hue (/DESIGN.md:
-          modeTheme is content-level semantics only). */}
+      {/* Live edit/read chip. Priority: editing (where it's writing) → reading
+          (it's looking at the canvas). Agent activity is terracotta (the
+          `agent` token); the chip names the mode in words. */}
       {edit ? (
         <button
           onClick={() => onJump(edit.mode)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[4px] bg-agent/10 px-2 py-1 text-[10.5px] font-medium text-agent ring-1 ring-inset ring-agent/20 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-agent/10 px-1.5 py-px text-[11px] font-medium text-agent transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           title={`Jump to ${MODE_LABEL[edit.mode]} — where it's writing`}
         >
           <span className="relative flex h-1.5 w-1.5">
@@ -158,10 +119,9 @@ export default function AgentPresence({ agents, edit, reading, onJump, onOpenTas
         </button>
       ) : showReading ? (
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[4px] bg-agent/10 px-2 py-1 text-[10.5px] font-medium text-agent ring-1 ring-inset ring-agent/20"
-          title="The agent is reading the canvas"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-agent/10 px-1.5 py-px text-[11px] font-medium text-agent"
+          title="An agent is reading the canvas"
         >
-          {/* Three sweeping bars — a little "scanning" equaliser. */}
           <span className="flex items-end gap-[2px]" aria-hidden="true">
             <span className="tandem-read-bar h-2 w-[2px] rounded-full bg-agent" style={{ animationDelay: "0ms" }} />
             <span className="tandem-read-bar h-2 w-[2px] rounded-full bg-agent" style={{ animationDelay: "140ms" }} />
@@ -169,16 +129,14 @@ export default function AgentPresence({ agents, edit, reading, onJump, onOpenTas
           </span>
           reading
         </span>
-      ) : (
-        <span className="shrink-0 text-[10.5px] font-medium text-ink/50">here</span>
-      )}
+      ) : null}
     </div>
   );
 }
 
 function Sparkle() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path
         d="M6 0.5 C6.4 3 7.2 3.8 9.5 4.2 C7.2 4.6 6.4 5.4 6 7.8 C5.6 5.4 4.8 4.6 2.5 4.2 C4.8 3.8 5.6 3 6 0.5 Z"
         fill="white"

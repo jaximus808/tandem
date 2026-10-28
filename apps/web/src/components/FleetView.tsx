@@ -1,83 +1,52 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
-import { Shield, Users, X } from "lucide-react";
-import type { Action } from "../types";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { AlertTriangle, ArrowLeft, Bot, Shield, Users, X } from "lucide-react";
+import type { Action, TaskPayload, TaskProgressEntry } from "../types";
 import type { FleetAgent, FleetTask, FleetWait } from "../lib/api";
-import { useFleetRoster } from "../lib/useFleetRoster";
+import type { useFleetRoster } from "../lib/useFleetRoster";
 import { useActivityFeed } from "../lib/useActivityFeed";
 import { contentionByAgent, type ContentionTally } from "../lib/contention";
 import { ageOf, fullDate } from "../lib/relativeTime";
-import { deriveLease } from "../lib/lease";
+import { deriveLease, leaseAge, leaseSentence, type Lease } from "../lib/lease";
 import { LeaseChip } from "./TaskBoard";
 import { useFreshnessNow } from "./Freshness";
 import ActivityFeed from "./ActivityFeed";
 
-// The roster's in-flight task carries the extra lease fields the fleet view
-// needs to read the claim the SAME way the board does (TDM-112). They live on
-// the roster JSON (fleet_handler.go rosterTask) but aren't on the shared
-// FleetTask type, so this local view names them where they're used.
-//   - claimedBy       — the holder (deriveLease reads action.claimedBy).
-//   - claimedAt        — the LEASE stamp, pushed by heartbeats: what health is
-//                        measured against.
-//   - firstClaimedAt   — the STABLE start of this lease generation (heartbeats
-//                        don't move it): the honest "working for X".
-//   - progress[].at    — when each heartbeat landed, for the silent-vs-slipping read.
-type LeaseTask = FleetTask & {
-  claimedBy?: string;
-  firstClaimedAt?: string;
-  progress?: { at: string; note?: string }[];
-};
-
-// Adapt a roster task to the minimal Action shape deriveLease reads, so the
-// fleet view and the board compute one identical lease from one function.
-function leaseActionOf(task: LeaseTask): Action {
-  return {
-    type: task.type,
-    state: task.state,
-    claimedBy: task.claimedBy,
-    claimedAt: task.claimedAt,
-    payload: { progress: task.progress ?? [] },
-  } as unknown as Action;
-}
-
 /* ─────────────────────────────────────────────────────────────────────────────
-   FleetView — the header's fleet trigger + the roster panel it opens (TDM-47).
-   Replaces the old "Follow agent" toggle: with a TEAM of agents on a board,
-   "follow one of them around the document tabs" is the wrong question. The
-   question is "who is working, on what, and what are they waiting on" — which
-   is a readout, not a camera.
+   FleetView — the AGENTS surface (TDM-17). It used to be a header popover
+   (TDM-47); a team of agents is a first-class thing to look at, so it is now a
+   surface in the rail beside Board / Documents / Summary, and the header keeps
+   only a compact avatar stack + count that opens it (AgentPresence.tsx).
 
-   THE READOUT. Every row is three aligned columns, so a fleet of six scans in
-   one pass without reading a word:
+   THE ROSTER. One row per live agent, nested under the orchestrator that
+   spawned it (parentAgentId), each row carrying:
 
-     ●  planner-1                                     claude
-        working   TDM-47  Fleet panel UI                 12m
-     ○  doc-agent                                         codex
-        idle                                              6m
+     ●  opus-agentspanel-tdm17   executor   claude-opus-5-5
+        TDM-17  Agents panel: replace the header…     ● 2m      held 14m
+          ↳ Wrote the surface; wiring App.tsx                      1m
+        ⚠ claim lease ran out 3 minutes ago — reclaimable
 
-   status dot (state) · verb column (what it's doing) · mono age (for how long).
-   Colour comes only from the closed semantic state set — working violet, done
-   emerald — and vendor identity from the agent token. No avatars: an agent's
-   identity is its name, its model, and what it holds.
+   Name, role and model on the identity line; then EVERY claim the agent holds
+   (ticket ref + title, click → the task on the Board), its newest task_progress
+   line, how long it has been held, and the lease health — with a spelled-out
+   warning once the lease has lapsed, because that is the one state that asks a
+   human for something.
 
-   ACTIVE vs DORMANT. The API returns every identity that has ever registered on
-   the canvas, which on a long-lived board is a graveyard. The panel shows the
-   fleet that is actually around (holding a claim, or online and recently
-   active) and folds the rest behind a disclosure — and the trigger chip counts
-   the active ones, so "4 agents" means four agents you could be waiting on.
+   LIVE. The roster REST read (fleet_handler.go) is refetched on WS lifecycle
+   pings (claim / complete / approve) by useFleetRoster. A task_progress report
+   is NOT a lifecycle ping — it is a state push — so the per-task details (the
+   progress line, the lease, the title) are read from the canvas actions already
+   in hand, which every state push keeps current. The roster says WHO holds
+   WHAT; canvas state says how that work is going right now. Claims that land in
+   state before the roster refetch are folded in the same way, and claims that
+   have finished drop out immediately.
 
-   TWO TABS, ONE PANEL (TDM-48). "Who is working" and "what just happened" are
-   the same question asked in two tenses, so the Feed is a tab on THIS popover
-   rather than a second one competing for the same corner of the header: one
-   place to watch the team. The roster is unchanged behind its tab; the Feed
-   loads nothing until you look at it, and carries a small count while facts
-   pile up on the side you aren't reading.
+   WATCHING ONE AGENT (the hook TDM-19 fills). Clicking an agent's identity line
+   selects it — `watchedAgentId` / `onWatchAgent` are lifted to App so any other
+   surface can open the same agent — and a detail pane opens beside the roster:
+   identity, every claim with its full progress log, and a slot for the live
+   Claude Code transcript. That slot renders `renderAgentWatch(agent)` when App
+   provides one, and a placeholder until then. Only registered agents (those
+   with an id) can be watched; an unregistered claimant has no session to read.
    ──────────────────────────────────────────────────────────────────────────── */
 
 // An idle registered agent counts as "around" for this long after its last
@@ -86,32 +55,42 @@ function leaseActionOf(task: LeaseTask): Action {
 const ACTIVE_MS = 30 * 60_000;
 // How recently a completion still reads as "just finished" on an idle row.
 const RECENT_DONE_MS = 45 * 60_000;
-// Ages re-render on this cadence so "12m" doesn't freeze while the panel is up.
+// Ages re-render on this cadence so "12m" doesn't freeze while the surface is up.
 const TICK_MS = 30_000;
 const MAX_DEPTH = 4;
+// How many progress entries the detail pane lists per claim.
+const DETAIL_PROGRESS = 6;
+
+export type FleetRosterState = ReturnType<typeof useFleetRoster>;
 
 interface Props {
-  /** Canvas code — the roster read is a canvas-JWT call keyed on it. */
+  /** Canvas code — the feed read is a canvas-JWT call keyed on it. */
   code: string;
-  /** Canvas actions, already in hand: powers "just finished" + the approval foot. */
+  /** The live roster read, owned by App so the header count reads the same rows. */
+  fleet: FleetRosterState;
+  /** Canvas actions, already in hand: live progress/lease, "just finished", contention. */
   actions: Record<string, Action>;
-  /** Agent rows in canvas state — a change here means someone registered. */
-  agentCount: number;
   /** Tasks sitting in `proposed`: the fleet's blocker is the human. */
   proposedCount: number;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** Whether the surface is on screen — gates the age tick and the feed fetch. */
+  visible: boolean;
   /** Focus a task on the Board (scope → its epic, detail slide-over open). */
   onOpenTask: (taskId: string) => void;
   /** Show the Board — used by the "awaiting approval" foot. */
   onOpenBoard: () => void;
   /** Open the Connect dialog — the empty state's one action. */
   onConnect: () => void;
+  /** The agent whose detail pane is open (a registered agent id), or null. */
+  watchedAgentId: string | null;
+  /** Select an agent to watch (null closes the pane). TDM-19's entry point. */
+  onWatchAgent: (agentId: string | null) => void;
+  /** TDM-19: the live transcript pane for the watched agent. Placeholder when absent. */
+  renderAgentWatch?: (agent: FleetAgent) => ReactNode;
 }
 
-type TabId = "fleet" | "feed";
+type TabId = "roster" | "feed";
 const TABS: { id: TabId; label: string }[] = [
-  { id: "fleet", label: "Fleet" },
+  { id: "roster", label: "Roster" },
   { id: "feed", label: "Feed" },
 ];
 
@@ -122,8 +101,10 @@ type Vendor = { label: string; kind: VendorKind; title: string };
 
 // Vendor is READ OFF the declared model, never guessed from behaviour. An
 // unregistered claimant has no model to read (it never called agent_register),
-// so it gets its own treatment rather than a wrong badge.
-function vendorOf(a: FleetAgent): Vendor {
+// so it gets its own treatment rather than a wrong badge. The chip shows the
+// declared model string itself when there is one — "claude-opus-5-5" says more
+// than "claude".
+export function vendorOf(a: FleetAgent): Vendor {
   if (!a.registered) {
     return {
       label: "external",
@@ -132,21 +113,15 @@ function vendorOf(a: FleetAgent): Vendor {
     };
   }
   const model = (a.model ?? "").trim();
-  const named = (label: string, kind: VendorKind): Vendor => ({
-    label,
+  const named = (kind: VendorKind, fallback: string): Vendor => ({
+    label: model || fallback,
     kind,
-    title: model ? `Model: ${model}` : `${label} agent`,
+    title: model ? `Model: ${model}` : `${fallback} agent — no model declared`,
   });
   if (/claude/i.test(model) || (!model && /claude/i.test(a.name))) return named("claude", "claude");
-  if (/codex/i.test(model)) return named("codex", "vendor");
-  if (/gpt|openai|^o[134]\b/i.test(model)) return named("openai", "vendor");
-  if (/gemini/i.test(model)) return named("gemini", "vendor");
-  if (model) return named(model, "model");
-  return {
-    label: "agent",
-    kind: "model",
-    title: `${a.name} registered without declaring a model`,
-  };
+  if (/codex|gpt|openai|^o[134]\b|gemini/i.test(model)) return named("vendor", "agent");
+  if (model) return named("model", "agent");
+  return { label: "agent", kind: "model", title: `${a.name} registered without declaring a model` };
 }
 
 const VENDOR_CLS: Record<VendorKind, string> = {
@@ -157,534 +132,495 @@ const VENDOR_CLS: Record<VendorKind, string> = {
   external: "border border-dashed border-ink/25 text-ink/55",
 };
 
-// ── time ─────────────────────────────────────────────────────────────────────
-// ageOf / fullDate live in lib/relativeTime so the Feed tab's right-hand column
-// reads identically to the roster's.
+/** The stable key a row is selected by. Only registered agents have one. */
+function agentKey(a: FleetAgent): string {
+  return a.id ?? `claimant:${a.name}`;
+}
 
-function within(iso: string | undefined, ms: number): boolean {
+// ── activity ─────────────────────────────────────────────────────────────────
+
+function within(iso: string | undefined, ms: number, now = Date.now()): boolean {
   if (!iso) return false;
   const t = Date.parse(iso);
-  return Number.isFinite(t) && Date.now() - t < ms;
+  return Number.isFinite(t) && now - t < ms;
+}
+
+/** Working, waiting, or online and recently active — "around" right now.
+ *  Shared with the header's avatar stack so the two can never disagree. */
+export function isActiveFleetAgent(a: FleetAgent): boolean {
+  return (
+    a.tasks.length > 0 ||
+    !!a.waiting ||
+    (a.registered ? a.status === "online" && within(a.lastActivityAt, ACTIVE_MS) : within(a.lastActivityAt, ACTIVE_MS))
+  );
+}
+
+/* One claim as the surface renders it: the roster's row, overlaid with the live
+   action from canvas state when we have it. */
+export type LiveClaim = {
+  id: string;
+  ticketId?: string;
+  title: string;
+  /** Lease derived from the freshest data we hold (state push > roster read). */
+  action: Action;
+  /** Stable start of this lease generation — the honest "held for". */
+  startedAt?: string;
+  progress: TaskProgressEntry[];
+};
+
+type RosterTaskExtra = FleetTask & {
+  claimedBy?: string;
+  firstClaimedAt?: string;
+  progress?: { at: string; note?: string }[];
+};
+
+function claimRecordAt(a: Action): string | undefined {
+  const rec = (a.payload as { claim?: { at?: string } } | undefined)?.claim;
+  return rec?.at;
+}
+
+function progressOf(a: Action | undefined, fallback?: RosterTaskExtra): TaskProgressEntry[] {
+  const live = (a?.payload as TaskPayload | undefined)?.progress;
+  if (live && live.length > 0) return live;
+  return (fallback?.progress ?? []).map((p) => ({ at: p.at, note: p.note ?? "" }));
+}
+
+/** Newest progress entry by timestamp (the log is append-only, but be safe). */
+function newestProgress(list: TaskProgressEntry[]): TaskProgressEntry | undefined {
+  let best: TaskProgressEntry | undefined;
+  let bestT = -Infinity;
+  for (const e of list) {
+    const t = Date.parse(e.at);
+    if (Number.isFinite(t) && t >= bestT) {
+      best = e;
+      bestT = t;
+    }
+  }
+  return best;
+}
+
+// Adapt a roster task to the minimal Action shape deriveLease reads, for a claim
+// canvas state doesn't carry (it should, but the roster is the fallback).
+function actionOfRosterTask(task: RosterTaskExtra): Action {
+  return {
+    id: task.id,
+    type: task.type,
+    state: task.state,
+    claimedBy: task.claimedBy,
+    claimedAt: task.claimedAt,
+    ticketId: task.ticketId,
+    payload: { title: task.title ?? "", progress: task.progress ?? [] },
+  } as unknown as Action;
+}
+
+/**
+ * Every claim this agent holds RIGHT NOW: the roster's tasks, minus any the live
+ * state says have finished or changed hands, plus any executing claim the state
+ * attributes to it that the roster hasn't refetched yet. Attribution matches the
+ * roster's own join (fleet_handler.go buildRoster): the claim's stored agent id
+ * first, then the free-text claimedBy name.
+ */
+function liveClaimsOf(agent: FleetAgent, actions: Record<string, Action>): LiveClaim[] {
+  const holds = (a: Action) =>
+    a.state === "executing" &&
+    (a.claimedByAgentId
+      ? a.claimedByAgentId === agent.id
+      : a.claimedBy === agent.name || (!!agent.id && a.claimedBy === agent.id));
+
+  const out = new Map<string, LiveClaim>();
+  for (const t of agent.tasks as RosterTaskExtra[]) {
+    const live = actions[t.id];
+    if (live && !holds(live)) continue; // finished, released, or reclaimed since the read
+    const action = live ?? actionOfRosterTask(t);
+    out.set(t.id, {
+      id: t.id,
+      ticketId: live?.ticketId ?? t.ticketId,
+      title: (live?.payload as TaskPayload | undefined)?.title || t.title || "Untitled task",
+      action,
+      startedAt: (live && claimRecordAt(live)) ?? t.firstClaimedAt ?? t.claimedAt,
+      progress: progressOf(live, t),
+    });
+  }
+  // Claims the roster hasn't refetched yet. Only those carrying the stored agent
+  // id (TDM-16): a legacy name-only claim is left to the roster's own join, so
+  // two agents sharing a name never both show it.
+  for (const a of Object.values(actions)) {
+    if (!agent.id || !a.claimedByAgentId || out.has(a.id) || !holds(a)) continue;
+    out.set(a.id, {
+      id: a.id,
+      ticketId: a.ticketId,
+      title: (a.payload as TaskPayload | undefined)?.title || "Untitled task",
+      action: a,
+      startedAt: claimRecordAt(a) ?? a.claimedAt,
+      progress: progressOf(a),
+    });
+  }
+  // Newest claim first, as the roster sorts them.
+  return [...out.values()].sort(
+    (x, y) => (Date.parse(y.startedAt ?? "") || 0) - (Date.parse(x.startedAt ?? "") || 0),
+  );
+}
+
+/** The header's read of the fleet: the active agents and how many hold a claim,
+ *  by the exact rules the surface below lists them with. */
+export function activeFleetSummary(
+  agents: FleetAgent[],
+  actions: Record<string, Action>,
+): { active: FleetAgent[]; working: number } {
+  const active: FleetAgent[] = [];
+  let working = 0;
+  for (const a of agents) {
+    const held = liveClaimsOf(a, actions).length > 0;
+    if (held || isActiveFleetAgent(a)) active.push(a);
+    if (held) working++;
+  }
+  return { active, working };
 }
 
 // ── component ────────────────────────────────────────────────────────────────
 
 export default function FleetView({
   code,
+  fleet,
   actions,
-  agentCount,
   proposedCount,
-  open,
-  onOpenChange,
+  visible,
   onOpenTask,
   onOpenBoard,
   onConnect,
+  watchedAgentId,
+  onWatchAgent,
+  renderAgentWatch,
 }: Props) {
-  const { roster, error, loading, reload } = useFleetRoster(code, open, agentCount);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const { roster, error, loading, reload } = fleet;
   const [showDormant, setShowDormant] = useState(false);
-  const [tab, setTab] = useState<TabId>("fleet");
+  const [tab, setTab] = useState<TabId>("roster");
   const [actorFilter, setActorFilter] = useState<string | null>(null);
   // The feed fetches only while it's the visible tab — a board where nobody
   // opens it costs one WS subscription and nothing else.
-  const feed = useActivityFeed(code, open && tab === "feed");
-  // Re-render on a slow tick so relative ages stay honest while the panel is up.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!open) return;
-    const t = setInterval(() => setTick((n) => n + 1), TICK_MS);
-    return () => clearInterval(t);
-  }, [open]);
+  const feed = useActivityFeed(code, visible && tab === "feed");
+  // One clock for every age and lease on the surface. It ticks while hidden too
+  // (cheap), so switching to the surface never shows a frozen read.
+  const now = useFreshnessNow(TICK_MS);
 
   // Another board's agent names mean nothing here.
   useEffect(() => setActorFilter(null), [code]);
 
   const all = useMemo(() => roster?.agents ?? [], [roster]);
-  // Working, waiting, or online and recently active. Everything else is dormant
-  // history. A parked waiter is active by the strongest evidence there is — the
-  // server is holding its connection open as we read — so it counts even if it
-  // has never claimed anything and its lastSeen is stale.
+
+  // Live claims per agent, recomputed on every state push.
+  const claimsByKey = useMemo(() => {
+    const m = new Map<string, LiveClaim[]>();
+    for (const a of all) m.set(agentKey(a), liveClaimsOf(a, actions));
+    return m;
+  }, [all, actions]);
+  const claimsOf = useCallback((a: FleetAgent) => claimsByKey.get(agentKey(a)) ?? [], [claimsByKey]);
+
   const isActive = useCallback(
-    (a: FleetAgent) =>
-      a.tasks.length > 0 ||
-      !!a.waiting ||
-      (a.registered ? a.status === "online" && within(a.lastActivityAt, ACTIVE_MS) : within(a.lastActivityAt, ACTIVE_MS)),
-    [],
+    (a: FleetAgent) => claimsOf(a).length > 0 || isActiveFleetAgent(a),
+    [claimsOf],
   );
   const active = useMemo(() => all.filter(isActive), [all, isActive]);
   const dormant = useMemo(() => all.filter((a) => !isActive(a)), [all, isActive]);
-  const workingCount = useMemo(() => active.filter((a) => a.tasks.length > 0).length, [active]);
+  const workingCount = useMemo(() => active.filter((a) => claimsOf(a).length > 0).length, [active, claimsOf]);
   // Parked on the queue and holding nothing: present, blocked, and the human is
-  // the blocker. Counted off the same rows the panel renders, so the chip and
-  // the list can never disagree — and it is zero unless the server is holding a
-  // live wait, which is the whole point (see FleetWait).
+  // the blocker. Zero unless the server is holding a live wait (see FleetWait).
   const waitingCount = useMemo(
-    () => active.filter((a) => a.tasks.length === 0 && a.waiting).length,
-    [active],
+    () => active.filter((a) => claimsOf(a).length === 0 && a.waiting).length,
+    [active, claimsOf],
   );
-  // Live waits nobody can name (no X-Tandem-Agent on the poll). Real presence
-  // with no row to sit on, so it's reported as a number rather than invented
-  // into an agent.
   const unnamedWaiting = roster?.counts?.waitingUnattributed ?? 0;
+  const idleCount = active.length - workingCount - waitingCount;
 
   // "Just finished": the newest done/failed task each identity completed, taken
-  // straight from canvas state we already hold — no second fetch, and it stays
-  // live with the board.
+  // straight from canvas state we already hold — no second fetch.
   const lastDone = useMemo(() => {
     const out = new Map<string, Action>();
     for (const a of Object.values(actions)) {
       if (a.type !== "task") continue;
       if (a.state !== "done" && a.state !== "failed") continue;
-      if (!a.claimedBy || !within(a.updatedAt, RECENT_DONE_MS)) continue;
+      if (!a.claimedBy || !within(a.updatedAt, RECENT_DONE_MS, now)) continue;
       const prev = out.get(a.claimedBy);
       if (!prev || Date.parse(a.updatedAt) > Date.parse(prev.updatedAt)) out.set(a.claimedBy, a);
     }
     return out;
-  }, [actions]);
+  }, [actions, now]);
 
-  // Collisions per agent (TDM-100). The roster answers "who is working on what";
-  // this adds "and who has been losing races", which is the question a fleet that
-  // is fighting itself makes urgent. Derived from the canvas actions already in
-  // hand — every task's contention trail rides the same state push — so it costs
-  // no fetch and stays live with the board, exactly like `lastDone` above.
+  // Collisions per agent (TDM-100), derived from the canvas actions in hand.
   const contention = useMemo(() => contentionByAgent(actions), [actions]);
 
-  // Panel lifecycle: focus in on open, back to the trigger on close, Esc closes.
-  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  // Nest executors under the parent that spawned them. An agent whose parent
+  // isn't on the active roster renders at the top level rather than vanishing.
+  const tree = useMemo(() => buildTree(active), [active]);
+  const dormantTree = useMemo(() => buildTree(dormant), [dormant]);
+
+  const watched = useMemo(
+    () => (watchedAgentId ? all.find((a) => a.id === watchedAgentId) ?? null : null),
+    [all, watchedAgentId],
+  );
+  // Esc closes the detail pane while the surface is up.
   useEffect(() => {
-    if (!open) return;
-    panelRef.current?.focus();
+    if (!visible || !watchedAgentId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        close();
-        triggerRef.current?.focus();
-      }
+      if (e.key === "Escape" && !e.defaultPrevented) onWatchAgent(null);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, close]);
+  }, [visible, watchedAgentId, onWatchAgent]);
 
-  function trapTab(e: ReactKeyboardEvent) {
-    if (e.key !== "Tab") return;
-    const root = panelRef.current;
-    if (!root) return;
-    const focusables = Array.from(
-      root.querySelectorAll<HTMLElement>('button, [href], input, [tabindex]:not([tabindex="-1"])'),
-    ).filter((el) => !el.hasAttribute("disabled") && el.getClientRects().length > 0);
-    if (focusables.length === 0) {
-      e.preventDefault();
-      return;
-    }
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey) {
-      if (document.activeElement === first || document.activeElement === root) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else if (document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-
-  // Left/Right move between the tabs, per the tabs pattern. Both stay in the
-  // Tab order (rather than roving tabindex) so the panel's existing focus trap
-  // keeps working unchanged.
   function onTabKey(e: ReactKeyboardEvent) {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const i = TABS.findIndex((t) => t.id === tab);
     const next = TABS[(i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
     setTab(next.id);
-    (e.currentTarget as HTMLElement)
-      .querySelector<HTMLElement>(`#fleet-tab-${next.id}`)
-      ?.focus();
+    (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`#agents-tab-${next.id}`)?.focus();
   }
 
-  function openTask(id: string) {
-    close();
-    onOpenTask(id);
-  }
+  const rowCtx: RowCtx = {
+    childrenById: tree.childrenById,
+    claimsOf,
+    lastDone,
+    contention,
+    now,
+    watchedAgentId,
+    onWatch: (a) => a.id && onWatchAgent(a.id === watchedAgentId ? null : a.id),
+    onOpenTask,
+  };
 
-  // Nest executors under the parent that spawned them. An agent whose parent
-  // isn't on the roster renders at the top level rather than disappearing.
-  const byId = useMemo(() => {
-    const m = new Map<string, FleetAgent>();
-    for (const a of active) if (a.id) m.set(a.id, a);
-    return m;
-  }, [active]);
-  const childrenById = useMemo(() => {
-    const m = new Map<string, FleetAgent[]>();
-    for (const a of active) {
-      const pid = a.parentAgentId;
-      if (!pid || pid === a.id || !byId.has(pid)) continue;
-      const kids = m.get(pid) ?? [];
-      kids.push(a);
-      m.set(pid, kids);
-    }
-    return m;
-  }, [active, byId]);
-  const roots = useMemo(
-    () => active.filter((a) => !a.parentAgentId || a.parentAgentId === a.id || !byId.has(a.parentAgentId)),
-    [active, byId],
-  );
-
-  const counts = roster?.counts;
-  const total = active.length;
-  // The chip says the most urgent true thing: work in flight beats work blocked,
-  // and blocked beats idle. "2 agents · 1 waiting" is the reading that makes an
-  // orchestrator parked on your approval visible without opening anything.
-  const chipLabel =
-    total === 0
-      ? "Fleet"
-      : workingCount > 0
-        ? `${total} agent${total === 1 ? "" : "s"} · ${workingCount} working`
-        : waitingCount > 0
-          ? `${total} agent${total === 1 ? "" : "s"} · ${waitingCount} waiting`
-          : `${total} agent${total === 1 ? "" : "s"} · idle`;
-
-  // ZONE 3 · CONTROLS of the canvas header's collapse contract (see the block
-  // comment above `HEADER_DROP` in App.tsx): `shrink-0`, and never inside an
-  // overflow-hidden ancestor — the roster panel below is absolutely positioned
-  // and would be clipped by one. The chip itself is never dropped (the roster
-  // has no other door); ladder rank 7 only sheds its label below sm, leaving
-  // the gauge + count.
   return (
-    <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        onClick={() => {
-          const next = !open;
-          onOpenChange(next);
-          if (next) {
-          }
-        }}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={
-          total === 0
-            ? "Fleet — no agents on this canvas"
-            : `Fleet — ${total} agent${total === 1 ? "" : "s"}, ${workingCount} working${
-                waitingCount > 0 ? `, ${waitingCount} waiting on your approval` : ""
-              }`
-        }
-        title={
-          total === 0
-            ? "No agents on this canvas yet — open the fleet for how to connect one"
-            : waitingCount > 0
-              ? `Who's on this canvas — ${waitingCount} parked on the queue waiting for you to approve work`
-              : "Who's on this canvas and what they're working on"
-        }
-        className={[
-          // h-9 below sm, matching the header's other controls; on a phone this
-          // chip collapses to a gauge + count, so it is also the narrowest.
-          "inline-flex h-9 items-center gap-2 rounded-md px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:h-8",
-          open ? "bg-accent/[0.08] text-accent" : "text-ink/60 hover:bg-ink/5 hover:text-ink/85",
-        ].join(" ")}
+    <div className="flex min-h-0 min-w-0 flex-1 bg-paper text-ink">
+      {/* Roster column. Hidden below sm while an agent is watched — on a phone
+          the detail pane takes the whole surface and has a back control. */}
+      <section
+        aria-label="Agents"
+        className={`min-h-0 min-w-0 flex-1 flex-col ${watched ? "hidden sm:flex" : "flex"}`}
       >
-        <FleetGauge total={total} working={workingCount} waiting={waitingCount} />
-        {/* Ladder rank 7 — see the header contract in App.tsx. */}
-        <span className="hidden sm:inline">{chipLabel}</span>
-        {total > 0 && <span className="sm:hidden tabular-nums">{total}</span>}
-      </button>
-
-      {open && (
-        <>
-          {/* Click-away catcher. No scrim: this is a popover on a live board, not
-              a modal that should dim the work behind it. */}
-          <div className="fixed inset-0 z-40" onClick={close} aria-hidden="true" />
+        <header className="flex shrink-0 items-center gap-3 border-b border-ink/10 px-4 py-2.5 sm:px-5">
+          <Bot size={17} strokeWidth={1.75} className="shrink-0 text-ink/45" aria-hidden="true" />
+          <h2 className="shrink-0 text-[14px] font-semibold tracking-tight text-ink">Agents</h2>
+          <p className="min-w-0 truncate text-[12px] text-ink/50">
+            {active.length === 0
+              ? "Nobody connected"
+              : [
+                  `${workingCount} working`,
+                  waitingCount > 0 && `${waitingCount} waiting`,
+                  idleCount > 0 && `${idleCount} idle`,
+                  roster?.counts && roster.counts.unregistered > 0 && `${roster.counts.unregistered} external`,
+                  unnamedWaiting > 0 && `${unnamedWaiting} unnamed waiting`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+          </p>
           <div
-            ref={panelRef}
-            role="dialog"
-            aria-label="Fleet"
-            tabIndex={-1}
-            onKeyDown={trapTab}
-            className="absolute right-0 top-full z-50 mt-2 flex max-h-[min(70vh,560px)] w-[min(380px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-[10px] border border-ink/10 bg-surface shadow-lg focus-visible:outline-none"
+            role="tablist"
+            aria-label="Agent views"
+            onKeyDown={onTabKey}
+            className="ml-auto flex shrink-0 items-center gap-0.5"
           >
-            {/* Head — the two readings of "how is the team doing", plus close.
-                The tab labels are the panel's title; a separate heading over
-                them would say "Fleet" twice. */}
-            <div className="flex shrink-0 items-center gap-1 border-b border-ink/10 px-2 py-1.5">
-              <div
-                role="tablist"
-                aria-label="Fleet views"
-                onKeyDown={onTabKey}
-                className="flex min-w-0 items-center gap-1"
-              >
-                {TABS.map((t) => (
-                  <button
-                    key={t.id}
-                    role="tab"
-                    id={`fleet-tab-${t.id}`}
-                    aria-selected={tab === t.id}
-                    aria-controls={`fleet-panel-${t.id}`}
-                    onClick={() => {
-                      setTab(t.id);
-                      if (t.id === "feed") {
-                      }
-                    }}
-                    className={[
-                      // tandem-tap: on a phone the fleet popover is a full-width
-                      // panel and these tabs are its only navigation.
-                      "tandem-tap flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-                      tab === t.id
-                        ? "bg-accent/[0.08] text-accent"
-                        : "text-ink/50 hover:bg-ink/5 hover:text-ink/80",
-                    ].join(" ")}
-                  >
-                    {t.label}
-                    {/* What happened while you were reading the other tab.
-                        Terracotta is the agent-activity token — this count is
-                        exactly that. */}
-                    {t.id === "feed" && tab !== "feed" && feed.unseen > 0 && (
-                      <span
-                        aria-label={`${feed.unseen} new`}
-                        className="flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-agent px-1 text-[10px] font-semibold leading-none text-white tabular-nums"
-                      >
-                        {feed.unseen > 9 ? "9+" : feed.unseen}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+            {TABS.map((t) => (
               <button
-                onClick={() => {
-                  close();
-                  triggerRef.current?.focus();
-                }}
-                aria-label="Close fleet"
-                className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink/40 transition-colors hover:bg-ink/5 hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-6 sm:w-6"
+                key={t.id}
+                role="tab"
+                id={`agents-tab-${t.id}`}
+                aria-selected={tab === t.id}
+                aria-controls={`agents-panel-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={[
+                  "tandem-tap flex h-7 items-center gap-1.5 rounded px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                  tab === t.id ? "bg-ink/[0.06] text-ink" : "text-ink/50 hover:bg-ink/[0.05] hover:text-ink",
+                ].join(" ")}
               >
-                <X size={14} />
+                {t.label}
+                {t.id === "feed" && tab !== "feed" && feed.unseen > 0 && (
+                  <span
+                    aria-label={`${feed.unseen} new`}
+                    className="flex h-4 min-w-4 items-center justify-center rounded-sm bg-agent px-1 text-[10px] font-semibold leading-none text-paper tabular-nums"
+                  >
+                    {feed.unseen > 9 ? "9+" : feed.unseen}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        {tab === "feed" && (
+          <div
+            role="tabpanel"
+            id="agents-panel-feed"
+            aria-labelledby="agents-tab-feed"
+            className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col"
+          >
+            <ActivityFeed
+              events={feed.events}
+              loading={feed.loading}
+              error={feed.error}
+              onReload={() => void feed.reload()}
+              onOpenTask={onOpenTask}
+              actorFilter={actorFilter}
+              onFilterChange={setActorFilter}
+            />
+          </div>
+        )}
+
+        <div
+          role="tabpanel"
+          id="agents-panel-roster"
+          aria-labelledby="agents-tab-roster"
+          hidden={tab !== "roster"}
+          className={tab === "roster" ? "tandem-fab-reserve min-h-0 flex-1 overflow-y-auto" : "hidden"}
+        >
+          {/* What the fleet is waiting on. The blocker is you — so it leads. */}
+          {proposedCount > 0 && (
+            <button
+              onClick={onOpenBoard}
+              className="flex w-full items-center gap-2 border-b border-ink/10 bg-state-proposed/[0.06] px-4 py-2 text-left transition-colors hover:bg-state-proposed/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 sm:px-5"
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-state-proposed" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/80">
+                <span className="font-medium">
+                  {proposedCount} task{proposedCount === 1 ? "" : "s"} awaiting your approval
+                </span>
+                <span className="text-ink/55">
+                  {waitingCount + unnamedWaiting > 0
+                    ? ` — ${waitingCount + unnamedWaiting} agent${waitingCount + unnamedWaiting === 1 ? " is" : "s are"} parked on the queue; approving wakes ${waitingCount + unnamedWaiting === 1 ? "it" : "them"}.`
+                    : workingCount === 0
+                      ? " — nothing is running; the fleet is waiting on you."
+                      : ""}
+                </span>
+              </span>
+              <span className="shrink-0 text-[12px] font-medium text-ink underline-offset-2 hover:underline">
+                Review
+              </span>
+            </button>
+          )}
+
+          {/* A failed refresh keeps the last roster on screen — stale rows beat
+              a blank surface while the next ping or poll retries. */}
+          {error && roster && (
+            <div className="flex items-center gap-2 border-b border-ink/10 px-4 py-1.5 sm:px-5">
+              <span className="min-w-0 flex-1 truncate text-[12px] text-ink/55">
+                Couldn't refresh — showing the last roster.
+              </span>
+              <button
+                onClick={() => void reload()}
+                className="shrink-0 text-[12px] font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                Retry
               </button>
             </div>
+          )}
 
-            {tab === "feed" && (
-              <div
-                role="tabpanel"
-                id="fleet-panel-feed"
-                aria-labelledby="fleet-tab-feed"
-                className="flex min-h-0 flex-1 flex-col"
+          {error && !roster ? (
+            <div className="px-4 py-6 sm:px-5">
+              <p className="text-[13px] leading-relaxed text-ink/70">{error}</p>
+              <button
+                onClick={() => void reload()}
+                className="mt-2 h-7 rounded border border-ink/15 px-2.5 text-[12px] font-medium text-ink/80 transition-colors hover:border-ink/25 hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
-                <ActivityFeed
-                  events={feed.events}
-                  loading={feed.loading}
-                  error={feed.error}
-                  onReload={() => void feed.reload()}
-                  onOpenTask={openTask}
-                  actorFilter={actorFilter}
-                  onFilterChange={setActorFilter}
-                />
-              </div>
-            )}
+                Try again
+              </button>
+            </div>
+          ) : !roster && loading ? (
+            <p className="px-4 py-6 text-[13px] text-ink/50 sm:px-5">Reading the roster…</p>
+          ) : active.length === 0 ? (
+            <div className="max-w-lg px-4 py-6 sm:px-5">
+              <p className="text-[13px] font-medium text-ink/80">
+                {dormant.length > 0 ? "Nobody is around right now." : "No agents here yet."}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink/55">
+                {dormant.length > 0
+                  ? `${dormant.length} agent${dormant.length === 1 ? " has" : "s have"} worked this canvas before. Start a session and it rejoins the list here.`
+                  : "Point a session at this canvas over MCP. It appears the moment it registers, and every task it claims shows up here."}
+              </p>
+              <button
+                onClick={onConnect}
+                className="mt-3 h-8 rounded bg-primary px-3 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+              >
+                Connect an agent
+              </button>
+            </div>
+          ) : (
+            <ul className="divide-y divide-ink/[0.07]">
+              {tree.roots.map((a) => (
+                <AgentRow key={agentKey(a)} agent={a} depth={0} ctx={rowCtx} />
+              ))}
+            </ul>
+          )}
 
-            {/* Roster */}
-            <div
-              role="tabpanel"
-              id="fleet-panel-fleet"
-              aria-labelledby="fleet-tab-fleet"
-              hidden={tab !== "fleet"}
-              className={tab === "fleet" ? "min-h-0 flex-1 overflow-y-auto" : "hidden"}
-            >
-              {total > 0 && (
-                <p className="border-b border-ink/[0.07] px-3 py-1.5 text-[11px] text-ink/50">
-                  {workingCount} working
-                  {waitingCount > 0 ? ` · ${waitingCount} waiting` : ""}
-                  {total - workingCount - waitingCount > 0
-                    ? ` · ${total - workingCount - waitingCount} idle`
-                    : ""}
-                  {counts && counts.unregistered > 0 ? ` · ${counts.unregistered} external` : ""}
-                  {/* A wait that named nobody still happened — say so rather than
-                      leave the count short by one. */}
-                  {unnamedWaiting > 0 ? ` · ${unnamedWaiting} unnamed waiting` : ""}
-                </p>
-              )}
-              {/* A failed refresh keeps the last roster on screen — stale rows
-                  beat a blank panel while the next ping or poll retries. */}
-              {error && roster && (
-                <div className="flex items-center gap-2 border-b border-ink/[0.07] px-3 py-1.5">
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-ink/50">
-                    Couldn't refresh — showing the last roster.
-                  </span>
-                  <button
-                    onClick={() => void reload()}
-                    className="shrink-0 text-[11px] font-medium text-accent transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {error && !roster ? (
-                <div className="px-3 py-4">
-                  <p className="text-[12.5px] leading-relaxed text-ink/70">{error}</p>
-                  <button
-                    onClick={() => void reload()}
-                    className="mt-2 rounded-md border border-ink/15 px-2.5 py-1 text-[12px] font-medium text-ink/70 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : !roster && loading ? (
-                <p className="px-3 py-4 text-[12.5px] text-ink/50">Reading the roster…</p>
-              ) : total === 0 ? (
-                <div className="px-3 py-4">
-                  <p className="text-[12.5px] font-medium text-ink/80">
-                    {dormant.length > 0 ? "Nobody is around right now." : "No agents here yet."}
-                  </p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-ink/55">
-                    {dormant.length > 0
-                      ? `${dormant.length} agent${dormant.length === 1 ? " has" : "s have"} worked this canvas before. Start a session and it rejoins the list here.`
-                      : "Point a session at this canvas over MCP. It appears the moment it registers, and every task it claims shows up on this list."}
-                  </p>
-                  <button
-                    onClick={() => {
-                      close();
-                      onConnect();
-                    }}
-                    className="mt-2.5 rounded-md bg-accent px-2.5 py-1.5 text-[12px] font-medium text-white transition-[filter] hover:brightness-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                  >
-                    Connect an agent
-                  </button>
-                </div>
-              ) : (
-                <ul className="py-1">
-                  {roots.map((a) => (
+          {/* Everyone who has registered here but isn't around right now. */}
+          {dormant.length > 0 && (
+            <div className="border-t border-ink/10">
+              <button
+                onClick={() => setShowDormant((s) => !s)}
+                aria-expanded={showDormant}
+                className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[12px] text-ink/50 transition-colors hover:bg-ink/[0.03] hover:text-ink/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 sm:px-5"
+              >
+                {showDormant ? "Hide" : "Show"} {dormant.length} dormant
+                {!showDormant && <span className="text-ink/45">— registered here, not around now</span>}
+              </button>
+              {showDormant && (
+                <ul className="divide-y divide-ink/[0.07] pb-1">
+                  {dormantTree.roots.map((a) => (
                     <AgentRow
-                      key={a.id ?? a.name}
+                      key={agentKey(a)}
                       agent={a}
                       depth={0}
-                      childrenById={childrenById}
-                      lastDone={lastDone}
-                      contention={contention}
-                      onOpenTask={openTask}
+                      ctx={{ ...rowCtx, childrenById: dormantTree.childrenById }}
+                      dormant
                     />
                   ))}
                 </ul>
               )}
-
-              {/* Everyone who has registered here but isn't around right now. */}
-              {dormant.length > 0 && (
-                <div className="border-t border-ink/[0.07]">
-                  <button
-                    onClick={() => setShowDormant((s) => !s)}
-                    aria-expanded={showDormant}
-                    className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[11.5px] text-ink/50 transition-colors hover:bg-ink/[0.03] hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
-                  >
-                    {showDormant ? "Hide" : "Show"} {dormant.length} dormant
-                    <span className="text-ink/50">
-                      {showDormant ? "" : "— registered here, not around now"}
-                    </span>
-                  </button>
-                  {showDormant && (
-                    <ul className="pb-1">
-                      {dormant.map((a) => (
-                        <AgentRow
-                          key={a.id ?? a.name}
-                          agent={a}
-                          depth={0}
-                          childrenById={childrenById}
-                          lastDone={lastDone}
-                          contention={contention}
-                          onOpenTask={openTask}
-                          dormant
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
             </div>
+          )}
+        </div>
+      </section>
 
-            {/* What the fleet is waiting on. The blocker is you. */}
-            {proposedCount > 0 && (
-              <button
-                onClick={() => {
-                  close();
-                  onOpenBoard();
-                }}
-                className="group flex shrink-0 items-center gap-2 border-t border-ink/10 px-3 py-2.5 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[12px] font-medium text-ink/80">
-                    {proposedCount} task{proposedCount === 1 ? "" : "s"} awaiting your approval
-                  </span>
-                  {/* With a live waiter this stops being a figure of speech: an
-                      agent is parked on the queue and wakes the moment you
-                      approve. Without one, the older, weaker sentence — nobody
-                      is standing there, whatever the queue says. */}
-                  {waitingCount + unnamedWaiting > 0 ? (
-                    <span className="mt-px block text-[11px] text-ink/50">
-                      {waitingCount + unnamedWaiting} agent
-                      {waitingCount + unnamedWaiting === 1 ? " is" : "s are"} parked on the queue —
-                      approving wakes {waitingCount + unnamedWaiting === 1 ? "it" : "them"}.
-                    </span>
-                  ) : (
-                    workingCount === 0 && (
-                      <span className="mt-px block text-[11px] text-ink/50">
-                        Nothing is running — the fleet is waiting on you.
-                      </span>
-                    )
-                  )}
-                </span>
-                <span className="shrink-0 text-[11.5px] font-medium text-accent">Review</span>
-              </button>
-            )}
-          </div>
-        </>
+      {watched && (
+        <AgentDetail
+          agent={watched}
+          claims={claimsOf(watched)}
+          now={now}
+          onClose={() => onWatchAgent(null)}
+          onOpenTask={onOpenTask}
+          renderAgentWatch={renderAgentWatch}
+        />
       )}
     </div>
   );
 }
 
-/* FleetGauge — the trigger's mark. One bar per active agent (capped at five):
-   tall + violet while it holds a claim, half-height + amber while it is parked
-   on the queue, short + neutral while idle. It carries the same fact as the
-   label, in a shape you can read without reading.
+function buildTree(list: FleetAgent[]) {
+  const byId = new Map<string, FleetAgent>();
+  for (const a of list) if (a.id) byId.set(a.id, a);
+  const childrenById = new Map<string, FleetAgent[]>();
+  const roots: FleetAgent[] = [];
+  for (const a of list) {
+    const pid = a.parentAgentId;
+    if (!pid || pid === a.id || !byId.has(pid)) {
+      roots.push(a);
+      continue;
+    }
+    const kids = childrenById.get(pid) ?? [];
+    kids.push(a);
+    childrenById.set(pid, kids);
+  }
+  return { roots, childrenById };
+}
 
-   Amber is already the board's "the blocker is you" token (the approval foot
-   below, and the proposed state on the cards), so a waiting agent is drawn in
-   the colour of the thing it is waiting for. Half height, not full: waiting is
-   presence without progress, and it must not read as work getting done.
-   Working and waiting are the two pulses this surface allows — both are live
-   states a human is meant to notice. */
-function FleetGauge({
-  total,
-  working,
-  waiting,
-}: {
-  total: number;
-  working: number;
-  waiting: number;
-}) {
-  const shown = Math.min(Math.max(total, 1), 5);
-  return (
-    <span className="flex h-3.5 shrink-0 items-end gap-[2px]" aria-hidden="true">
-      {Array.from({ length: shown }, (_, i) => {
-        const busy = i < working;
-        const parked = !busy && i < working + waiting;
-        return (
-          <span
-            key={i}
-            style={busy || parked ? { animationDelay: `${i * 300}ms` } : undefined}
-            className={[
-              "w-[2px] rounded-full transition-all duration-200",
-              busy
-                ? "h-3.5 bg-violet-500 tandem-breathe"
-                : parked
-                  ? "h-2 bg-amber-500 tandem-breathe"
-                  : total === 0
-                    ? "h-1.5 bg-ink/20"
-                    : "h-1.5 bg-ink/30",
-            ].join(" ")}
-          />
-        );
-      })}
-    </span>
-  );
+// ── rows ─────────────────────────────────────────────────────────────────────
+
+interface RowCtx {
+  childrenById: Map<string, FleetAgent[]>;
+  claimsOf: (a: FleetAgent) => LiveClaim[];
+  lastDone: Map<string, Action>;
+  contention: Map<string, ContentionTally>;
+  now: number;
+  watchedAgentId: string | null;
+  onWatch: (a: FleetAgent) => void;
+  onOpenTask: (taskId: string) => void;
 }
 
 /* One fleet member, plus any executors it spawned (nested under a hairline
@@ -692,97 +628,80 @@ function FleetGauge({
 function AgentRow({
   agent,
   depth,
-  childrenById,
-  lastDone,
-  contention,
-  onOpenTask,
+  ctx,
   dormant = false,
 }: {
   agent: FleetAgent;
   depth: number;
-  childrenById: Map<string, FleetAgent[]>;
-  lastDone: Map<string, Action>;
-  /** Collisions per agent name — see contentionByAgent. */
-  contention: Map<string, ContentionTally>;
-  onOpenTask: (taskId: string) => void;
+  ctx: RowCtx;
   dormant?: boolean;
 }) {
   const vendor = vendorOf(agent);
-  const kids = depth < MAX_DEPTH ? (agent.id ? (childrenById.get(agent.id) ?? []) : []) : [];
-  const done = lastDone.get(agent.name) ?? (agent.id ? lastDone.get(agent.id) : undefined);
-  const working = agent.tasks.length > 0;
-  // Parked on the queue long poll RIGHT NOW (TDM-151). Server-set only while it
-  // is holding the connection, so this is presence, not a guess — and it ranks
-  // below a claim, because what an agent holds matters more than what it awaits.
+  const kids = depth < MAX_DEPTH && agent.id ? (ctx.childrenById.get(agent.id) ?? []) : [];
+  const claims = ctx.claimsOf(agent);
+  const working = claims.length > 0;
+  const done = ctx.lastDone.get(agent.name) ?? (agent.id ? ctx.lastDone.get(agent.id) : undefined);
+  // Parked on the queue long poll RIGHT NOW (TDM-151) — ranks below a claim.
   const waiting = !working ? agent.waiting : undefined;
-  // Matched by NAME first then by id, the same two-step the roster join uses:
-  // `claimed_by` and the contention trail both record the free-text identity, so
-  // the two agree without a lookup table.
-  const raced = contention.get(agent.name) ?? (agent.id ? contention.get(agent.id) : undefined);
+  const raced = ctx.contention.get(agent.name) ?? (agent.id ? ctx.contention.get(agent.id) : undefined);
+  const selected = !!agent.id && agent.id === ctx.watchedAgentId;
+  const watchable = !!agent.id;
+
+  const identity = (
+    <>
+      <StatusDot working={working} waiting={!!waiting} done={!working && !waiting ? done : undefined} dormant={dormant} />
+      <span className="min-w-0 truncate font-code text-[12.5px] font-medium text-ink" title={agent.name}>
+        {agent.name}
+      </span>
+      {agent.role && agent.role !== "agent" && (
+        <span className="shrink-0 text-[11px] text-ink/50">{agent.role}</span>
+      )}
+      {raced && <ContentionCount tally={raced} name={agent.name} />}
+      <span
+        title={vendor.title}
+        className={`ml-auto max-w-[45%] shrink-0 truncate rounded-sm px-1 py-px font-code text-[10.5px] ${VENDOR_CLS[vendor.kind]}`}
+      >
+        {vendor.label}
+      </span>
+    </>
+  );
 
   return (
-    <li>
-      {/* Dormant rows are tighter, never dimmer — sub-12px text at reduced
-          opacity falls under the readability floor. */}
-      <div className={dormant ? "px-3 py-1.5" : "px-3 py-2"}>
-        {/* Identity line: state · name · role · vendor. */}
-        <div className="flex items-center gap-1.5">
-          <StatusDot
-            working={working}
-            waiting={!!waiting}
-            done={!working && !waiting && !!done}
-            dormant={dormant}
-          />
-          <span
-            className="truncate font-code text-[11.5px] font-medium text-ink"
-            title={agent.name}
+    <li className={depth > 0 ? "border-t border-ink/[0.07] first:border-t-0" : undefined}>
+      <div className={`${dormant ? "py-1.5" : "py-2"} pl-4 pr-4 sm:pr-5 ${selected ? "bg-ink/[0.05]" : ""}`}>
+        {/* Identity line: state · name · role · model. Clicking it watches the
+            agent (opens the detail pane). Unregistered claimants have no id and
+            so no session to watch — their line is static. */}
+        {watchable ? (
+          <button
+            onClick={() => ctx.onWatch(agent)}
+            aria-pressed={selected}
+            title={selected ? `Close ${agent.name}` : `Watch ${agent.name}`}
+            className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-0.5 text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            {agent.name}
-          </span>
-          {agent.role && agent.role !== "agent" && (
-            <span className="shrink-0 text-[10.5px] text-ink/50">{agent.role}</span>
-          )}
-          {/* How much this member has collided with the rest of the fleet
-              (TDM-100). Sits with the IDENTITY, not with the status line, because
-              it is a fact about the agent across the whole board rather than about
-              whatever it happens to hold right now. */}
-          {raced && <ContentionCount tally={raced} name={agent.name} />}
-          <span
-            title={vendor.title}
-            className={`ml-auto shrink-0 rounded-[3px] px-1 py-px font-code text-[10px] ${VENDOR_CLS[vendor.kind]}`}
-          >
-            {vendor.label}
-          </span>
-        </div>
+            {identity}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 py-0.5">{identity}</div>
+        )}
 
-        {/* Status lines: one per claim, or a single waiting/idle/just-finished
-            line. Waiting outranks "just finished" — an agent that completed a
-            task and then parked on the queue is waiting NOW; its last completion
-            is history, and history was already what made a parked agent
-            indistinguishable from a dead one. */}
-        <div className="mt-0.5 pl-[14px]">
+        {/* Status: one block per claim, or a single waiting / done / idle line. */}
+        <div className="mt-0.5 flex flex-col gap-1 pl-[14px]">
           {working ? (
-            agent.tasks.map((t) => (
-              <TaskLine key={t.id} task={t} agentName={agent.name} onOpen={onOpenTask} />
+            claims.map((c) => (
+              <ClaimBlock key={c.id} claim={c} agentName={agent.name} now={ctx.now} onOpen={ctx.onOpenTask} />
             ))
           ) : waiting ? (
             <WaitingLine wait={waiting} agentName={agent.name} />
           ) : done ? (
-            <DoneLine action={done} agentName={agent.name} onOpen={onOpenTask} />
+            <DoneLine action={done} agentName={agent.name} onOpen={ctx.onOpenTask} />
           ) : (
             <div className="flex items-center gap-2 py-px">
-              <span className="w-[52px] shrink-0 text-[11px] text-ink/50">idle</span>
-              <span className="min-w-0 flex-1" />
+              <span className="min-w-0 flex-1 text-[12px] text-ink/50">idle</span>
               <span
-                className="shrink-0 font-code text-[10.5px] text-ink/50"
-                title={
-                  agent.lastActivityAt
-                    ? `Last active ${fullDate(agent.lastActivityAt)}`
-                    : "No recorded activity"
-                }
+                className="shrink-0 font-code text-[11px] text-ink/50"
+                title={agent.lastActivityAt ? `Last active ${fullDate(agent.lastActivityAt)}` : "No recorded activity"}
               >
-                {/* The right column is uniformly "how long" — spell that out for
-                    a screen reader, where the visual column is no help. */}
                 <span className="sr-only">last active </span>
                 {ageOf(agent.lastActivityAt)}
                 <span className="sr-only"> ago</span>
@@ -793,18 +712,9 @@ function AgentRow({
       </div>
 
       {kids.length > 0 && (
-        <ul className="ml-[18px] border-l border-ink/10">
+        <ul className="ml-[22px] border-l border-ink/10">
           {kids.map((k) => (
-            <AgentRow
-              key={k.id ?? k.name}
-              agent={k}
-              depth={depth + 1}
-              childrenById={childrenById}
-              lastDone={lastDone}
-              contention={contention}
-              onOpenTask={onOpenTask}
-              dormant={dormant}
-            />
+            <AgentRow key={agentKey(k)} agent={k} depth={depth + 1} ctx={ctx} dormant={dormant} />
           ))}
         </ul>
       )}
@@ -812,22 +722,78 @@ function AgentRow({
   );
 }
 
+/* A live claim: ticket + title (click → the task on the Board), lease health,
+   held-for; then the newest task_progress line; then — only once the lease has
+   lapsed — the spelled-out warning. */
+function ClaimBlock({
+  claim,
+  agentName,
+  now,
+  onOpen,
+}: {
+  claim: LiveClaim;
+  agentName: string;
+  now: number;
+  onOpen: (taskId: string) => void;
+}) {
+  const lease = deriveLease(claim.action, now);
+  const last = newestProgress(claim.progress);
+  return (
+    <div className="min-w-0">
+      <button
+        onClick={() => onOpen(claim.id)}
+        title={`${claim.ticketId ? `${claim.ticketId} — ` : ""}${claim.title}\nOpen on the Board`}
+        aria-label={`${agentName} is working ${claim.ticketId ?? "a task"}, ${claim.title}, held for ${ageOf(claim.startedAt)}${
+          lease.health === "stale" ? " — claim lapsed, reclaimable" : lease.health === "slipping" ? " — no recent heartbeat" : ""
+        }. Open it on the board.`}
+        className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      >
+        {claim.ticketId && (
+          <span className="shrink-0 font-code text-[11px] font-medium text-state-executing">{claim.ticketId}</span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/80">{claim.title}</span>
+        <LeaseChip lease={lease} />
+        <span
+          className="w-[52px] shrink-0 text-right font-code text-[11px] text-ink/50"
+          title={claim.startedAt ? `Held since ${fullDate(claim.startedAt)}` : undefined}
+        >
+          <span className="sr-only">held </span>
+          {ageOf(claim.startedAt)}
+        </span>
+      </button>
+      {last?.note && (
+        <div className="flex items-baseline gap-2 pl-1" title={last.note}>
+          <span aria-hidden="true" className="shrink-0 font-code text-[11px] text-ink/30">
+            ↳
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-ink/60">{last.note}</span>
+          <span className="w-[52px] shrink-0 text-right font-code text-[11px] text-ink/45" title={fullDate(last.at)}>
+            <span className="sr-only">reported </span>
+            {ageOf(last.at)}
+          </span>
+        </div>
+      )}
+      {lease.health === "stale" && <StaleWarning lease={lease} />}
+    </div>
+  );
+}
+
+function StaleWarning({ lease }: { lease: Lease }) {
+  return (
+    <p className="mt-0.5 flex items-start gap-1.5 pl-1 text-[11.5px] leading-snug text-state-proposed" title={leaseSentence(lease)}>
+      <AlertTriangle size={12} className="mt-px shrink-0" aria-hidden="true" />
+      <span className="min-w-0">
+        Claim lease lapsed{lease.overdueMs >= 60_000 ? ` ${leaseAge(lease.overdueMs)} ago` : ""} — the next agent to ask takes it over.
+      </span>
+    </p>
+  );
+}
+
 /* ContentionCount — how often this member has been refused (TDM-100).
-   Two numbers, never one, because they mean different things:
-
-     ⌾ n  RACED   claims it lost at the door. Routine on a busy queue: it asked,
-                  was told no, and went and took other work. Nothing was wasted.
-     ⛨ n  FENCED  writes of its own that were refused because it no longer held
-                  the claim. That is a worker outliving its lease and coming back
-                  to finish work that had moved on — the near miss the fence exists
-                  to catch, and the only one of the two worth a human's attention.
-
-   Collapsing them into "3 collisions" would hide the distinction the reader acts
-   on, so both are shown, fenced first, and each hides itself at zero.
-
-   No hue, per the marker on the cards: a fenced write can happen to an agent in
-   any state, and this panel's colours are spoken for (violet = working, emerald =
-   just finished, terracotta = the agent token). Weight carries it instead. */
+     ⛨ n  FENCED  writes refused because it no longer held the claim — the near
+                  miss worth a human's attention.
+     ⌾ n  RACED   claims it lost at the door; routine on a busy queue.
+   Both shown, fenced first, each hidden at zero. No hue — weight carries it. */
 function ContentionCount({ tally, name }: { tally: ContentionTally; name: string }) {
   if (tally.total === 0) return null;
   const title = [
@@ -843,14 +809,14 @@ function ContentionCount({ tally, name }: { tally: ContentionTally; name: string
   return (
     <span className="flex shrink-0 items-center gap-1.5" title={title}>
       {tally.fenced > 0 && (
-        <span className="inline-flex items-center gap-0.5 font-code text-[10px] font-medium text-ink/70">
-          <Shield size={9} className="shrink-0" aria-hidden="true" />
+        <span className="inline-flex items-center gap-0.5 font-code text-[10.5px] font-medium text-ink/70">
+          <Shield size={10} className="shrink-0" aria-hidden="true" />
           {tally.fenced}
         </span>
       )}
       {tally.raced > 0 && (
-        <span className="inline-flex items-center gap-0.5 font-code text-[10px] text-ink/45">
-          <Users size={9} className="shrink-0" aria-hidden="true" />
+        <span className="inline-flex items-center gap-0.5 font-code text-[10.5px] text-ink/45">
+          <Users size={10} className="shrink-0" aria-hidden="true" />
           {tally.raced}
         </span>
       )}
@@ -867,30 +833,19 @@ function StatusDot({
 }: {
   working: boolean;
   waiting: boolean;
-  done: boolean;
+  done?: Action;
   dormant: boolean;
 }) {
-  if (working) {
-    return (
-      <span
-        aria-hidden="true"
-        className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500"
-      />
-    );
-  }
-  // Amber, and breathing: parked on the queue is a LIVE state — the agent is
-  // there, on the other end of an open connection. A still dot would read as the
-  // thing this exists to disprove.
-  if (waiting) {
-    return (
-      <span
-        aria-hidden="true"
-        className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
-      />
-    );
-  }
+  // Working and waiting are the two live states this surface lets breathe.
+  if (working) return <span aria-hidden="true" className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-state-executing" />;
+  if (waiting) return <span aria-hidden="true" className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-state-proposed" />;
   if (done) {
-    return <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/70" />;
+    return (
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${done.state === "failed" ? "bg-state-failed" : "bg-state-done"}`}
+      />
+    );
   }
   return (
     <span
@@ -900,87 +855,19 @@ function StatusDot({
   );
 }
 
-// A live claim: click through to the task on the Board.
-function TaskLine({
-  task,
-  agentName,
-  onOpen,
-}: {
-  task: FleetTask;
-  agentName: string;
-  onOpen: (taskId: string) => void;
-}) {
-  const title = task.title || "Untitled task";
-  const lt = task as LeaseTask;
-  // Ticking clock so a stalled worker's lease slips visibly with nothing arriving
-  // over the socket — the same clock the board's chips use.
-  const now = useFreshnessNow(TICK_MS);
-  const lease = deriveLease(leaseActionOf(lt), now);
-  // "Working for X" is anchored to the STABLE first-claim time, not the
-  // heartbeat-pushed claimedAt the old UI showed (which froze/reset and lied
-  // about duration). Fall back to claimedAt only for pre-claim-record rows.
-  const startedAt = lt.firstClaimedAt ?? task.claimedAt;
-  return (
-    <button
-      onClick={() => onOpen(task.id)}
-      title={`${task.ticketId ? `${task.ticketId} — ` : ""}${title}\nOpen on the Board`}
-      aria-label={`${agentName} is working ${task.ticketId ?? "a task"}, ${title}, for ${ageOf(startedAt)}${
-        lease.health === "stale"
-          ? " — claim lapsed, reclaimable"
-          : lease.health === "slipping"
-            ? " — no recent heartbeat"
-            : ""
-      }. Open it on the board.`}
-      className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded-[4px] px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-    >
-      <span className="w-[52px] shrink-0 text-[11px] text-ink/55">working</span>
-      {task.ticketId && (
-        <span className="shrink-0 font-code text-[10.5px] font-medium text-violet-600 dark:text-violet-400">
-          {task.ticketId}
-        </span>
-      )}
-      <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink/70">{title}</span>
-      {/* Live/slipping/stale — the honesty signal, ticking on its own so a
-          stalled worker becomes visually distinct within one lease window. */}
-      <LeaseChip lease={lease} />
-      <span
-        className="shrink-0 font-code text-[10.5px] text-ink/50"
-        title={startedAt ? `Working since ${fullDate(startedAt)}` : undefined}
-      >
-        {ageOf(startedAt)}
-      </span>
-    </button>
-  );
-}
-
-/* Parked on the queue, blocked on a human (TDM-151).
-
-   The line this whole feature is for. Until it existed, an orchestrator sitting
-   on the approval queue and one that quietly ended its turn rendered the same —
-   both just "idle" — and a real one went unnoticed until a person happened to
-   look. The three columns say the three things that distinguish them: that it IS
-   waiting, WHAT for, and SINCE WHEN, in the same verb · detail · age grid every
-   other row uses.
-
-   Deliberately NOT a button: unlike a claim, a wait points at no one task. The
-   action for a human is the approval foot at the bottom of this panel, which
-   already goes to the Board. */
+/* Parked on the queue, blocked on a human (TDM-151). Not a button: a wait points
+   at no one task — the approval bar at the top of the roster is the action. */
 function WaitingLine({ wait, agentName }: { wait: FleetWait; agentName: string }) {
-  const what = wait.scope === "epic" ? "for its batch to be approved" : "for approved work";
-  const since = ageOf(wait.since);
+  const what = wait.scope === "epic" ? "waiting for its batch to be approved" : "waiting for approved work";
   return (
     <div
       className="flex items-center gap-2 py-px"
-      title={`${agentName} is holding the queue open, waiting ${what} — since ${fullDate(wait.since)}.\nIt is blocked on you: approve something on the Board and it wakes.`}
+      title={`${agentName} is holding the queue open, ${what} — since ${fullDate(wait.since)}.\nIt is blocked on you: approve something on the Board and it wakes.`}
     >
-      <span className="w-[52px] shrink-0 text-[11px] text-amber-600 dark:text-amber-400">
-        waiting
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink/60">{what}</span>
-      <span className="shrink-0 font-code text-[10.5px] text-ink/50">
-        {/* Same right-hand "how long" column as every other row. */}
+      <span className="min-w-0 flex-1 truncate text-[12px] text-state-proposed">{what}</span>
+      <span className="shrink-0 font-code text-[11px] text-ink/50">
         <span className="sr-only">waiting for </span>
-        {since}
+        {ageOf(wait.since)}
       </span>
     </div>
   );
@@ -998,24 +885,153 @@ function DoneLine({
 }) {
   const failed = action.state === "failed";
   const title = (action.payload as { title?: string }).title || "Untitled task";
-  const hue = failed
-    ? "text-rose-600 dark:text-rose-400"
-    : "text-emerald-600 dark:text-emerald-400";
   return (
     <button
       onClick={() => onOpen(action.id)}
       title={`${action.ticketId ? `${action.ticketId} — ` : ""}${title}\nOpen on the Board`}
       aria-label={`${agentName} ${failed ? "failed" : "finished"} ${action.ticketId ?? "a task"}, ${title}, ${ageOf(action.updatedAt)} ago. Open it on the board.`}
-      className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded-[4px] px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
     >
-      <span className="w-[52px] shrink-0 text-[11px] text-ink/55">{failed ? "failed" : "done"}</span>
+      <span className="shrink-0 text-[12px] text-ink/50">{failed ? "failed" : "finished"}</span>
       {action.ticketId && (
-        <span className={`shrink-0 font-code text-[10.5px] font-medium ${hue}`}>{action.ticketId}</span>
+        <span className={`shrink-0 font-code text-[11px] font-medium ${failed ? "text-state-failed" : "text-state-done"}`}>
+          {action.ticketId}
+        </span>
       )}
-      <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink/60">{title}</span>
-      <span className="shrink-0 font-code text-[10.5px] text-ink/50" title={fullDate(action.updatedAt)}>
+      <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/60">{title}</span>
+      <span className="w-[52px] shrink-0 text-right font-code text-[11px] text-ink/50" title={fullDate(action.updatedAt)}>
         {ageOf(action.updatedAt)}
       </span>
     </button>
+  );
+}
+
+// ── detail pane (the TDM-19 hook) ────────────────────────────────────────────
+
+/* The watched agent: identity, every claim with its recent progress log, and the
+   live-session slot. TDM-19 renders the Claude Code transcript into that slot by
+   passing `renderAgentWatch` from App; until then it shows a placeholder. */
+function AgentDetail({
+  agent,
+  claims,
+  now,
+  onClose,
+  onOpenTask,
+  renderAgentWatch,
+}: {
+  agent: FleetAgent;
+  claims: LiveClaim[];
+  now: number;
+  onClose: () => void;
+  onOpenTask: (taskId: string) => void;
+  renderAgentWatch?: (agent: FleetAgent) => ReactNode;
+}) {
+  const vendor = vendorOf(agent);
+  return (
+    <aside
+      aria-label={`${agent.name} detail`}
+      className="flex min-h-0 w-full min-w-0 flex-col border-ink/10 bg-paper sm:w-[min(460px,45%)] sm:border-l"
+    >
+      <header className="flex shrink-0 items-center gap-2 border-b border-ink/10 px-3 py-2.5 sm:px-4">
+        <button
+          onClick={onClose}
+          aria-label="Back to the roster"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink/50 transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:hidden"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-code text-[13px] font-medium text-ink" title={agent.name}>
+            {agent.name}
+          </p>
+          <p className="mt-0.5 flex min-w-0 items-center gap-2 text-[11.5px] text-ink/50">
+            {agent.role && <span className="shrink-0">{agent.role}</span>}
+            <span title={vendor.title} className={`min-w-0 truncate rounded-sm px-1 py-px font-code text-[10.5px] ${VENDOR_CLS[vendor.kind]}`}>
+              {vendor.label}
+            </span>
+            <span className="shrink-0 font-code" title={agent.lastActivityAt ? fullDate(agent.lastActivityAt) : undefined}>
+              active {ageOf(agent.lastActivityAt)} ago
+            </span>
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close agent detail"
+          className="hidden h-7 w-7 shrink-0 items-center justify-center rounded text-ink/45 transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:flex"
+        >
+          <X size={15} />
+        </button>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <section className="shrink-0 border-b border-ink/10 px-3 py-3 sm:px-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
+            Holding {claims.length > 0 ? claims.length : ""}
+          </h3>
+          {claims.length === 0 ? (
+            <p className="mt-1.5 text-[12.5px] text-ink/55">
+              {agent.waiting ? "Nothing — parked on the queue, waiting for approved work." : "No claims right now."}
+            </p>
+          ) : (
+            <ul className="mt-1.5 flex flex-col gap-3">
+              {claims.map((c) => {
+                const lease = deriveLease(c.action, now);
+                const log = [...c.progress]
+                  .sort((x, y) => (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))
+                  .slice(0, DETAIL_PROGRESS);
+                return (
+                  <li key={c.id} className="min-w-0">
+                    <button
+                      onClick={() => onOpenTask(c.id)}
+                      className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      title="Open on the Board"
+                    >
+                      {c.ticketId && (
+                        <span className="shrink-0 font-code text-[11px] font-medium text-state-executing">{c.ticketId}</span>
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink/85">{c.title}</span>
+                      <LeaseChip lease={lease} />
+                    </button>
+                    <p className="mt-0.5 font-code text-[11px] text-ink/45">
+                      held {ageOf(c.startedAt)}
+                      {c.startedAt ? ` · since ${fullDate(c.startedAt)}` : ""}
+                    </p>
+                    {lease.health !== "none" && (
+                      <p className={`mt-0.5 text-[11.5px] leading-snug ${lease.health === "stale" ? "text-state-proposed" : "text-ink/50"}`}>
+                        {leaseSentence(lease)}
+                      </p>
+                    )}
+                    {log.length > 0 && (
+                      <ol className="mt-1.5 flex flex-col gap-1 border-l border-ink/10 pl-2.5">
+                        {log.map((e, i) => (
+                          <li key={`${e.at}-${i}`} className="flex items-baseline gap-2">
+                            <span className="min-w-0 flex-1 text-[12px] leading-snug text-ink/70">{e.note}</span>
+                            <span className="shrink-0 font-code text-[10.5px] text-ink/40" title={fullDate(e.at)}>
+                              {ageOf(e.at)}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* TDM-19 slot: the live Claude Code transcript for this agent. */}
+        <section className="flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4" data-agent-watch-slot={agent.id}>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">Live session</h3>
+          {renderAgentWatch ? (
+            <div className="mt-1.5 flex min-h-0 flex-1 flex-col">{renderAgentWatch(agent)}</div>
+          ) : (
+            <div className="mt-1.5 rounded border border-dashed border-ink/15 px-3 py-4 text-[12.5px] leading-relaxed text-ink/50">
+              The agent's live session transcript will appear here.
+            </div>
+          )}
+        </section>
+      </div>
+    </aside>
   );
 }

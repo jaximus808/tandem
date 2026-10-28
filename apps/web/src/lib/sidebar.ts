@@ -1,14 +1,18 @@
 import type { LucideIcon } from "lucide-react";
-import { Files, Gauge, SquareKanban } from "lucide-react";
+import { Bot, Files, Gauge, SquareKanban } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Workspace navigation registry.
 
-   A canvas has three TOP-LEVEL SURFACES — different kinds of workspace, not
+   A canvas has four TOP-LEVEL SURFACES — different kinds of workspace, not
    tabs of one another:
 
      · Board      — the task kanban (epics + Proposed/Ready/Working/Done).
                     THE canonical home for tasks and agent work.
+     · Agents     — the fleet roster (TDM-17): one row per live agent, nested
+                    under its orchestrator, with every ticket it holds, its
+                    last progress line and its lease health. Was a header
+                    popover; the header now only carries a count that opens it.
      · Documents  — the tabbed document worksurface (maps, docs, sheets, …).
      · Summary    — the read-only "where does this project stand" overview
                     (epic timeline, completion stats, stale work). Derived
@@ -20,7 +24,7 @@ import { Files, Gauge, SquareKanban } from "lucide-react";
    panel), reachable from the nav's bottom slot but not a surface.
    ──────────────────────────────────────────────────────────────────────────── */
 
-export type Surface = "board" | "documents" | "summary";
+export type Surface = "board" | "agents" | "documents" | "summary";
 
 export interface SurfaceItem {
   id: Surface;
@@ -30,13 +34,14 @@ export interface SurfaceItem {
 
 export const SURFACE_ITEMS: SurfaceItem[] = [
   { id: "board", icon: SquareKanban, label: "Board" },
+  { id: "agents", icon: Bot, label: "Agents" },
   { id: "documents", icon: Files, label: "Documents" },
   { id: "summary", icon: Gauge, label: "Summary" },
 ];
 
 // Guard a persisted string back into a valid surface (unknown → null).
 export function parseSurface(v: unknown): Surface | null {
-  return v === "board" || v === "documents" || v === "summary" ? v : null;
+  return v === "board" || v === "agents" || v === "documents" || v === "summary" ? v : null;
 }
 
 /* The side panel views. "documents" is the explorer (belongs to the Documents
