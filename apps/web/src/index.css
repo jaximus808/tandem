@@ -2,27 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Theme tokens (Design System v2 — "Precision Canon", see /DESIGN.md) ─────
+/* ── Theme tokens (Design System v3 — "Tool", see /DESIGN.md) ───────────────
    Semantic colours live here as space-separated RGB channels so Tailwind's
    `rgb(var(--color-x) / <alpha-value>)` can apply any opacity (see
-   tailwind.config.js). Cool neutral ground; ONE saturated interactive hue
-   (accent, indigo). `agent` terracotta survives strictly for agent presence
-   (chips/cursors/attribution). `.dark` (set on <html> by the boot script +
-   lib/theme.ts) flips the channels. */
+   tailwind.config.js). `.dark` (set on <html> by the boot script +
+   lib/theme.ts) flips the channels.
+
+   The palette is deliberately quiet (TDM-10): neutral ground, hairline borders,
+   primary actions in ink rather than a hue, ONE desaturated blue for links /
+   focus / selection, and a closed set of muted task-state hues. Text contrast:
+   every state + accent value clears 4.5:1 on paper AND surface in its theme. */
 :root {
   --color-paper: 250 250 250; /* #FAFAFA — page ground */
   --color-surface: 255 255 255; /* #FFFFFF — cards / panels */
   --color-ink: 24 24 27; /* #18181B — text + hairlines via alpha */
-  --color-accent: 79 70 229; /* #4F46E5 — the single interactive hue */
+  --color-primary: 24 24 27; /* #18181B — primary action fill (= ink) */
+  --color-primary-fg: 250 250 250; /* #FAFAFA — text on primary */
+  --color-accent: 63 95 153; /* #3F5F99 — links, focus, selection (6.1:1) */
   --color-agent: 194 87 27; /* #C2571B — agent presence only, muted */
+
+  /* Task states — closed set, muted. Chip = /10 ground + full-strength text. */
+  --color-state-proposed: 160 103 14; /* #A0670E ochre — awaits a human */
+  --color-state-approved: 91 107 127; /* #5B6B7F slate — ready, nobody on it */
+  --color-state-executing: 43 115 133; /* #2B7385 teal — an agent holds it */
+  --color-state-done: 61 122 82; /* #3D7A52 green */
+  --color-state-failed: 178 59 55; /* #B23B37 brick */
+  --color-state-rejected: 113 113 122; /* #71717A zinc */
   color-scheme: light;
 }
 :root.dark {
   --color-paper: 10 10 11; /* #0A0A0B */
   --color-surface: 20 20 22; /* #141416 — one visible step above paper */
   --color-ink: 228 228 231; /* #E4E4E7 — cool off-white */
-  --color-accent: 99 102 241; /* #6366F1 */
+  --color-primary: 237 237 240; /* #EDEDF0 — off-white action fill */
+  --color-primary-fg: 10 10 11; /* #0A0A0B — text on primary */
+  --color-accent: 126 154 198; /* #7E9AC6 — 6.4:1 on surface */
   --color-agent: 224 122 84; /* lifted terracotta for dark contrast */
+
+  --color-state-proposed: 209 162 87; /* #D1A257 */
+  --color-state-approved: 148 163 184; /* #94A3B8 */
+  --color-state-executing: 111 178 192; /* #6FB2C0 */
+  --color-state-done: 116 184 138; /* #74B88A */
+  --color-state-failed: 227 128 122; /* #E3807A */
+  --color-state-rejected: 142 142 151; /* #8E8E97 */
   color-scheme: dark;
 }
 
@@ -376,13 +398,14 @@ body {
 
 /* A kanban card that just changed lanes (lib/useCardFlight flies a ghost clone
    across the gap; this is what the real card does when it arrives). One
-   terracotta ring that swells and fades — agent activity is terracotta
-   everywhere, so the board's own state hues stay free to mean state. Under
+   terracotta hairline ring that appears and fades — agent activity is
+   terracotta everywhere, so the board's own state hues stay free to mean
+   state. A ring, never a bloom: no blur radius (DESIGN.md bans glows). Under
    reduced motion the card simply holds a steady ring for the same window. */
 @keyframes tandem-card-land {
-  0%   { box-shadow: 0 0 0 0 rgb(var(--color-agent) / 0.55), 0 0 0 0 rgb(var(--color-agent) / 0.25); }
-  35%  { box-shadow: 0 0 0 3px rgb(var(--color-agent) / 0.35), 0 0 22px 2px rgb(var(--color-agent) / 0.28); }
-  100% { box-shadow: 0 0 0 0 rgb(var(--color-agent) / 0), 0 0 0 0 rgb(var(--color-agent) / 0); }
+  0%   { box-shadow: 0 0 0 0 rgb(var(--color-agent) / 0); }
+  20%  { box-shadow: 0 0 0 2px rgb(var(--color-agent) / 0.55); }
+  100% { box-shadow: 0 0 0 1px rgb(var(--color-agent) / 0); }
 }
 .tandem-card-land { animation: tandem-card-land 2.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
@@ -395,25 +418,25 @@ body {
 
 /* A card that just flew back to Ready because a REVIEWER sent it back
    (TDM-154/157). Same flight, same two-and-a-half seconds, different colour and
-   one extra beat: the ring is rose rather than terracotta, and the card recoils
-   a few pixels on arrival. Terracotta means "an agent moved something", which is
-   true here and beside the point — this is the one board move that is a refusal,
-   and the demo's whole punchline is that you can see it happen from across the
-   room. Under reduced motion it holds a steady rose ring and does not move. */
+   one extra beat: the ring is the failed-state brick rather than terracotta,
+   and the card recoils a few pixels on arrival. Terracotta means "an agent
+   moved something", which is true here and beside the point — this is the one
+   board move that is a refusal. Ring only, no bloom. Under reduced motion it
+   holds a steady ring and does not move. */
 @keyframes tandem-card-bounce {
-  0%   { box-shadow: 0 0 0 0 rgb(244 63 94 / 0.6), 0 0 0 0 rgb(244 63 94 / 0.3); transform: none; }
-  18%  { box-shadow: 0 0 0 3px rgb(244 63 94 / 0.45), 0 0 26px 3px rgb(244 63 94 / 0.32); transform: translateX(-4px); }
+  0%   { box-shadow: 0 0 0 0 rgb(var(--color-state-failed) / 0); transform: none; }
+  18%  { box-shadow: 0 0 0 2px rgb(var(--color-state-failed) / 0.6); transform: translateX(-4px); }
   30%  { transform: translateX(3px); }
   42%  { transform: translateX(-2px); }
   54%  { transform: none; }
-  100% { box-shadow: 0 0 0 0 rgb(244 63 94 / 0), 0 0 0 0 rgb(244 63 94 / 0); transform: none; }
+  100% { box-shadow: 0 0 0 1px rgb(var(--color-state-failed) / 0); transform: none; }
 }
 .tandem-card-bounce { animation: tandem-card-bounce 2.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .tandem-card-bounce {
     animation: none;
-    box-shadow: 0 0 0 2px rgb(244 63 94 / 0.4);
+    box-shadow: 0 0 0 2px rgb(var(--color-state-failed) / 0.4);
   }
 }
 
