@@ -258,7 +258,7 @@ The schema is `apps/api/internal/store/sqlite/schema.sql`, applied by `migrate.g
 The server version is `apps/api/VERSION`. Tagging it publishes the binaries:
 
 ```bash
-git tag v0.1.1 && git push origin v0.1.1
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 [`release.yml`](.github/workflows/release.yml) builds darwin / linux / windows × amd64 / arm64 and attaches them (plus `SHA256SUMS`) to the GitHub Release — what `up` downloads (`TANDEM_VERSION` pins one; default latest). The gateway's npm release is separate: `mcp-v*` tags, [`release-mcp-gateway.yml`](.github/workflows/release-mcp-gateway.yml).

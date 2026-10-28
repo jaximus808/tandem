@@ -61,7 +61,7 @@ export const SERVER_INSTRUCTIONS =
 
 // Keep in sync with package.json `version`. Surfaced via `--version` and the
 // MCP server's self-identification over both transports.
-export const VERSION = "3.0.0";
+export const VERSION = "3.2.0";
 
 // The LOCAL Tandem server — Tandem is a locally run tool (`tandem-mcp up`
 // starts it; the stdio server auto-starts it on first use, see up.ts). Override

@@ -1,5 +1,23 @@
 # Changelog — @jaximus/tandem-mcp
 
+## 3.2.0 — 2026-10-28
+
+Pairs with Tandem server v0.2.0 (see the root [`CHANGELOG.md`](../../CHANGELOG.md)).
+
+### Distinct agent names
+
+- **`canvas_connect` / `agent_register` now use the name the server assigns.**
+  A registration with no `name` gets `<role>-<4 chars>`. A name already held by
+  a different agent gets a suffix, so same-role subagents no longer merge
+  (TDM-22). When the server renames you, the result reports `renamedFrom`
+  and a `nameNote`, and your claims and completions run under the returned
+  `name`. On re-register the gateway sends the session's existing `agentId`, so
+  the same session refreshes its own agent and never steals another's name.
+  An older server that returns no name still gets the old default (name, else
+  role).
+- `--version` and the MCP server's self-identification report the package
+  version again (the constant had been stuck at 3.0.0).
+
 ## 3.1.1 — 2026-10-14
 
 ### Repo moved to `jaximus808/tandem`
