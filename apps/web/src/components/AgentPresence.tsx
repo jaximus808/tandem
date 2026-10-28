@@ -1,14 +1,17 @@
-import type { CanvasMode } from "../types";
+import { useMemo } from "react";
+import type { Action, CanvasMode } from "../types";
 import type { AgentEdit } from "../lib/useAgentActivity";
 import type { FleetAgent } from "../lib/api";
-import { vendorOf } from "./FleetView";
+import { activeFleetSummary, agentKey, vendorOf } from "./FleetView";
+import { useFreshnessNow } from "./Freshness";
 
 interface Props {
-  /** The ACTIVE fleet — the same rows the Agents surface lists (isActiveFleetAgent),
-   *  so the header count and the surface can never disagree. */
-  agents: FleetAgent[];
-  /** How many of them hold a claim right now. */
-  working: number;
+  /** The whole roster. The active subset, and who is working vs stalled, come
+   *  from activeFleetSummary — the same read the Agents surface lists with, so
+   *  the header count and the surface can never disagree. */
+  fleet: FleetAgent[] | undefined;
+  /** Live canvas actions: the lease on every held claim is read from these. */
+  actions: Record<string, Action> | undefined;
   edit: AgentEdit | null;
   reading: boolean;
   onJump: (mode: CanvasMode) => void;
@@ -26,6 +29,12 @@ const MODE_LABEL: Record<CanvasMode, string> = {
 
 // Avatars drawn before the stack folds the rest into "+n".
 const MAX_AVATARS = 4;
+// The lease clock. A stalled agent sends nothing, so without a tick of our own
+// it would read "working" until some unrelated push re-rendered the header.
+// Same cadence as the Agents surface.
+const TICK_MS = 30_000;
+const NO_AGENTS: FleetAgent[] = [];
+const NO_ACTIONS: Record<string, Action> = {};
 
 /**
  * Header presence (TDM-17): a compact avatar stack + count that opens the
@@ -37,13 +46,36 @@ const MAX_AVATARS = 4;
  * When an agent is mid-edit on a document, a live "editing {Mode}" chip still
  * rides beside the stack and jumps to where it's writing.
  */
-export default function AgentPresence({ agents, working, edit, reading, onJump, onOpenAgents, current }: Props) {
+export default function AgentPresence({ fleet, actions, edit, reading, onJump, onOpenAgents, current }: Props) {
+  const now = useFreshnessNow(TICK_MS);
+  const summary = useMemo(
+    () => activeFleetSummary(fleet ?? NO_AGENTS, actions ?? NO_ACTIONS, now),
+    [fleet, actions, now],
+  );
+  // Working agents lead the stack and stalled ones trail it, so when it folds
+  // into "+n" the dimmed avatars are the ones that go.
+  const agents = useMemo(() => {
+    const rank = (a: FleetAgent) => {
+      const h = summary.holds.get(agentKey(a));
+      return h === "working" ? 0 : h === "stalled" ? 2 : 1;
+    };
+    return [...summary.active].sort((x, y) => rank(x) - rank(y));
+  }, [summary]);
+
   if (agents.length === 0) return null;
+  const { working, stalled } = summary;
+  const holdOf = (a: FleetAgent) => summary.holds.get(agentKey(a));
   const showReading = !edit && reading;
   const shown = agents.slice(0, MAX_AVATARS);
   const extra = agents.length - shown.length;
   const total = agents.length;
-  const label = `${total} agent${total === 1 ? "" : "s"}${working > 0 ? ` · ${working} working` : ""}`;
+  const label = [
+    `${total} agent${total === 1 ? "" : "s"}`,
+    working > 0 && `${working} working`,
+    stalled > 0 && `${stalled} stalled`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // ZONE 2 · AMBIENT of the canvas header's collapse contract — the block
   // comment above `HEADER_DROP` in App.tsx is the whole rule; this is the one
@@ -66,7 +98,11 @@ export default function AgentPresence({ agents, working, edit, reading, onJump, 
         aria-current={current ? "page" : undefined}
         aria-label={`Open Agents — ${label}`}
         title={agents
-          .map((a) => `${a.name}${a.tasks.length > 0 ? ` — ${a.tasks.map((t) => t.ticketId ?? "task").join(", ")}` : ""}`)
+          .map((a) => {
+            const claims = summary.claims.get(agentKey(a)) ?? [];
+            const held = claims.length > 0 ? ` — ${claims.map((c) => c.ticketId ?? "task").join(", ")}` : "";
+            return `${a.name}${held}${holdOf(a) === "stalled" ? " (stalled: lease lapsed)" : ""}`;
+          })
           .join("\n")}
         className={[
           "inline-flex h-8 shrink-0 items-center gap-2 rounded px-1.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
@@ -76,17 +112,19 @@ export default function AgentPresence({ agents, working, edit, reading, onJump, 
         <span className="flex shrink-0 -space-x-1" aria-hidden="true">
           {shown.map((a) => {
             const isClaude = vendorOf(a).kind === "claude";
-            const busy = a.tasks.length > 0;
+            const hold = holdOf(a);
+            const busy = hold === "working";
             return (
               <span
-                key={a.id ?? a.name}
+                key={agentKey(a)}
                 className={`relative grid h-5 w-5 place-items-center overflow-hidden rounded-[4px] ring-2 ring-paper ${
                   isClaude ? "bg-agent" : "bg-zinc-700"
-                }`}
+                }${hold === "stalled" ? " opacity-40" : ""}`}
               >
                 <Sparkle />
                 {showReading && <span className="tandem-scan absolute inset-0" />}
-                {/* Working agents carry a state-executing tick in the corner. */}
+                {/* Working agents (a live lease) carry a state-executing tick in
+                    the corner; stalled ones (every lease lapsed) are dimmed. */}
                 {busy && (
                   <span className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-tl-[2px] bg-state-executing" />
                 )}

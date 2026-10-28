@@ -133,7 +133,7 @@ const VENDOR_CLS: Record<VendorKind, string> = {
 };
 
 /** The stable key a row is selected by. Only registered agents have one. */
-function agentKey(a: FleetAgent): string {
+export function agentKey(a: FleetAgent): string {
   return a.id ?? `claimant:${a.name}`;
 }
 
@@ -261,20 +261,56 @@ function liveClaimsOf(agent: FleetAgent, actions: Record<string, Action>): LiveC
   );
 }
 
-/** The header's read of the fleet: the active agents and how many hold a claim,
- *  by the exact rules the surface below lists them with. */
+/** What an agent holding claims is doing with them (TDM-24).
+ *    working  at least one claim's lease is still live (lib/lease: not "stale")
+ *    stalled  every claim it holds has lapsed — nobody has heard from it in a
+ *             full TTL, and the next agent to ask takes the work over
+ *  An agent holding nothing has no hold at all. */
+export type FleetHold = "working" | "stalled";
+
+function holdOf(claims: LiveClaim[], now: number): FleetHold | null {
+  if (claims.length === 0) return null;
+  return claims.some((c) => deriveLease(c.action, now).health !== "stale") ? "working" : "stalled";
+}
+
+export interface FleetSummary {
+  /** Everyone "around": holding a claim (live or lapsed), waiting, or recently active. */
+  active: FleetAgent[];
+  /** Agents with at least one live lease. */
+  working: number;
+  /** Agents whose every claim has lapsed. */
+  stalled: number;
+  /** Per-agent hold, keyed by agentKey; absent when the agent holds nothing. */
+  holds: Map<string, FleetHold>;
+  /** Live claims per agent, keyed by agentKey (every agent passed in). */
+  claims: Map<string, LiveClaim[]>;
+}
+
+/** The fleet's read of itself — the header's avatar stack + count AND the
+ *  Agents surface both come from this, so the two can never disagree. Lease
+ *  state is derived from the live `actions` at `now`, so a heartbeat landing on
+ *  a state push flips a stalled agent back to working on the next render. */
 export function activeFleetSummary(
   agents: FleetAgent[],
   actions: Record<string, Action>,
-): { active: FleetAgent[]; working: number } {
+  now: number,
+): FleetSummary {
   const active: FleetAgent[] = [];
+  const holds = new Map<string, FleetHold>();
+  const claims = new Map<string, LiveClaim[]>();
   let working = 0;
+  let stalled = 0;
   for (const a of agents) {
-    const held = liveClaimsOf(a, actions).length > 0;
-    if (held || isActiveFleetAgent(a)) active.push(a);
-    if (held) working++;
+    const key = agentKey(a);
+    const held = liveClaimsOf(a, actions);
+    claims.set(key, held);
+    const hold = holdOf(held, now);
+    if (hold) holds.set(key, hold);
+    if (hold || isActiveFleetAgent(a)) active.push(a);
+    if (hold === "working") working++;
+    else if (hold === "stalled") stalled++;
   }
-  return { active, working };
+  return { active, working, stalled, holds, claims };
 }
 
 // ── component ────────────────────────────────────────────────────────────────
@@ -308,21 +344,23 @@ export default function FleetView({
 
   const all = useMemo(() => roster?.agents ?? [], [roster]);
 
-  // Live claims per agent, recomputed on every state push.
-  const claimsByKey = useMemo(() => {
-    const m = new Map<string, LiveClaim[]>();
-    for (const a of all) m.set(agentKey(a), liveClaimsOf(a, actions));
-    return m;
-  }, [all, actions]);
-  const claimsOf = useCallback((a: FleetAgent) => claimsByKey.get(agentKey(a)) ?? [], [claimsByKey]);
+  // The one shared read (the header's too): live claims, holds and counts,
+  // recomputed on every state push and every tick of the lease clock.
+  const summary = useMemo(() => activeFleetSummary(all, actions, now), [all, actions, now]);
+  const claimsOf = useCallback((a: FleetAgent) => summary.claims.get(agentKey(a)) ?? [], [summary]);
+  const holdOfAgent = useCallback((a: FleetAgent) => summary.holds.get(agentKey(a)) ?? null, [summary]);
 
-  const isActive = useCallback(
-    (a: FleetAgent) => claimsOf(a).length > 0 || isActiveFleetAgent(a),
-    [claimsOf],
-  );
-  const active = useMemo(() => all.filter(isActive), [all, isActive]);
-  const dormant = useMemo(() => all.filter((a) => !isActive(a)), [all, isActive]);
-  const workingCount = useMemo(() => active.filter((a) => claimsOf(a).length > 0).length, [active, claimsOf]);
+  const active = summary.active;
+  const dormant = useMemo(() => {
+    const on = new Set(active);
+    return all.filter((a) => !on.has(a));
+  }, [all, active]);
+  // Stalled agents (every claim lapsed) list in their own section below
+  // everyone else, so a dead claim never reads as running work.
+  const live = useMemo(() => active.filter((a) => holdOfAgent(a) !== "stalled"), [active, holdOfAgent]);
+  const stalledList = useMemo(() => active.filter((a) => holdOfAgent(a) === "stalled"), [active, holdOfAgent]);
+  const workingCount = summary.working;
+  const stalledCount = summary.stalled;
   // Parked on the queue and holding nothing: present, blocked, and the human is
   // the blocker. Zero unless the server is holding a live wait (see FleetWait).
   const waitingCount = useMemo(
@@ -330,7 +368,7 @@ export default function FleetView({
     [active, claimsOf],
   );
   const unnamedWaiting = roster?.counts?.waitingUnattributed ?? 0;
-  const idleCount = active.length - workingCount - waitingCount;
+  const idleCount = active.length - workingCount - stalledCount - waitingCount;
 
   // "Just finished": the newest done/failed task each identity completed, taken
   // straight from canvas state we already hold — no second fetch.
@@ -351,7 +389,8 @@ export default function FleetView({
 
   // Nest executors under the parent that spawned them. An agent whose parent
   // isn't on the active roster renders at the top level rather than vanishing.
-  const tree = useMemo(() => buildTree(active), [active]);
+  const tree = useMemo(() => buildTree(live), [live]);
+  const stalledTree = useMemo(() => buildTree(stalledList), [stalledList]);
   const dormantTree = useMemo(() => buildTree(dormant), [dormant]);
 
   const watched = useMemo(
@@ -380,6 +419,7 @@ export default function FleetView({
   const rowCtx: RowCtx = {
     childrenById: tree.childrenById,
     claimsOf,
+    holdOf: holdOfAgent,
     lastDone,
     contention,
     now,
@@ -403,7 +443,8 @@ export default function FleetView({
             {active.length === 0
               ? "Nobody connected"
               : [
-                  `${workingCount} working`,
+                  workingCount > 0 && `${workingCount} working`,
+                  stalledCount > 0 && `${stalledCount} stalled`,
                   waitingCount > 0 && `${waitingCount} waiting`,
                   idleCount > 0 && `${idleCount} idle`,
                   roster?.counts && roster.counts.unregistered > 0 && `${roster.counts.unregistered} external`,
@@ -542,11 +583,35 @@ export default function FleetView({
               </button>
             </div>
           ) : (
-            <ul className="divide-y divide-ink/[0.07]">
-              {tree.roots.map((a) => (
-                <AgentRow key={agentKey(a)} agent={a} depth={0} ctx={rowCtx} />
-              ))}
-            </ul>
+            <>
+              {tree.roots.length > 0 && (
+                <ul className="divide-y divide-ink/[0.07]">
+                  {tree.roots.map((a) => (
+                    <AgentRow key={agentKey(a)} agent={a} depth={0} ctx={rowCtx} />
+                  ))}
+                </ul>
+              )}
+              {/* Holding claims nobody is working: every lease lapsed (TDM-24).
+                  Below the live fleet, each claim still carrying its warning. */}
+              {stalledTree.roots.length > 0 && (
+                <div className={tree.roots.length > 0 ? "border-t border-ink/10" : undefined}>
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-medium text-ink/55 sm:px-5">
+                    Stalled
+                    <span className="font-normal text-ink/45"> — holding claims whose lease lapsed</span>
+                  </p>
+                  <ul className="divide-y divide-ink/[0.07]">
+                    {stalledTree.roots.map((a) => (
+                      <AgentRow
+                        key={agentKey(a)}
+                        agent={a}
+                        depth={0}
+                        ctx={{ ...rowCtx, childrenById: stalledTree.childrenById }}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
 
           {/* Everyone who has registered here but isn't around right now. */}
@@ -615,6 +680,7 @@ function buildTree(list: FleetAgent[]) {
 interface RowCtx {
   childrenById: Map<string, FleetAgent[]>;
   claimsOf: (a: FleetAgent) => LiveClaim[];
+  holdOf: (a: FleetAgent) => FleetHold | null;
   lastDone: Map<string, Action>;
   contention: Map<string, ContentionTally>;
   now: number;
@@ -640,6 +706,7 @@ function AgentRow({
   const kids = depth < MAX_DEPTH && agent.id ? (ctx.childrenById.get(agent.id) ?? []) : [];
   const claims = ctx.claimsOf(agent);
   const working = claims.length > 0;
+  const stalled = ctx.holdOf(agent) === "stalled";
   const done = ctx.lastDone.get(agent.name) ?? (agent.id ? ctx.lastDone.get(agent.id) : undefined);
   // Parked on the queue long poll RIGHT NOW (TDM-151) — ranks below a claim.
   const waiting = !working ? agent.waiting : undefined;
@@ -649,7 +716,7 @@ function AgentRow({
 
   const identity = (
     <>
-      <StatusDot working={working} waiting={!!waiting} done={!working && !waiting ? done : undefined} dormant={dormant} />
+      <StatusDot working={working && !stalled} stalled={stalled} waiting={!!waiting} done={!working && !waiting ? done : undefined} dormant={dormant} />
       <span className="min-w-0 truncate font-code text-[12.5px] font-medium text-ink" title={agent.name}>
         {agent.name}
       </span>
@@ -827,17 +894,21 @@ function ContentionCount({ tally, name }: { tally: ContentionTally; name: string
 
 function StatusDot({
   working,
+  stalled = false,
   waiting,
   done,
   dormant,
 }: {
   working: boolean;
+  stalled?: boolean;
   waiting: boolean;
   done?: Action;
   dormant: boolean;
 }) {
   // Working and waiting are the two live states this surface lets breathe.
   if (working) return <span aria-hidden="true" className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-state-executing" />;
+  // Stalled holds claims but nothing is moving — so it does NOT breathe.
+  if (stalled) return <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full border border-state-proposed" />;
   if (waiting) return <span aria-hidden="true" className="tandem-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-state-proposed" />;
   if (done) {
     return (

@@ -35,7 +35,7 @@ import AccountMenu from "./components/AccountMenu";
 import AgentCursor from "./components/AgentCursor";
 import AgentPresence from "./components/AgentPresence";
 import FollowControl from "./components/FollowControl";
-import FleetView, { activeFleetSummary } from "./components/FleetView";
+import FleetView from "./components/FleetView";
 import AgentWatch from "./components/AgentWatch";
 import NotificationBell from "./components/NotificationBell";
 import AgentToasts from "./components/AgentToasts";
@@ -1004,10 +1004,6 @@ export default function App() {
     surface === "agents",
     Object.keys(canvasState?.agents ?? {}).length,
   );
-  const fleetSummary = useMemo(
-    () => activeFleetSummary(fleet.roster?.agents ?? [], canvasState?.actions ?? {}),
-    [fleet.roster, canvasState?.actions],
-  );
   // Another canvas's agent ids mean nothing here.
   useEffect(() => setWatchedAgentId(null), [canvas?.code]);
 
@@ -1666,8 +1662,10 @@ export default function App() {
               what makes clipping it safe. Ladder rank 5 (below sm) lives there
               too. */}
           <AgentPresence
-            agents={fleetSummary.active}
-            working={fleetSummary.working}
+            // The header derives working / stalled itself (activeFleetSummary,
+            // on its own lease clock) so App doesn't re-render every tick.
+            fleet={fleet.roster?.agents}
+            actions={canvasState?.actions}
             edit={agentEdit}
             reading={agentReading}
             // Jumping to the agent means watching it edit documents — make
