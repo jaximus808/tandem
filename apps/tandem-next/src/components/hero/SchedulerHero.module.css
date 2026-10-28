@@ -1,0 +1,566 @@
+/* SchedulerHero — tokens, header strip, separate windows, flights.
+   Each pane is its own small window on the page's dark ground. Dark is the
+   native scene (long sessions, dim rooms); light is a real override. Every
+   colour is a variable on .root; sizing responds to the container. */
+
+.root {
+  --sh-panel: #141417;
+  --sh-edge: rgba(255, 255, 255, 0.09);
+  --sh-line: rgba(255, 255, 255, 0.06);
+  --sh-fg: #e7e7ea;
+  --sh-mid: #a2a2aa;
+  --sh-mute: #6e6e77;
+  --sh-dim: #4a4a52;
+  --sh-blue: #6d8df8;
+  --sh-green: #5fbf8a;
+  --sh-violet: #a98bf5;
+  --sh-teal: #5cb8c4;
+  --sh-rose: #dd8aa6;
+  --sh-clay: #e0956f;
+  --sh-amber: #d2a553;
+  --sh-shadow: 0 18px 44px -30px rgba(0, 0, 0, 0.7);
+  --sh-font: var(--font-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sh-size: 12px;
+  --sh-small: 10.5px;
+  --sh-pad: 14px;
+  --sh-gap: 14px;
+
+  width: 100%;
+  container-type: inline-size;
+  text-align: left;
+  color: var(--sh-fg);
+  font-family: var(--sh-font);
+  font-size: var(--sh-size);
+  line-height: 1.8;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-color-scheme: light) {
+  .root {
+    --sh-panel: #ffffff;
+    --sh-edge: rgba(0, 0, 0, 0.11);
+    --sh-line: rgba(0, 0, 0, 0.07);
+    --sh-fg: #1b1c1f;
+    --sh-mid: #4b4c52;
+    --sh-mute: #7d7e86;
+    --sh-dim: #b4b5bc;
+    --sh-blue: #3b5bdb;
+    --sh-green: #2b8a57;
+    --sh-violet: #6f47e0;
+    --sh-teal: #1f8a99;
+    --sh-rose: #b5456c;
+    --sh-clay: #b4582f;
+    --sh-amber: #b07a1a;
+    --sh-shadow: 0 18px 40px -30px rgba(20, 20, 30, 0.35);
+  }
+}
+
+.tone_blue {
+  --lc: var(--sh-blue);
+}
+.tone_green {
+  --lc: var(--sh-green);
+}
+.tone_violet {
+  --lc: var(--sh-violet);
+}
+.tone_teal {
+  --lc: var(--sh-teal);
+}
+.tone_rose {
+  --lc: var(--sh-rose);
+}
+.tone_clay {
+  --lc: var(--sh-clay);
+}
+
+/* ---- header strip (no box: just a line of status above the windows) ----- */
+
+.strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 28px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+  color: var(--sh-mute);
+  font-size: var(--sh-small);
+}
+.stripLeft,
+.stripRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.stripMark {
+  width: 15px;
+  height: 15px;
+  color: var(--sh-mid);
+}
+.stripName {
+  color: var(--sh-mid);
+}
+.stripSep {
+  color: var(--sh-dim);
+}
+.stripEpic {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.liveOn,
+.liveOff {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sh-green);
+  margin-right: -2px;
+}
+.liveOff {
+  background: var(--sh-dim);
+}
+.stat {
+  color: var(--sh-mute);
+  font-variant-numeric: tabular-nums;
+}
+.statRefused {
+  color: var(--sh-amber);
+  font-variant-numeric: tabular-nums;
+}
+.chip {
+  padding: 0 6px;
+  border: 1px solid var(--sh-edge);
+  border-radius: 4px;
+  color: var(--sh-mute);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+/* ---- stage: orchestrator window | worker windows ------------------------ */
+
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  gap: var(--sh-gap);
+  /* Height follows the viewport so the headline and both buttons stay above
+     a laptop fold; the page's other fold content is ~400px. */
+  height: clamp(250px, calc(100svh - 410px), 400px);
+  min-height: 0;
+}
+
+.win {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 10px var(--sh-pad) 12px;
+  background: var(--sh-panel);
+  border: 1px solid var(--sh-edge);
+  border-radius: 8px;
+  box-shadow: var(--sh-shadow);
+  contain: content;
+}
+.winHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  height: 22px;
+  margin-bottom: 6px;
+  font-size: var(--sh-small);
+  flex: none;
+  white-space: nowrap;
+}
+.winName {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sh-mid);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.winId {
+  margin-left: -1px;
+  color: var(--sh-dim);
+  font-variant-numeric: tabular-nums;
+}
+.winCur {
+  color: var(--sh-dim);
+  font-variant-numeric: tabular-nums;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lc);
+  flex: none;
+}
+.orchDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--sh-mid);
+  flex: none;
+}
+
+/* the orchestrator: a continuous log, bottom-anchored, faded at the top */
+.log {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 56px, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 56px, #000 100%);
+}
+
+/* worker windows: compact, top-anchored, a few lines each */
+.tiles {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: auto;
+  align-content: start;
+  gap: var(--sh-gap);
+  min-height: 0;
+  min-width: 0;
+}
+.tiles[data-n="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.tile {
+  min-height: calc(22px + 6px + 2 * 1.8em + 22px);
+  transition: transform 420ms cubic-bezier(0.2, 0.7, 0.1, 1), opacity 500ms ease, box-shadow 300ms ease;
+  will-change: transform;
+}
+.lines {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.tileIn {
+  animation: tileIn 320ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards, arrive 900ms ease-out 850ms backwards;
+}
+.tileOut {
+  opacity: 0.3;
+}
+.tileOut .winName,
+.tileOut .winCur {
+  color: var(--sh-dim);
+}
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 12px var(--sh-pad);
+  border: 1px dashed var(--sh-edge);
+  border-radius: 8px;
+  color: var(--sh-dim);
+  font-size: var(--sh-small);
+  text-align: center;
+}
+
+/* ---- dispatch flights ----------------------------------------------------- */
+
+.wires {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.wire {
+  fill: none;
+  stroke: var(--lc);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.85;
+  animation: wireDraw 420ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards, wireFade 300ms ease-out 1050ms forwards;
+}
+.pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--lc);
+  border-radius: 999px;
+  background: var(--sh-panel);
+  color: var(--lc);
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  offset-rotate: 0deg;
+  offset-anchor: 100% 50%;
+  offset-distance: 0%;
+  animation: ride 760ms cubic-bezier(0.45, 0, 0.2, 1) 120ms both, pillFade 240ms ease-out 1000ms forwards;
+  will-change: offset-distance;
+}
+.pillMark {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---- lines ---------------------------------------------------------------- */
+
+/* marker column + text column; a tool name never breaks, an argument or
+   result wraps at spaces under a hanging indent */
+.line {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1.6ch minmax(0, 1fr);
+  align-items: baseline;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border-radius: 4px;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.text {
+  min-width: 0;
+}
+.ref {
+  white-space: nowrap;
+}
+.fresh {
+  animation: lineIn 240ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.user {
+  color: var(--sh-fg);
+  margin-top: 8px;
+}
+.user:first-child {
+  margin-top: 0;
+}
+.prompt {
+  color: var(--sh-mute);
+}
+
+.call {
+  color: var(--sh-fg);
+}
+.call + .call,
+.result + .call,
+.say + .call,
+.human + .call,
+.user + .call,
+.result + .say,
+.call + .say,
+.result + .human {
+  margin-top: 2px;
+}
+.bullet {
+  color: var(--lc, var(--sh-mid));
+  font-size: 0.78em;
+  transform: translateY(-0.06em);
+}
+.tool {
+  color: var(--sh-fg);
+  white-space: nowrap;
+}
+.dispatch .tool {
+  color: var(--lc);
+}
+.arg {
+  color: var(--sh-mid);
+}
+
+.result {
+  color: var(--sh-mute);
+  padding-left: calc(1.6ch + 6px);
+}
+.elbow {
+  color: var(--sh-dim);
+}
+.res_win {
+  color: var(--sh-fg);
+}
+.res_win .elbow {
+  color: var(--lc, var(--sh-mid));
+}
+.res_lose,
+.res_lose .elbow {
+  color: var(--sh-amber);
+}
+.res_dim {
+  color: var(--sh-dim);
+}
+.raceLose {
+  animation: lineIn 240ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards, raceLose 1800ms ease-out;
+}
+
+.say {
+  color: var(--sh-mid);
+}
+.sayDot {
+  color: var(--sh-dim);
+  font-size: 0.78em;
+  transform: translateY(-0.06em);
+}
+
+.human {
+  color: var(--sh-fg);
+  margin-top: 2px;
+  animation: lineIn 240ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards, humanIn 2400ms ease-out;
+}
+.check {
+  color: var(--sh-green);
+}
+
+/* ---- keyframes ----------------------------------------------------------- */
+
+@keyframes lineIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes arrive {
+  0% {
+    box-shadow: var(--sh-shadow), 0 0 0 1px color-mix(in srgb, var(--lc) 70%, transparent);
+  }
+  100% {
+    box-shadow: var(--sh-shadow), 0 0 0 1px transparent;
+  }
+}
+@keyframes wireDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes wireFade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ride {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+@keyframes pillFade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes raceLose {
+  0% {
+    background: color-mix(in srgb, var(--sh-amber) 22%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@keyframes humanIn {
+  0%,
+  30% {
+    background: color-mix(in srgb, var(--sh-fg) 10%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* ---- responsive ---------------------------------------------------------- */
+
+/* laptop fold: the hero renders at ~820px wide */
+@container (max-width: 960px) {
+  .root {
+    --sh-size: 11.5px;
+    --sh-small: 10.5px;
+    --sh-pad: 12px;
+    --sh-gap: 10px;
+  }
+  .win {
+    padding: 8px var(--sh-pad) 10px;
+  }
+  .log {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 100%);
+  }
+}
+
+/* phone: orchestrator on top, then a 2-column mini tiling; no flights */
+@container (max-width: 699px) {
+  .root {
+    --sh-size: 12px;
+    --sh-small: 11px;
+    --sh-pad: 14px;
+    --sh-gap: 10px;
+  }
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .hideSm {
+    display: none;
+  }
+  .log {
+    flex: none;
+    height: calc(8 * 1.8em);
+  }
+  .tiles,
+  .tiles[data-n="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tile .lines {
+    max-height: calc(3 * 1.8em);
+  }
+  .wires,
+  .pill {
+    display: none;
+  }
+  .empty {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- reduced motion: a still, meaningful frame --------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .fresh,
+  .tileIn,
+  .raceLose,
+  .human,
+  .wire,
+  .pill {
+    animation: none;
+  }
+  .tile {
+    transition: none;
+  }
+}
