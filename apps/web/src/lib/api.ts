@@ -653,6 +653,46 @@ export async function rejectAction(code: string, id: string, reason?: string): P
   );
 }
 
+/** One id's outcome in rejectBatch, in input order (deduped server-side). */
+export type RejectBatchResult = {
+  id: string;
+  ticketId?: string;
+  /** "rejected" = moved by THIS call; "unchanged" = already rejected (a retry);
+   *  "refused" = see `error`. */
+  outcome: "rejected" | "unchanged" | "refused";
+  /** The state it was rejected out of, on "rejected". */
+  from?: string;
+  /** Its state after the call (absent when it was not found). */
+  state?: string;
+  /** On "refused": invalid_id, not_found, reject_not_task, reject_claimed,
+   *  reject_finished, reject_illegal_state, reject_failed. */
+  error?: string;
+  message?: string;
+  /** On reject_claimed: who got there first. */
+  claimedBy?: string;
+};
+
+// Bulk reject (TDM-14 / TDM-15): many TASKS in ONE request, proposed OR approved
+// (the ready queue), one shared reason, one broadcast. Each id is judged on its
+// own with the conditional write, so a ticket an agent claimed between the
+// board's render and this request comes back `refused` / reject_claimed rather
+// than being dragged out of 'executing'. 200 whenever the request was
+// well-formed — even if every id was refused — so the per-id `results` are the
+// answer, not the status code. Human-only, like every reject.
+export async function rejectBatch(
+  code: string,
+  ids: string[],
+  reason?: string,
+): Promise<{ rejected: string[]; results: RejectBatchResult[] }> {
+  const res = await authedFetch(
+    code,
+    "/api/canvas/actions/reject-batch",
+    { method: "POST", body: { ids, reason: reason?.trim() || undefined } },
+    "Could not reject tasks",
+  );
+  return (await res.json()) as { rejected: string[]; results: RejectBatchResult[] };
+}
+
 // Take ownership of an unowned (agent-created) canvas using its private claim
 // token. Unlike copyCanvas this transfers THE canvas itself — the same one the
 // agent keeps editing — and the API voids the token on success (single-use).
