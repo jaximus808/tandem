@@ -102,7 +102,7 @@ export default function SettingsPanel({
         <button
           onClick={onClose}
           title="Hide settings"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-ink/35 transition-colors hover:bg-ink/5 hover:text-ink/60"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-ink/35 transition-colors hover:bg-ink/5 hover:text-ink/60"
         >
           <ChevronsLeft size={16} strokeWidth={1.75} />
         </button>
@@ -134,7 +134,7 @@ export default function SettingsPanel({
               Approval gate
             </p>
             <span
-              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+              className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${
                 loose ? "bg-ink/10 text-ink/70" : "bg-ink/[0.06] text-ink/50"
               }`}
             >
@@ -198,14 +198,14 @@ export default function SettingsPanel({
             </p>
             <button
               onClick={() => setWebhooksOpen(true)}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-ink/15 px-3 py-1.5 text-[12px] font-medium text-ink/70 transition-colors hover:border-ink/40 hover:bg-paper"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-ink/15 px-3 py-1.5 text-[12px] font-medium text-ink/70 transition-colors hover:border-ink/40 hover:bg-paper"
             >
               <Webhook className="h-3.5 w-3.5" />
               {summary && summary.count > 0
                 ? `Manage ${summary.count} endpoint${summary.count === 1 ? "" : "s"}`
                 : "Add an endpoint"}
               {summary && summary.failed > 0 && (
-                <span className="ml-0.5 rounded-full bg-rose-500/15 px-1.5 py-0.5 font-code text-[10px] leading-none text-rose-600 dark:text-rose-400">
+                <span className="ml-0.5 rounded-sm bg-state-failed/10 px-1.5 py-0.5 font-code text-[10px] leading-none text-state-failed">
                   {summary.failed} failed
                 </span>
               )}
@@ -224,7 +224,7 @@ export default function SettingsPanel({
               </p>
               <button
                 onClick={() => setConfirming(true)}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-state-failed/25 px-3 py-1.5 text-[12px] font-medium text-state-failed transition-colors hover:bg-state-failed/10"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete canvas

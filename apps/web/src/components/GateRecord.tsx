@@ -90,7 +90,7 @@ export function GateRecord({ gate }: { gate: GateMetrics }) {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink/40">
           Pre-work intervention
         </p>
-        <span className="rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-ink/50">
+        <span className="rounded-sm bg-ink/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-ink/50">
           {gate.windowDays}d
         </span>
       </div>
@@ -180,7 +180,7 @@ export function GateRecordDisclosure({ code }: { code: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="tandem-fade-in absolute left-0 z-40 mt-1.5 max-h-[70vh] w-[21rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-lg border border-ink/10 bg-surface p-4 shadow-lg">
+          <div className="tandem-fade-in absolute left-0 z-40 mt-1.5 max-h-[70vh] w-[21rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-ink/10 bg-surface p-4 shadow-lg">
             {gate ? (
               <GateRecord gate={gate} />
             ) : (

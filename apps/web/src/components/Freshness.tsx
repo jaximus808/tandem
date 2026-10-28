@@ -59,13 +59,13 @@ export function useFreshnessNow(intervalMs = 60_000): number {
 type Tone = { well: string; dot: string; text: string };
 
 const TONE: Record<Exclude<Freshness, "unknown">, Tone> = {
-  fresh: { well: "", dot: "bg-emerald-500", text: "text-ink/40" },
+  fresh: { well: "", dot: "bg-state-done", text: "text-ink/40" },
   aging: {
     well: "",
-    dot: "border border-amber-500 bg-transparent",
-    text: "text-amber-600 dark:text-amber-400",
+    dot: "border border-state-proposed bg-transparent",
+    text: "text-state-proposed",
   },
-  stale: { well: "bg-rose-500/10", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
+  stale: { well: "bg-state-failed/10", dot: "bg-state-failed", text: "text-state-failed" },
 };
 
 export function FreshnessChip({
@@ -93,7 +93,7 @@ export function FreshnessChip({
     <span
       title={sentence}
       className={[
-        "inline-flex shrink-0 items-center gap-1 rounded-[4px] align-middle",
+        "inline-flex shrink-0 items-center gap-1 rounded align-middle",
         variant === "chip" ? "px-1.5 py-px" : "",
         tone.well,
         className,
@@ -218,7 +218,7 @@ export function VerifyControl({
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className="absolute right-0 top-full z-40 mt-1 w-60 overflow-hidden rounded-lg border border-ink/10 bg-surface py-1 text-left shadow-lg"
+            className="absolute right-0 top-full z-40 mt-1 w-60 overflow-hidden rounded-md border border-ink/10 bg-surface py-1 text-left shadow-lg"
           >
             <div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-ink/45">
               Verify · goes stale after
@@ -252,7 +252,7 @@ export function VerifyControl({
                     setOpen(false);
                   }}
                   title={`Currently: ${shelfLifeLabel(shelfLife)}`}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-ink/60 hover:bg-ink/5 hover:text-rose-600 dark:hover:text-rose-400"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-ink/60 hover:bg-ink/5 hover:text-state-failed"
                 >
                   <span className="w-3 shrink-0" />
                   Clear verification

@@ -42,10 +42,10 @@ export default function DeleteAccountModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-account-title"
-        className="relative w-full max-w-md rounded-[10px] border border-ink/10 bg-surface p-6 shadow-lg"
+        className="relative w-full max-w-md rounded-md border border-ink/10 bg-surface p-6 shadow-lg"
       >
         <div className="flex items-start gap-3.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-state-failed/10 text-state-failed">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -62,7 +62,7 @@ export default function DeleteAccountModal({
 
         <label className="mt-5 block">
           <span className="text-xs font-medium text-ink/60">
-            Type <span className="font-code font-semibold text-rose-600 dark:text-rose-400">{CONFIRM_WORD}</span> to
+            Type <span className="font-code font-semibold text-state-failed">{CONFIRM_WORD}</span> to
             confirm
           </span>
           <input
@@ -77,12 +77,12 @@ export default function DeleteAccountModal({
             autoComplete="off"
             spellCheck={false}
             placeholder={CONFIRM_WORD}
-            className="mt-1.5 w-full rounded-md border border-ink/15 bg-paper px-3 py-2 font-code text-sm text-ink placeholder:text-ink/25 focus:border-rose-500/50 focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-1.5 w-full rounded-md border border-ink/15 bg-paper px-3 py-2 font-code text-sm text-ink placeholder:text-ink/25 focus:border-state-failed/50 focus:outline-none focus:ring-2 focus:ring-state-failed/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
         {error && (
-          <p className="mt-4 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-600 dark:text-rose-400">
+          <p className="mt-4 rounded-md border border-state-failed/20 bg-state-failed/10 px-3 py-2 text-sm text-state-failed">
             {error}
           </p>
         )}
@@ -98,7 +98,7 @@ export default function DeleteAccountModal({
           <button
             onClick={onConfirm}
             disabled={!armed || deleting}
-            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-md bg-state-failed px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-state-failed/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
             {deleting ? "Deleting…" : "Delete account"}

@@ -100,11 +100,11 @@ export default function WelcomeMode({
           {docCount > 0 && (
             <button
               onClick={onOpenAll}
-              className="group inline-flex items-center gap-3 rounded-md bg-accent px-6 py-3.5 text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
+              className="group inline-flex items-center gap-3 rounded-md bg-primary px-6 py-3.5 text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
             >
               <Layers size={20} className="opacity-90" />
               <span className="text-base font-semibold tracking-tight">Open all tabs</span>
-              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium text-white/85">
+              <span className="rounded-sm bg-primary-fg/15 px-2 py-0.5 text-[11px] font-medium text-primary-fg/85">
                 {docCount} doc{docCount === 1 ? "" : "s"}
               </span>
             </button>
@@ -150,7 +150,7 @@ export default function WelcomeMode({
             <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-ink/50">
               More prompts to start
             </h2>
-            <ul className="overflow-hidden rounded-lg border border-ink/10 bg-surface">
+            <ul className="overflow-hidden rounded-md border border-ink/10 bg-surface">
               {STARTER_PROMPTS.map((p, idx) => (
                 <li
                   key={idx}
@@ -164,7 +164,7 @@ export default function WelcomeMode({
                   </span>
                   <button
                     onClick={() => copyPrompt(p, `prompt:${idx}`)}
-                    className="shrink-0 rounded-[4px] border border-ink/10 px-2 py-1 text-[10px] font-medium text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                    className="shrink-0 rounded border border-ink/10 px-2 py-1 text-[10px] font-medium text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     {copied === `prompt:${idx}` ? "copied ✓" : "copy"}
                   </button>
@@ -178,14 +178,14 @@ export default function WelcomeMode({
               Recent canvases
             </h2>
             {recents.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-ink/15 bg-surface/50 px-4 py-6 text-center">
+              <div className="rounded-md border border-dashed border-ink/15 bg-surface/50 px-4 py-6 text-center">
                 <Clock size={16} className="mx-auto mb-2 text-ink/25" />
                 <p className="text-[12px] leading-relaxed text-ink/45">
                   Canvases you open show up here for quick re-entry.
                 </p>
               </div>
             ) : (
-              <ul className="overflow-hidden rounded-lg border border-ink/10 bg-surface">
+              <ul className="overflow-hidden rounded-md border border-ink/10 bg-surface">
                 {recents.map((c, idx) => (
                   <li key={c.code} className={idx > 0 ? "border-t border-ink/10" : ""}>
                     <button
@@ -236,7 +236,7 @@ function CapabilityCard({
     <button
       onClick={onCopy}
       title="Copy this prompt"
-      className="group relative flex flex-col rounded-lg border border-ink/10 bg-surface p-4 text-left transition-all hover:border-ink/20 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      className="group relative flex flex-col rounded-md border border-ink/10 bg-surface p-4 text-left transition-all hover:border-ink/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       <div className="font-medium text-ink">{cap.title}</div>
       <div className="mt-2 text-xs leading-relaxed text-ink/55">{cap.blurb}</div>

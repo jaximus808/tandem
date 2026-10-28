@@ -357,7 +357,7 @@ const CONNECTOR_URL = "https://tandemcanvas.com/api/mcp";
 
 function StepNum({ children }: { children: string }) {
   return (
-    <span className="shrink-0 grid place-items-center h-6 w-6 rounded-full bg-sky-600 text-white text-xs font-semibold font-code">
+    <span className="shrink-0 grid place-items-center h-6 w-6 rounded bg-ink/[0.06] text-ink/70 text-xs font-semibold font-code">
       {children}
     </span>
   );
@@ -378,7 +378,7 @@ function CodeBlock({
     <div className="relative">
       {/* Dark terminal block — bg-ink/text-paper invert with the theme, matching
           the ConnectModal <pre> idiom (dark slab in light mode, light slab in dark). */}
-      <pre className="bg-ink text-paper text-xs rounded-lg px-4 py-3 overflow-x-auto whitespace-pre">
+      <pre className="bg-ink text-paper text-xs rounded-md px-4 py-3 overflow-x-auto whitespace-pre">
 {code}
       </pre>
       <button
@@ -395,7 +395,7 @@ function CodeBlock({
 // since it's the top-level choice.
 function pathPill(active: boolean): string {
   return [
-    "px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
+    "px-4 py-2 rounded-md text-sm font-semibold transition-colors",
     active
       ? "bg-ink text-paper"
       : "bg-surface border border-ink/15 text-ink/60 hover:bg-ink/5",
@@ -459,7 +459,7 @@ export default function MCPSupport({
               href="https://modelcontextprotocol.io"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sky-600 underline hover:text-sky-700"
+              className="text-accent underline hover:text-accent/80"
             >
               Model Context Protocol
             </a>{" "}
@@ -507,7 +507,7 @@ export default function MCPSupport({
               </p>
             </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-sky-200/70 bg-surface p-6 sm:p-8 dark:border-sky-800/50">
+          <div className="relative overflow-hidden rounded-md border border-ink/10 bg-surface p-6 sm:p-8">
             <ol className="relative space-y-4">
               <li className="flex gap-3">
                 <StepNum>1</StepNum>
@@ -530,7 +530,7 @@ export default function MCPSupport({
                     Paste this URL — leave the OAuth fields blank — and hit{" "}
                     <span className="font-medium text-ink">Add</span>:
                   </p>
-                  <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-surface py-1.5 pl-3 pr-1.5">
+                  <div className="flex items-center gap-2 rounded-md border border-ink/15 bg-surface py-1.5 pl-3 pr-1.5">
                     <span className="flex-1 truncate font-code text-sm text-ink">
                       {CONNECTOR_URL}
                     </span>
@@ -549,7 +549,7 @@ export default function MCPSupport({
                   Enable Tandem in a chat from the{" "}
                   <span className="font-medium text-ink">+</span> menu, then
                   tell Claude{" "}
-                  <span className="font-code text-xs text-sky-700">
+                  <span className="font-code text-xs text-ink">
                     connect to canvas TOKYO7X3K
                   </span>
                   . It binds to that canvas and edits it live — same as any other
@@ -561,7 +561,7 @@ export default function MCPSupport({
 
           {/* Auth explainer — the OAuth step-up model. Fixed-sky "tip" island,
               same idiom as the multi-agent callout below. */}
-          <div className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">
+          <div className="rounded-md border border-ink/10 bg-ink/[0.03] p-4 text-sm leading-relaxed text-ink/70">
             <span className="font-semibold">Signing in is only asked for when it's needed.</span>{" "}
             Public canvases connect with no sign-in at all — leaving the OAuth
             fields blank in step 2 is correct. The first time you point Claude at
@@ -573,7 +573,7 @@ export default function MCPSupport({
             time under{" "}
             <button
               onClick={onShowSettings}
-              className="font-semibold underline underline-offset-2 hover:text-sky-700"
+              className="font-semibold text-accent underline underline-offset-2 hover:text-accent/80"
             >
               Settings → Connected apps
             </button>
@@ -600,7 +600,7 @@ export default function MCPSupport({
           <div>
             <h3 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-ink">
               Connect by URL
-              <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">
+              <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-sm bg-ink/[0.06] text-ink/70">
                 Recommended
               </span>
             </h3>
@@ -611,7 +611,7 @@ export default function MCPSupport({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-surface py-1.5 pl-3 pr-1.5">
+          <div className="flex items-center gap-2 rounded-md border border-ink/15 bg-surface py-1.5 pl-3 pr-1.5">
             <span className="flex-1 truncate font-code text-sm text-ink">
               {CONNECTOR_URL}
             </span>
@@ -640,7 +640,7 @@ export default function MCPSupport({
             ))}
           </div>
 
-          <div className="bg-surface border border-ink/15 rounded-xl p-4 space-y-3">
+          <div className="bg-surface border border-ink/15 rounded-md p-4 space-y-3">
             <p className="text-sm text-ink/60">{activeRemote.blurb}</p>
             <CodeBlock
               code={activeRemote.config}
@@ -655,7 +655,7 @@ export default function MCPSupport({
           </p>
 
           {/* Auth note for the remote path — same OAuth step-up as the connector. */}
-          <div className="rounded-lg border border-ink/10 bg-ink/[0.03] p-3 text-xs leading-relaxed text-ink/60">
+          <div className="rounded-md border border-ink/10 bg-ink/[0.03] p-3 text-xs leading-relaxed text-ink/60">
             <span className="font-semibold text-ink/70">Auth:</span> same as the
             Claude connector — public canvases connect anonymously, and the first
             time you connect to a private or shared canvas the client runs the
@@ -685,7 +685,7 @@ export default function MCPSupport({
             </div>
 
             {/* Auth note for stdio — this path does NOT use OAuth. */}
-            <div className="rounded-lg border border-ink/10 bg-ink/[0.03] p-3 text-xs leading-relaxed text-ink/60">
+            <div className="rounded-md border border-ink/10 bg-ink/[0.03] p-3 text-xs leading-relaxed text-ink/60">
               <span className="font-semibold text-ink/70">Auth is different here:</span>{" "}
               the local gateway doesn't do the OAuth browser flow. Without a
               credential it can only reach public canvases. To let the agent act
@@ -734,7 +734,7 @@ export default function MCPSupport({
                       m.badge === "Recommended"
                         ? installTab === m.id
                           ? "bg-paper/15 text-paper"
-                          : "bg-sky-100 text-sky-700"
+                          : "bg-ink/[0.06] text-ink/70"
                         : installTab === m.id
                           ? "bg-paper/15 text-paper/90"
                           : "bg-ink/10 text-ink/50",
@@ -747,7 +747,7 @@ export default function MCPSupport({
             ))}
           </div>
 
-          <div className="bg-surface border border-ink/15 rounded-xl p-4 space-y-4">
+          <div className="bg-surface border border-ink/15 rounded-md p-4 space-y-4">
             <p className="text-sm text-ink/60">{activeInstall.blurb}</p>
             {activeInstall.steps.map((step, i) => (
               <div key={i} className="space-y-2">
@@ -798,7 +798,7 @@ export default function MCPSupport({
             ))}
           </div>
 
-          <div className="bg-surface border border-ink/15 rounded-xl p-4 space-y-3">
+          <div className="bg-surface border border-ink/15 rounded-md p-4 space-y-3">
             <p className="text-sm text-ink/60">{activeClient.blurb}</p>
             <CodeBlock
               code={activeClient.config}
@@ -839,7 +839,7 @@ export default function MCPSupport({
             {TOOLS.map((group) => (
               <div
                 key={group.group}
-                className="bg-surface border border-ink/15 rounded-xl p-4"
+                className="bg-surface border border-ink/15 rounded-md p-4"
               >
                 <div className="text-xs font-semibold text-ink/50 uppercase tracking-wide mb-2">
                   {group.group}
@@ -847,7 +847,7 @@ export default function MCPSupport({
                 <ul className="space-y-2">
                   {group.items.map(([name, desc]) => (
                     <li key={name} className="text-sm">
-                      <span className="font-code text-xs text-sky-700">{name}</span>
+                      <span className="font-code text-xs text-ink">{name}</span>
                       <span className="text-ink/60"> — {desc}</span>
                     </li>
                   ))}
@@ -872,7 +872,7 @@ export default function MCPSupport({
             </p>
           </div>
 
-          <div className="bg-surface border border-ink/15 rounded-xl p-5">
+          <div className="bg-surface border border-ink/15 rounded-md p-5">
             <ol className="space-y-4 text-sm text-ink/70">
               <li>
                 <div className="font-semibold text-ink">1. Scout agent — fills the map</div>
@@ -915,7 +915,7 @@ export default function MCPSupport({
 
           {/* Deliberate fixed-sky accent callout (a highlighted "tip" island) —
               stays light-sky in both themes, like the accent chips above. */}
-          <div className="bg-sky-50 border border-sky-100 rounded-xl p-4 text-sm text-sky-900 leading-relaxed">
+          <div className="bg-ink/[0.03] border border-ink/10 rounded-md p-4 text-sm text-ink/70 leading-relaxed">
             <span className="font-semibold">The pattern:</span> the canvas is the
             blackboard. Each agent only needs the code, an MCP client, and a
             narrow role. Hand-offs happen through canvas state, not through a
@@ -942,7 +942,7 @@ export default function MCPSupport({
               href="https://github.com/jaximus808/tandem/tree/main/apps/mcp-gateway"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-code text-xs text-sky-600 underline hover:text-sky-700"
+              className="font-code text-xs text-accent underline hover:text-accent/80"
             >
               apps/mcp-gateway/
             </a>{" "}

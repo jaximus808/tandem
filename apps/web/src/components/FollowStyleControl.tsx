@@ -26,7 +26,7 @@ export default function FollowStyleControl() {
     { key: "minimal", label: "Minimal", icon: Minus },
   ];
   return (
-    <div className="inline-flex shrink-0 rounded-lg border border-ink/10 bg-ink/[0.03] p-0.5">
+    <div className="inline-flex shrink-0 rounded-md border border-ink/10 bg-ink/[0.03] p-0.5">
       {opts.map(({ key, label, icon: Icon }) => {
         const active = style === key;
         return (
@@ -37,7 +37,7 @@ export default function FollowStyleControl() {
             aria-pressed={active}
             onClick={() => choose(key)}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-              active ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
+              active ? "bg-surface text-ink ring-1 ring-inset ring-ink/10" : "text-ink/50 hover:text-ink"
             }`}
           >
             <Icon className="h-3.5 w-3.5" />

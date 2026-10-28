@@ -100,7 +100,7 @@ export default function StaleTasksSection({
                   {row.staleClaim && (
                     <span
                       title="Its 15-minute claim lease has lapsed — the holder has gone quiet, and the next agent to ask for this task takes it over."
-                      className={`${CHIP_BASE} flex items-center gap-1 bg-rose-500/10 text-rose-600 dark:text-rose-400`}
+                      className={`${CHIP_BASE} flex items-center gap-1 bg-state-failed/10 text-state-failed`}
                     >
                       <AlertTriangle size={10} strokeWidth={2.25} />
                       Claim stale

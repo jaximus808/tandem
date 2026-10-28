@@ -60,14 +60,14 @@ export default function ConnectionStatus() {
     <div
       role="status"
       aria-live="polite"
-      className="tandem-toast-in fixed left-1/2 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/10 bg-surface/95 px-3 py-1.5 text-[12px] font-medium text-ink/80 shadow-lg backdrop-blur"
+      className="tandem-toast-in fixed left-1/2 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-md border border-ink/10 bg-surface/95 px-3 py-1.5 text-[12px] font-medium text-ink/80 shadow-lg backdrop-blur"
       style={{ bottom: "calc(var(--tandem-float-gap) + var(--tandem-safe-b))" }}
     >
       <span
         aria-hidden="true"
         className={[
           "h-1.5 w-1.5 shrink-0 rounded-full",
-          offline ? "bg-rose-500" : "bg-amber-500 tandem-breathe",
+          offline ? "bg-state-failed" : "bg-state-proposed tandem-breathe",
         ].join(" ")}
       />
       {offline ? (
@@ -76,7 +76,7 @@ export default function ConnectionStatus() {
           {ago && <span className="text-ink/50">· {ago}</span>}
           <button
             onClick={() => reconnectNow()}
-            className="-my-0.5 ml-0.5 inline-flex items-center gap-1 rounded-full border border-ink/15 bg-ink/[0.03] px-2 py-0.5 text-[11px] font-semibold text-ink/70 transition-colors hover:border-ink/25 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="-my-0.5 ml-0.5 inline-flex items-center gap-1 rounded border border-ink/15 bg-ink/[0.03] px-2 py-0.5 text-[11px] font-semibold text-ink/70 transition-colors hover:border-ink/25 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             title="Reconnect and refresh the board"
           >
             <RotateCw size={11} strokeWidth={2} />

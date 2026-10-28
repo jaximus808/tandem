@@ -113,7 +113,7 @@ export default function WhyTandem({
             building about it.
           </p>
 
-          <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-ink/10 bg-ink/10 sm:grid-cols-4">
+          <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ink/10 bg-ink/10 sm:grid-cols-4">
             {STATS.map((s) => (
               <div key={s.label} className="bg-paper px-4 py-3.5">
                 <dt className="text-lg font-semibold tracking-tight text-ink tabular-nums">

@@ -63,7 +63,7 @@ export default function NotificationBell({ log, unread, muted, toggleMute, markR
           {muted ? <BellOff className="h-[17px] w-[17px]" /> : <Bell className="h-[17px] w-[17px]" />}
         </span>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid min-w-[15px] place-items-center rounded-full bg-agent px-1 font-code text-[9px] font-semibold leading-[15px] text-white ring-2 ring-paper">
+          <span className="absolute -right-0.5 -top-0.5 grid min-w-[15px] place-items-center rounded-sm bg-agent px-1 font-code text-[9px] font-semibold leading-[15px] text-paper ring-2 ring-paper">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -74,7 +74,7 @@ export default function NotificationBell({ log, unread, muted, toggleMute, markR
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className="tandem-fade-in absolute left-0 z-40 mt-1.5 w-[18rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-ink/10 bg-surface shadow-lg"
+            className="tandem-fade-in absolute left-0 z-40 mt-1.5 w-[18rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border border-ink/10 bg-surface shadow-lg"
           >
             {/* Header — title + the popup mute toggle the bell controls. */}
             <div className="flex items-center justify-between gap-2 border-b border-ink/[0.07] px-3 py-2">
@@ -84,7 +84,7 @@ export default function NotificationBell({ log, unread, muted, toggleMute, markR
               <button
                 onClick={toggleMute}
                 className={[
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                  "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
                   muted
                     ? "bg-ink/[0.05] text-ink/45 hover:text-ink/70"
                     : "bg-agent/10 text-agent hover:bg-agent/15",
@@ -109,7 +109,7 @@ export default function NotificationBell({ log, unread, muted, toggleMute, markR
                 {log.map((n) => (
                   <li key={n.id} className="flex items-center gap-2.5 px-3 py-1.5">
                     <span
-                      className={`grid h-6 w-6 shrink-0 place-items-center rounded-[5px] ${
+                      className={`grid h-6 w-6 shrink-0 place-items-center rounded ${
                         n.isClaude ? "bg-agent" : "bg-ink"
                       }`}
                     >

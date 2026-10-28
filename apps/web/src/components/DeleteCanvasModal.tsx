@@ -35,10 +35,10 @@ export default function DeleteCanvasModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-canvas-title"
-        className="relative w-full max-w-md rounded-[10px] border border-ink/10 bg-surface p-6 shadow-lg"
+        className="relative w-full max-w-md rounded-md border border-ink/10 bg-surface p-6 shadow-lg"
       >
         <div className="flex items-start gap-3.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-state-failed/10 text-state-failed">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -55,7 +55,7 @@ export default function DeleteCanvasModal({
         </div>
 
         {error && (
-          <p className="mt-4 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-600 dark:text-rose-400">
+          <p className="mt-4 rounded-md border border-state-failed/20 bg-state-failed/10 px-3 py-2 text-sm text-state-failed">
             {error}
           </p>
         )}
@@ -71,7 +71,7 @@ export default function DeleteCanvasModal({
           <button
             onClick={onConfirm}
             disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-md bg-state-failed px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-state-failed/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
             {deleting ? "Deleting…" : "Delete canvas"}

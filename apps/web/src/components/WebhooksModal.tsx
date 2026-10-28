@@ -61,7 +61,7 @@ const fieldClass =
 
 function ErrorStrip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[13px] text-rose-600 dark:text-rose-400">
+    <div className="mt-3 flex items-start gap-2 rounded-md border border-state-failed/20 bg-state-failed/10 px-3 py-2 text-[13px] text-state-failed">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <span className="min-w-0">{children}</span>
     </div>
@@ -115,18 +115,18 @@ function SecretCallout({ minted, onDismiss }: { minted: MintedWebhook; onDismiss
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50 p-4 dark:border-amber-400/30 dark:bg-amber-500/10">
-      <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+    <div className="mt-4 rounded-md border border-state-proposed/70 bg-state-proposed/10 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-state-proposed">
         <AlertTriangle className="h-4 w-4" />
         Copy this signing secret now — it won’t be shown again.
       </div>
       <div className="mt-2.5 flex items-center gap-2">
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-lg border border-amber-300/60 bg-paper px-3 py-2 font-code text-xs text-ink">
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-state-proposed/60 bg-paper px-3 py-2 font-code text-xs text-ink">
           {minted.secret}
         </code>
         <button
           onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-paper hover:opacity-90"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-ink px-3 py-2 text-xs font-medium text-paper hover:opacity-90"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? "Copied" : "Copy"}
@@ -134,12 +134,12 @@ function SecretCallout({ minted, onDismiss }: { minted: MintedWebhook; onDismiss
         <button
           onClick={onDismiss}
           title="Dismiss"
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-ink/15 p-2 text-ink/50 hover:bg-paper"
+          className="inline-flex shrink-0 items-center justify-center rounded-md border border-ink/15 p-2 text-ink/50 hover:bg-paper"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <p className="mt-2 text-[11.5px] leading-relaxed text-amber-800/80 dark:text-amber-300/70">
+      <p className="mt-2 text-[11.5px] leading-relaxed text-state-proposed/80">
         Your server verifies each delivery with it: HMAC-SHA256 over{" "}
         <code className="font-code">&lt;Tandem-Timestamp&gt;.&lt;raw body&gt;</code>, compared to the{" "}
         <code className="font-code">Tandem-Signature</code> header.
@@ -251,7 +251,7 @@ function EndpointForm({
         <button
           disabled={!ready}
           onClick={() => onSubmit({ url, name, events })}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           {busy && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
           {existing ? "Save changes" : "Add endpoint"}
@@ -454,7 +454,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="webhooks-title"
-        className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[10px] border border-ink/10 bg-surface text-ink shadow-lg outline-none"
+        className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-md border border-ink/10 bg-surface text-ink shadow-lg outline-none"
       >
         <div className="tandem-scroll overflow-y-auto px-5 pb-5 pt-5">
           <Kicker>Webhooks · {code}</Kicker>
@@ -545,14 +545,14 @@ export default function WebhooksModal({ code, onClose }: Props) {
                               aria-hidden
                               className={[
                                 "h-1.5 w-1.5 shrink-0 rounded-full",
-                                h.enabled ? "bg-emerald-500" : "bg-ink/20",
+                                h.enabled ? "bg-state-done" : "bg-ink/20",
                               ].join(" ")}
                             />
                             <span className="truncate text-[13px] font-medium text-ink">
                               {h.name || "Untitled endpoint"}
                             </span>
                             {!h.enabled && (
-                              <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink/40">
+                              <span className="shrink-0 rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink/40">
                                 Off
                               </span>
                             )}
@@ -584,11 +584,11 @@ export default function WebhooksModal({ code, onClose }: Props) {
                                 aria-pressed={h.enabled === on}
                                 onClick={() => h.enabled !== on && handleToggle(h)}
                                 className={[
-                                  "rounded-[5px] px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                                  "rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                                   h.enabled === on
                                     ? on
-                                      ? "bg-accent text-white"
-                                      : "bg-ink/70 text-paper"
+                                      ? "bg-state-done/10 text-state-done"
+                                      : "bg-ink/[0.08] text-ink"
                                     : "text-ink/45 hover:text-ink",
                                 ].join(" ")}
                               >
@@ -619,7 +619,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
                             <button
                               onClick={() => setConfirmingDelete(h.id)}
                               title="Delete endpoint"
-                              className="rounded-md border border-ink/15 p-1.5 text-ink/50 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                              className="rounded-md border border-ink/15 p-1.5 text-ink/50 transition-colors hover:border-state-failed/25 hover:bg-state-failed/10 hover:text-state-failed"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -628,7 +628,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
                       </div>
 
                       {confirmingDelete === h.id && (
-                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2">
+                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-md border border-state-failed/20 bg-state-failed/[0.07] px-3 py-2">
                           <span className="text-[12px] text-ink/70">
                             Delete this endpoint? Its delivery history goes too.
                           </span>
@@ -641,7 +641,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
                             </button>
                             <button
                               onClick={() => handleDelete(h.id)}
-                              className="rounded-md bg-rose-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-rose-500"
+                              className="rounded-md bg-state-failed px-2.5 py-1 text-[12px] font-medium text-paper hover:bg-state-failed/90"
                             >
                               Delete
                             </button>
@@ -661,7 +661,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
               <div className="flex items-baseline gap-2">
                 <h3 className="text-[13px] font-semibold text-ink">Failed deliveries</h3>
                 {dead && dead.length > 0 && (
-                  <span className="font-code text-[11px] text-rose-600 dark:text-rose-400">
+                  <span className="font-code text-[11px] text-state-failed">
                     {dead.length}
                   </span>
                 )}
@@ -687,9 +687,9 @@ export default function WebhooksModal({ code, onClose }: Props) {
               )}
 
               {dead && dead.length > 0 && (
-                <ul className="divide-y divide-ink/[0.07] overflow-hidden rounded-md border border-rose-500/20">
+                <ul className="divide-y divide-ink/[0.07] overflow-hidden rounded-md border border-state-failed/20">
                   {dead.map((d) => (
-                    <li key={d.id} className="flex items-start gap-3 bg-rose-500/[0.04] px-3.5 py-2.5">
+                    <li key={d.id} className="flex items-start gap-3 bg-state-failed/[0.04] px-3.5 py-2.5">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="rounded border border-ink/10 bg-ink/[0.04] px-1.5 py-0.5 font-code text-[10.5px] leading-none text-ink/70">
@@ -706,7 +706,7 @@ export default function WebhooksModal({ code, onClose }: Props) {
                         >
                           {urlOf(d.webhookId)}
                         </div>
-                        <div className="mt-1 line-clamp-2 font-code text-[11px] leading-snug text-rose-600 dark:text-rose-400">
+                        <div className="mt-1 line-clamp-2 font-code text-[11px] leading-snug text-state-failed">
                           {d.responseStatus ? `HTTP ${d.responseStatus}` : "No response"}
                           {d.error ? ` — ${d.error}` : ""}
                           {d.responseBody ? ` — ${d.responseBody}` : ""}

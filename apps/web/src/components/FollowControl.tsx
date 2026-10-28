@@ -106,7 +106,7 @@ export default function FollowControl({ agents, prefs, onChange, paused, pending
         {pending > 0 && (
           <span
             aria-label={`${pending} agent moves while you were editing`}
-            className="flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-agent px-1 text-[10px] font-semibold leading-none text-white tabular-nums"
+            className="flex h-[15px] min-w-[15px] items-center justify-center rounded-sm bg-agent px-1 text-[10px] font-semibold leading-none text-paper tabular-nums"
           >
             {pending > 9 ? "9+" : pending}
           </span>
@@ -120,7 +120,7 @@ export default function FollowControl({ agents, prefs, onChange, paused, pending
             ref={panelRef}
             role="dialog"
             aria-label="Follow agents"
-            className="absolute right-0 top-full z-50 mt-2 w-[min(300px,calc(100vw-1.5rem))] overflow-hidden rounded-[10px] border border-ink/10 bg-surface shadow-lg"
+            className="absolute right-0 top-full z-50 mt-2 w-[min(300px,calc(100vw-1.5rem))] overflow-hidden rounded-md border border-ink/10 bg-surface shadow-lg"
           >
             <button
               onClick={() => onChange({ on: !prefs.on, agents: prefs.agents })}
@@ -128,12 +128,12 @@ export default function FollowControl({ agents, prefs, onChange, paused, pending
             >
               <span
                 aria-hidden="true"
-                className={`mt-px flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+                className={`mt-px flex h-4 w-7 shrink-0 items-center rounded p-0.5 transition-colors ${
                   prefs.on ? "bg-agent" : "bg-ink/20"
                 }`}
               >
                 <span
-                  className={`h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                  className={`h-3 w-3 rounded-sm bg-paper transition-transform ${
                     prefs.on ? "translate-x-3" : "translate-x-0"
                   }`}
                 />
@@ -189,7 +189,7 @@ export default function FollowControl({ agents, prefs, onChange, paused, pending
                       {a.name}
                     </span>
                     {a.taskTicket && (
-                      <span className="shrink-0 font-code text-[10px] text-violet-600 dark:text-violet-400">
+                      <span className="shrink-0 font-code text-[10px] text-state-executing">
                         {a.taskTicket}
                       </span>
                     )}

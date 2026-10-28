@@ -166,7 +166,7 @@ export default function AccountMenu({
         onClick={() => setMenuOpen((o) => !o)}
         // h-9 below sm, matching the header's other icon buttons — this avatar
         // is the last control in a tight row of them on a phone.
-        className="relative flex h-9 w-9 items-center justify-center rounded-full overflow-hidden bg-accent text-white text-sm font-semibold transition hover:ring-2 hover:ring-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-8 sm:w-8"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full overflow-hidden bg-primary text-primary-fg text-sm font-semibold transition hover:ring-2 hover:ring-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-8 sm:w-8"
         title={unread > 0 ? `${unread} new notification${unread === 1 ? "" : "s"}` : user.email}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
@@ -183,7 +183,7 @@ export default function AccountMenu({
         )}
         {/* Unread badge — the notification signal now lives on the avatar. */}
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex min-w-[16px] items-center justify-center rounded-full border-2 border-paper bg-agent px-1 text-[9px] font-bold leading-[14px] text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex min-w-[16px] items-center justify-center rounded-sm border-2 border-paper bg-agent px-1 text-[9px] font-bold leading-[14px] text-paper">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -191,7 +191,7 @@ export default function AccountMenu({
       {menuOpen && (
         <div
           role="menu"
-          className="absolute right-0 mt-1.5 z-50 w-72 overflow-hidden rounded-lg border border-ink/10 bg-surface shadow-lg"
+          className="absolute right-0 mt-1.5 z-50 w-72 overflow-hidden rounded-md border border-ink/10 bg-surface shadow-lg"
         >
           {panel === "menu" ? (
             <>
@@ -210,7 +210,7 @@ export default function AccountMenu({
                   <Inbox className="h-4 w-4 text-ink/45" aria-hidden="true" />
                   <span>Inbox</span>
                   {unread > 0 && (
-                    <span className="ml-auto flex min-w-[18px] items-center justify-center rounded-full bg-agent px-1.5 text-[10px] font-semibold leading-[18px] text-white">
+                    <span className="ml-auto flex min-w-[18px] items-center justify-center rounded-sm bg-agent px-1.5 text-[10px] font-semibold leading-[18px] text-paper">
                       {unread > 9 ? "9+" : unread}
                     </span>
                   )}

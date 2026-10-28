@@ -106,7 +106,7 @@ export default function TaskComposer({
                 // card controls use, collapsing to the dense desktop height on
                 // sm+ so this segmented control is unchanged above 640px.
                 "tandem-tap flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-                active ? "bg-surface text-accent shadow-sm" : "text-ink/40 hover:text-ink/65",
+                active ? "bg-surface text-ink ring-1 ring-inset ring-ink/10" : "text-ink/40 hover:text-ink/65",
               ].join(" ")}
             >
               {a === "agent" ? <Bot size={13} /> : <User size={13} />}
@@ -154,11 +154,11 @@ export default function TaskComposer({
                 >
                   <span
                     aria-hidden="true"
-                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
-                      linked.has(t.id) ? "border-accent bg-accent" : "border-ink/20 bg-transparent"
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
+                      linked.has(t.id) ? "border-primary bg-primary" : "border-ink/20 bg-transparent"
                     }`}
                   >
-                    {linked.has(t.id) && <Check size={10} className="text-white" />}
+                    {linked.has(t.id) && <Check size={10} className="text-primary-fg" />}
                   </span>
                   <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink/50">
                     {t.kind === "roadmap" ? "goal" : "note"}
@@ -171,13 +171,13 @@ export default function TaskComposer({
         </div>
       )}
 
-      {error && <p className="text-[11px] text-rose-600">{error}</p>}
+      {error && <p className="text-[11px] text-state-failed">{error}</p>}
 
       <div className="flex gap-1.5">
         <button
           onClick={() => void submit()}
           disabled={!title.trim() || saving}
-          className="tandem-tap flex flex-1 items-center justify-center rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+          className="tandem-tap flex flex-1 items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
         >
           {saving ? "Saving…" : submitLabel}
         </button>

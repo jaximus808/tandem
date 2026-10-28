@@ -17,7 +17,7 @@ import { importBriefing } from "../lib/api";
    one-shot copy; there is no file watching, and the modal says so rather than
    letting anyone assume it. E1.5 owns the freshness UI that follows.
 
-   Styled off ConnectModal (kicker, tab pills, rounded-[10px] surface card) and
+   Styled off ConnectModal (kicker, tab segments, rounded-md surface card) and
    DeleteAccountModal (portal, error strip), so it reads as the same app. */
 
 type Source = "paste" | "url";
@@ -95,7 +95,7 @@ export default function ImportBriefingModal({
       "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
       active
-        ? "border-accent bg-accent text-white"
+        ? "border-ink/30 bg-ink/[0.06] text-ink"
         : "border-ink/15 bg-surface text-ink/50 hover:border-ink/35 hover:text-ink",
     ].join(" ");
   }
@@ -120,7 +120,7 @@ export default function ImportBriefingModal({
         aria-modal="true"
         aria-labelledby="import-briefing-title"
         onKeyDown={onFormKeyDown}
-        className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-[10px] border border-ink/10 bg-surface text-ink shadow-lg"
+        className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-md border border-ink/10 bg-surface text-ink shadow-lg"
       >
         <div className="tandem-scroll overflow-y-auto px-5 pb-5 pt-5">
           <span className="text-xs font-medium uppercase tracking-wide text-ink/50">
@@ -213,7 +213,7 @@ export default function ImportBriefingModal({
           </p>
 
           {error && (
-            <p className="mt-4 flex items-start gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-600 dark:text-rose-400">
+            <p className="mt-4 flex items-start gap-2 rounded-md border border-state-failed/20 bg-state-failed/10 px-3 py-2 text-sm text-state-failed">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="min-w-0 break-words">{error}</span>
             </p>
@@ -232,7 +232,7 @@ export default function ImportBriefingModal({
               type="button"
               onClick={() => void submit()}
               disabled={!ready || busy}
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
               {busy ? "Importing…" : "Import briefing"}

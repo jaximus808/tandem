@@ -217,7 +217,7 @@ export default function DocsMode({
                 )}
                 <button
                   onClick={handleAddNote}
-                  className="rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                 >
                   + New note
                 </button>
@@ -332,7 +332,7 @@ function DocumentTrustRow({
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink/10 pt-2 text-[11px]">
       {isBriefing ? (
         <span
-          className="inline-flex items-center gap-1 rounded-[4px] bg-accent/[0.08] py-0.5 pl-1.5 pr-1 font-medium text-accent"
+          className="inline-flex items-center gap-1 rounded bg-accent/[0.08] py-0.5 pl-1.5 pr-1 font-medium text-accent"
           title="Every agent reads this document the moment it connects"
         >
           <BookMarked size={11} strokeWidth={2} />
@@ -370,7 +370,7 @@ function DocumentTrustRow({
         {!readOnly && <VerifyControl item={doc} onPatch={patchDoc} alwaysVisible />}
       </span>
 
-      {error && <span className="text-rose-600 dark:text-rose-400">{error}</span>}
+      {error && <span className="text-state-failed">{error}</span>}
 
       {reviewCount > 0 && (
         <button
@@ -390,7 +390,7 @@ function DocumentTrustRow({
               : "text-ink/45 hover:bg-ink/5 hover:text-ink/70",
           ].join(" ")}
         >
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-state-proposed" />
           {reviewOnly ? `Showing ${reviewCount} to review` : `${reviewCount} to review`}
         </button>
       )}
@@ -696,7 +696,7 @@ function NoteCard({
       ref={cardRef}
       data-agent-target={note.id}
       className={[
-        "group bg-surface rounded-lg border transition-all",
+        "group bg-surface rounded-md border transition-all",
         highlighted
           ? "border-transparent ring-2 ring-accent"
           : "border-ink/10 hover:border-ink/20",
@@ -711,7 +711,7 @@ function NoteCard({
         {!readOnly && <VerifyControl item={note} onPatch={handleVerify} alwaysVisible={stale} />}
         <button
           onClick={handleDelete}
-          className="rounded p-0.5 text-ink/40 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-opacity"
+          className="rounded p-0.5 text-ink/40 hover:text-state-failed opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-opacity"
           title="Delete note"
         >
           <X size={13} />

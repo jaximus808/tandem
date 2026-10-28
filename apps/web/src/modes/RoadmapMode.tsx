@@ -147,7 +147,7 @@ function PhaseNameDialog({
   return (
     <div className="fixed inset-0 z-[2000] flex items-start justify-center pt-[18vh]" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[340px] max-w-[92vw] rounded-[10px] border border-ink/10 bg-surface p-4 shadow-lg">
+      <div className="relative w-[340px] max-w-[92vw] rounded-md border border-ink/10 bg-surface p-4 shadow-lg">
         <h3 className="text-sm font-semibold text-ink">{title}</h3>
         <input
           autoFocus
@@ -171,7 +171,7 @@ function PhaseNameDialog({
           <button
             onClick={submit}
             disabled={!canSubmit}
-            className="rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+            className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
           >
             {submitLabel}
           </button>
@@ -517,7 +517,7 @@ export default function RoadmapMode({ state, code, readOnly, onOpenBoardForEpic 
             )}
             <button
               onClick={handleAddRoot}
-              className="whitespace-nowrap rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="whitespace-nowrap rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               + New item
             </button>
@@ -637,7 +637,7 @@ function ViewToggle({
           key={v}
           onClick={() => onChange(v)}
           className={`px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
-            view === v ? "bg-accent text-white" : "bg-surface text-ink/60 hover:bg-ink/5"
+            view === v ? "bg-ink/[0.08] text-ink" : "bg-surface text-ink/60 hover:bg-ink/5"
           }`}
         >
           {/* "Board" names the top-level task surface exclusively; this
@@ -902,7 +902,7 @@ function Row({
         </button>
         <button
           onClick={handleDelete}
-          className="text-ink/40 hover:text-rose-600 dark:hover:text-rose-400 px-1.5 py-0.5 rounded hover:bg-rose-500/10"
+          className="text-ink/40 hover:text-state-failed px-1.5 py-0.5 rounded hover:bg-state-failed/10"
           title="Delete item"
         >
           <svg width="12" height="12" viewBox="0 0 12 12">
@@ -925,9 +925,9 @@ function Row({
 // done emerald, failed/blocked rose) — no hues outside it.
 const STATUS_ACCENT: Record<RoadmapStatus, string> = {
   todo: "bg-ink/20",
-  in_progress: "bg-violet-500",
-  done: "bg-emerald-500",
-  blocked: "bg-rose-500",
+  in_progress: "bg-state-executing",
+  done: "bg-state-done",
+  blocked: "bg-state-failed",
 };
 
 function childIndex(items: Record<string, RoadmapItem>): Map<string | null, RoadmapItem[]> {
@@ -1130,7 +1130,7 @@ function RoadmapColumn({
   return (
     <div
       data-agent-target={root.id}
-      className={`w-72 shrink-0 flex flex-col rounded-lg border border-ink/10 bg-surface shadow-sm overflow-hidden ${
+      className={`w-72 shrink-0 flex flex-col rounded-md border border-ink/10 bg-surface overflow-hidden ${
         compact ? "max-h-[26rem]" : "max-h-full"
       }`}
     >
@@ -1151,7 +1151,7 @@ function RoadmapColumn({
               onClick={deleteGoal}
               title="Delete goal"
               aria-label="Delete goal"
-              className="opacity-0 group-hover:opacity-100 text-ink/30 hover:text-rose-600 dark:hover:text-rose-400 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 text-ink/30 hover:text-state-failed transition-opacity"
             >
               <svg width="12" height="12" viewBox="0 0 12 12">
                 <path d="M3 3 L 9 9 M 9 3 L 3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -1233,7 +1233,7 @@ function BoardRow({
           onClick={del}
           title="Delete item"
           aria-label="Delete item"
-          className="rounded px-0.5 text-ink/40 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
+          className="rounded px-0.5 text-ink/40 hover:bg-state-failed/10 hover:text-state-failed"
         >
           <svg width="11" height="11" viewBox="0 0 12 12">
             <path d="M3 3 L 9 9 M 9 3 L 3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -1254,8 +1254,8 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
         </span>
         <span className="tabular-nums">{pct}%</span>
       </div>
-      <div className="h-1 rounded-full bg-ink/10 overflow-hidden">
-        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+      <div className="h-1 rounded-sm bg-ink/10 overflow-hidden">
+        <div className="h-full bg-state-done transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -1299,7 +1299,7 @@ function AgentTaskToggle({ item, size = "sm" }: { item: RoadmapItem; size?: "sm"
       onClick={toggle}
       className={`shrink-0 inline-flex items-center gap-1 font-medium rounded transition-colors ${pad} ${
         isAgent
-          ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+          ? "bg-state-approved/10 text-state-approved"
           : "opacity-0 group-hover:opacity-100 border border-dashed border-ink/20 text-ink/40 hover:text-ink/70"
       }`}
       title={isAgent ? "Agent task — click to unmark" : "Mark as an agent task"}
@@ -1373,7 +1373,7 @@ function AgentControls({
         <>
           {tasked ? (
             <span
-              className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+              className="inline-flex shrink-0 items-center gap-1 rounded bg-state-done/10 px-1.5 py-0.5 text-[10px] font-medium text-state-done"
               title={`${linked.length} agent task${linked.length > 1 ? "s" : ""} linked — open the Tasks panel to see ${linked.length > 1 ? "them" : "it"}`}
             >
               <Check size={icon} />
@@ -1385,7 +1385,7 @@ function AgentControls({
                 e.stopPropagation();
                 ctx.openCreateTask(item);
               }}
-              className="inline-flex shrink-0 items-center gap-1 rounded border border-dashed border-sky-600/40 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 transition-colors hover:bg-sky-500/10 dark:border-sky-400/40 dark:text-sky-400"
+              className="inline-flex shrink-0 items-center gap-1 rounded border border-dashed border-state-approved/40 px-1.5 py-0.5 text-[10px] font-medium text-state-approved transition-colors hover:bg-state-approved/10"
               title="Create an agent task from this item — born ready, no approval needed"
             >
               <Plus size={icon} />
@@ -1398,7 +1398,7 @@ function AgentControls({
                 e.stopPropagation();
                 ctx.openCreateEpic(item);
               }}
-              className="inline-flex shrink-0 items-center gap-1 rounded border border-dashed border-violet-300 px-1.5 py-0.5 text-[10px] font-medium text-violet-600 transition-colors hover:bg-violet-500/10 hover:text-violet-700 dark:border-violet-400/40 dark:text-violet-400"
+              className="inline-flex shrink-0 items-center gap-1 rounded border border-dashed border-state-executing/25 px-1.5 py-0.5 text-[10px] font-medium text-state-executing transition-colors hover:bg-state-executing/10 hover:text-state-executing"
               title="Create an epic from this item — born approved, agent tasks filed under it flow straight to the queue"
             >
               <Layers size={icon} />
@@ -1461,8 +1461,8 @@ function EpicChips({
 // Gate-state tag shown on a chip while the epic is NOT approved yet. Approved
 // is the steady state, so it stays untagged; anything else is worth a flag.
 const EPIC_STATE_TAG: Record<string, string> = {
-  proposed: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  rejected: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  proposed: "bg-state-proposed/10 text-state-proposed",
+  rejected: "bg-state-failed/10 text-state-failed",
 };
 
 // One epic chip: Layers glyph + truncated title + mini n/m-done progress bar.
@@ -1477,7 +1477,7 @@ function EpicChip({
   onOpen?: (epicId: string) => void;
 }) {
   const pct = epic.finished ? 100 : epic.total > 0 ? Math.round((epic.done / epic.total) * 100) : 0;
-  const base = `inline-flex min-w-0 items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.04] font-medium text-ink/60 ${
+  const base = `inline-flex min-w-0 items-center gap-1 rounded border border-ink/10 bg-ink/[0.04] font-medium text-ink/60 ${
     size === "xs" ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
   }`;
   const body = (
@@ -1488,21 +1488,21 @@ function EpicChip({
       </span>
       <span
         aria-hidden
-        className="h-[3px] w-7 shrink-0 overflow-hidden rounded-full bg-ink/10"
+        className="h-[3px] w-7 shrink-0 overflow-hidden rounded-sm bg-ink/10"
       >
-        <span className="block h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+        <span className="block h-full bg-state-done transition-all" style={{ width: `${pct}%` }} />
       </span>
       <span className="shrink-0 tabular-nums text-ink/45">
         {epic.done}/{epic.total}
       </span>
       {epic.finished ? (
-        <span className="shrink-0 rounded-[3px] bg-emerald-500/10 px-1 text-[8px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+        <span className="shrink-0 rounded-sm bg-state-done/10 px-1 text-[8px] font-medium uppercase tracking-wide text-state-done">
           done
         </span>
       ) : (
         epic.state !== "approved" && (
           <span
-            className={`shrink-0 rounded-[3px] px-1 text-[8px] font-medium uppercase tracking-wide ${
+            className={`shrink-0 rounded-sm px-1 text-[8px] font-medium uppercase tracking-wide ${
               EPIC_STATE_TAG[epic.state] ?? EPIC_STATE_TAG.proposed
             }`}
           >
@@ -1577,7 +1577,7 @@ function CreateTaskDialog({
       aria-modal="true"
     >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[440px] max-w-[92vw] rounded-[10px] border border-ink/10 bg-surface p-4 shadow-lg">
+      <div className="relative w-[440px] max-w-[92vw] rounded-md border border-ink/10 bg-surface p-4 shadow-lg">
         <div className="flex items-center gap-2">
           <Bot size={15} className="text-accent" />
           <h3 className="text-sm font-semibold text-ink">Create agent task</h3>
@@ -1603,11 +1603,11 @@ function CreateTaskDialog({
           rows={4}
           className="mt-2 w-full resize-none rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
         />
-        <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] text-ink/50">
+        <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] text-ink/50">
           <Link2 size={10} className="shrink-0" />
           <span className="truncate">Linked to “{item.title || "this item"}”</span>
         </div>
-        {error && <p className="mt-2 text-[11px] text-rose-600">{error}</p>}
+        {error && <p className="mt-2 text-[11px] text-state-failed">{error}</p>}
         <div className="mt-3 flex justify-end gap-1.5">
           <button
             onClick={onClose}
@@ -1618,7 +1618,7 @@ function CreateTaskDialog({
           <button
             onClick={submit}
             disabled={!title.trim() || saving}
-            className="rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+            className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
           >
             {saving ? "Creating…" : "Create task"}
           </button>
@@ -1673,7 +1673,7 @@ function CreateEpicDialog({
       aria-modal="true"
     >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[440px] max-w-[92vw] rounded-[10px] border border-ink/10 bg-surface p-4 shadow-lg">
+      <div className="relative w-[440px] max-w-[92vw] rounded-md border border-ink/10 bg-surface p-4 shadow-lg">
         <div className="flex items-center gap-2">
           <Layers size={15} className="text-accent" />
           <h3 className="text-sm font-semibold text-ink">Create epic from this</h3>
@@ -1700,11 +1700,11 @@ function CreateEpicDialog({
           rows={4}
           className="mt-2 w-full resize-none rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
         />
-        <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] text-ink/50">
+        <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[10px] text-ink/50">
           <Link2 size={10} className="shrink-0" />
           <span className="truncate">Linked to “{item.title || "this item"}”</span>
         </div>
-        {error && <p className="mt-2 text-[11px] text-rose-600">{error}</p>}
+        {error && <p className="mt-2 text-[11px] text-state-failed">{error}</p>}
         <div className="mt-3 flex justify-end gap-1.5">
           <button
             onClick={onClose}
@@ -1715,7 +1715,7 @@ function CreateEpicDialog({
           <button
             onClick={submit}
             disabled={!title.trim() || saving}
-            className="rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+            className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
           >
             {saving ? "Creating…" : "Create epic"}
           </button>
@@ -1780,7 +1780,7 @@ function EditableTitle({
           }
         }}
         placeholder={placeholder}
-        className={`bg-transparent focus:outline-none border-b border-blue-300 ${className}`}
+        className={`bg-transparent focus:outline-none border-b border-state-approved/25 ${className}`}
       />
     );
   }
@@ -1905,7 +1905,7 @@ function SectionHeader({
         {onClear && (
           <button
             onClick={onClear}
-            className="rounded px-1.5 py-0.5 text-[11px] text-ink/40 hover:bg-red-500/10 hover:text-red-600"
+            className="rounded px-1.5 py-0.5 text-[11px] text-ink/40 hover:bg-state-failed/10 hover:text-state-failed"
             title="Dissolve phase (unstage its goals)"
           >
             dissolve

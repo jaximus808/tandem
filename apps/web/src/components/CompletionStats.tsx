@@ -34,7 +34,7 @@ function Bar({
 }) {
   const pct = (n: number) => (total > 0 ? `${(n / total) * 100}%` : "0%");
   return (
-    <div className={`flex overflow-hidden rounded-full bg-ink/[0.08] ${className}`}>
+    <div className={`flex overflow-hidden rounded-sm bg-ink/[0.08] ${className}`}>
       {total > 0 && done > 0 && (
         <div className={`h-full ${STATE_CHIP.done.dot}`} style={{ width: pct(done) }} />
       )}

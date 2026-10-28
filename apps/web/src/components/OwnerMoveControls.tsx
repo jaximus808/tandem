@@ -226,10 +226,10 @@ export default function OwnerMoveControls({
 
   if (moves.length === 0 && !receipt) return null;
 
-  const primary = `flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 ${
+  const primary = `flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 font-medium text-primary-fg transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 ${
     pending?.kind === "retire"
-      ? "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500/40"
-      : "bg-accent hover:bg-accent/90 focus-visible:ring-accent/40"
+      ? "bg-state-failed hover:bg-state-failed/90 focus-visible:ring-state-failed/40"
+      : "bg-primary hover:bg-primary/90 focus-visible:ring-accent/40"
   } ${T_BTN} ${TAP}`;
   const quiet = `flex flex-1 items-center justify-center gap-1 rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`;
 
@@ -238,7 +238,7 @@ export default function OwnerMoveControls({
     // board, and pressing Re-open inside it must not also navigate.
     <div className={`flex flex-col gap-1.5 ${className}`} onClick={(e) => e.stopPropagation()}>
       {error && (
-        <div className="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11.5px] leading-snug text-rose-600 dark:text-rose-400">
+        <div className="rounded-md border border-state-failed/20 bg-state-failed/10 px-2 py-1 text-[11.5px] leading-snug text-state-failed">
           {error}
         </div>
       )}
@@ -307,7 +307,7 @@ export default function OwnerMoveControls({
                   title={m.hint}
                   className={
                     m.kind === "retire"
-                      ? `flex flex-1 items-center justify-center gap-1 rounded-md border border-rose-500/30 px-2 py-1 font-medium text-rose-600 transition-colors hover:border-rose-500/60 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:opacity-40 dark:text-rose-400 ${T_BTN} ${TAP}`
+                      ? `flex flex-1 items-center justify-center gap-1 rounded-md border border-state-failed/30 px-2 py-1 font-medium text-state-failed transition-colors hover:border-state-failed/60 hover:bg-state-failed/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:opacity-40 ${T_BTN} ${TAP}`
                       : quiet
                   }
                 >

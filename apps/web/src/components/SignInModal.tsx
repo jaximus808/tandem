@@ -20,7 +20,7 @@ function FeatureRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="shrink-0 w-8 h-8 rounded-md bg-accent/10 text-accent flex items-center justify-center">
+      <div className="shrink-0 w-8 h-8 rounded-md bg-ink/[0.06] text-ink/70 flex items-center justify-center">
         <Icon className="w-4 h-4" />
       </div>
       <div className="min-w-0">
@@ -98,7 +98,7 @@ export default function SignInModal({ onClose, onSignedIn }: Props) {
         // button is taller than a phone in landscape (and than a short in-app
         // webview), and this box had `overflow-hidden` with no scroller — the
         // sign-in button itself was the part that got cut off.
-        className="w-full max-w-sm max-h-[92dvh] overflow-y-auto bg-surface rounded-[10px] border border-ink/10 shadow-lg"
+        className="w-full max-w-sm max-h-[92dvh] overflow-y-auto bg-surface rounded-md border border-ink/10 shadow-lg"
       >
         {/* Banner: the orbit logo doubles as "agents around a canvas". Follows
             the app theme like every other modal. */}
@@ -106,13 +106,13 @@ export default function SignInModal({ onClose, onSignedIn }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-1 right-1 z-10 w-11 h-11 flex items-center justify-center rounded-full text-ink/55 hover:bg-ink/5 hover:text-ink/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:top-2 sm:right-2 sm:w-7 sm:h-7"
+            className="absolute top-1 right-1 z-10 w-11 h-11 flex items-center justify-center rounded text-ink/55 hover:bg-ink/5 hover:text-ink/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:top-2 sm:right-2 sm:w-7 sm:h-7"
           >
             <X size={15} />
           </button>
           <div className="relative h-full flex flex-col items-center justify-center gap-2">
             <TandemLogo size={52} />
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent/10 text-[11px] font-medium text-accent">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-ink/[0.06] text-[11px] font-medium text-ink/70">
               <Sparkles className="w-3 h-3" />
               Your canvases, saved
             </span>
@@ -150,7 +150,7 @@ export default function SignInModal({ onClose, onSignedIn }: Props) {
             {GOOGLE_CLIENT_ID ? (
               <div ref={googleBtnRef} />
             ) : (
-              <p className="text-sm text-rose-600 dark:text-rose-400">Sign-in isn't configured.</p>
+              <p className="text-sm text-state-failed">Sign-in isn't configured.</p>
             )}
           </div>
 

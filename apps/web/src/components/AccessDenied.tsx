@@ -39,8 +39,8 @@ export default function AccessDenied({
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6">
-        <div className="w-full max-w-md rounded-lg border border-ink/10 bg-surface px-8 py-10 text-center shadow-sm">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-ink/[0.06] text-ink/60">
+        <div className="w-full max-w-md rounded-md border border-ink/10 bg-surface px-8 py-10 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-ink/[0.06] text-ink/60">
             <Lock className="h-5 w-5" aria-hidden="true" />
           </div>
           <h1 className="mt-5 text-xl font-semibold tracking-tight">

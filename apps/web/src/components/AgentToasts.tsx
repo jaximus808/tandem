@@ -32,7 +32,7 @@ export default function AgentToasts({ toasts, onDismiss }: Props) {
 function Toast({ t, onDismiss }: { t: Notification; onDismiss: (id: number) => void }) {
   return (
     <div
-      className="tandem-toast-in pointer-events-auto relative overflow-hidden rounded-lg border border-ink/10 bg-surface shadow-lg"
+      className="tandem-toast-in pointer-events-auto relative overflow-hidden rounded-md border border-ink/10 bg-surface shadow-lg"
       role="status"
     >
       <button

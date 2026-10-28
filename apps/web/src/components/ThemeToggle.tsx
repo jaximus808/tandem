@@ -27,7 +27,7 @@ export default function ThemeToggle({
       role="radiogroup"
       aria-label="Theme"
       className={[
-        "inline-flex shrink-0 overflow-hidden rounded-lg border border-ink/15 bg-paper p-0.5",
+        "inline-flex shrink-0 overflow-hidden rounded-md border border-ink/15 bg-paper p-0.5",
         fullWidth ? "w-full" : "",
       ].join(" ")}
     >
@@ -41,7 +41,7 @@ export default function ThemeToggle({
             aria-checked={active}
             onClick={() => setPref(o.value)}
             className={[
-              "inline-flex items-center justify-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
               fullWidth ? "flex-1" : "",
               active ? "bg-ink text-paper" : "text-ink/55 hover:bg-ink/5 hover:text-ink",
             ].join(" ")}

@@ -91,17 +91,17 @@ const TICKET = { id: "TDM-50", title: "E7.2 About page rework aligned to charter
 const LIFECYCLE: { state: string; tone: string; by: ReactNode }[] = [
   {
     state: "proposed",
-    tone: "text-amber-600 dark:text-amber-400",
+    tone: "text-state-proposed",
     by: "Drafted by an agent session while planning the epic — as a proposal, not as work.",
   },
   {
     state: "approved",
-    tone: "text-sky-600 dark:text-sky-400",
+    tone: "text-state-approved",
     by: "By Jaxon, in the browser. Until then no session could see it in the queue.",
   },
   {
     state: "claimed",
-    tone: "text-violet-600 dark:text-violet-400",
+    tone: "text-state-executing",
     by: (
       <>
         By one Claude Code session over MCP. The claim is atomic, so the other sessions running at
@@ -111,7 +111,7 @@ const LIFECYCLE: { state: string; tone: string; by: ReactNode }[] = [
   },
   {
     state: "done",
-    tone: "text-emerald-600 dark:text-emerald-400",
+    tone: "text-state-done",
     by: "Handed back with a result and a commit. You're reading it.",
   },
 ];
@@ -189,9 +189,9 @@ function Eyebrow({ children }: { children: ReactNode }) {
 /** The three freshness states, in the same chips the landing uses. */
 function FreshnessChips() {
   const states = [
-    { label: "fresh", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-    { label: "aging", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-    { label: "stale", cls: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+    { label: "fresh", cls: "bg-state-done/10 text-state-done" },
+    { label: "aging", cls: "bg-state-proposed/10 text-state-proposed" },
+    { label: "stale", cls: "bg-state-failed/10 text-state-failed" },
   ];
   return (
     <span className="inline-flex gap-1 align-middle">
@@ -210,7 +210,7 @@ function FreshnessChips() {
 /** This page's own task, in the board's card vocabulary. The page's signature. */
 function ProvenanceCard() {
   return (
-    <div className="overflow-hidden rounded-lg border border-ink/10 bg-surface shadow-sm">
+    <div className="overflow-hidden rounded-md border border-ink/10 bg-surface">
       <div className="flex items-start gap-2.5 border-b border-ink/10 bg-paper px-4 py-3">
         <span className="min-w-0 text-[13px] font-semibold leading-snug text-ink">
           <span className="mr-1.5 font-code text-[10.5px] font-medium tracking-tight text-ink/50">
@@ -218,7 +218,7 @@ function ProvenanceCard() {
           </span>
           {TICKET.title}
         </span>
-        <span className="ml-auto shrink-0 rounded bg-emerald-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+        <span className="ml-auto shrink-0 rounded bg-state-done/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-state-done">
           Done
         </span>
       </div>
@@ -384,7 +384,7 @@ export default function About({ onBack, onOpenMCP, onShowCanvases, onShowSetting
             href={LIVE_BOARD_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-5 text-[13px] font-medium text-white transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-5 text-[13px] font-medium text-primary-fg transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
           >
             Watch the live board
             <ArrowIcon className="h-4 w-4 shrink-0" />
@@ -452,7 +452,7 @@ function LinkButton({
       className={[
         "group inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         primary
-          ? "bg-accent text-white transition-[filter] hover:brightness-95"
+          ? "bg-primary text-primary-fg transition-[filter] hover:brightness-95"
           : "border border-ink/15 bg-surface text-ink transition-colors hover:border-ink/25",
       ].join(" ")}
     >

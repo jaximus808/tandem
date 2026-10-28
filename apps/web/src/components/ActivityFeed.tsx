@@ -53,12 +53,12 @@ interface Props {
 type Tone = "violet" | "emerald" | "rose" | "amber" | "sky" | "zinc" | "quiet";
 
 const TONE_CLS: Record<Tone, string> = {
-  violet: "text-violet-600 dark:text-violet-400",
-  emerald: "text-emerald-600 dark:text-emerald-400",
-  rose: "text-rose-600 dark:text-rose-400",
-  amber: "text-amber-600 dark:text-amber-500",
-  sky: "text-sky-600 dark:text-sky-400",
-  zinc: "text-zinc-500 dark:text-zinc-400",
+  violet: "text-state-executing",
+  emerald: "text-state-done",
+  rose: "text-state-failed",
+  amber: "text-state-proposed",
+  sky: "text-state-approved",
+  zinc: "text-state-rejected",
   quiet: "text-ink/55",
 };
 
@@ -140,7 +140,7 @@ export default function ActivityFeed({
             onClick={() => onFilterChange(null)}
             title="Show every agent again"
             aria-label={`Filtering by ${actorFilter}. Clear the filter.`}
-            className="group inline-flex min-w-0 items-center gap-1 rounded-[4px] bg-agent/10 py-px pl-1.5 pr-1 font-code text-[10.5px] font-medium text-agent transition-colors hover:bg-agent/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="group inline-flex min-w-0 items-center gap-1 rounded bg-agent/10 py-px pl-1.5 pr-1 font-code text-[10.5px] font-medium text-agent transition-colors hover:bg-agent/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             <span className="truncate">{actorFilter}</span>
             <X size={11} className="shrink-0 opacity-70 group-hover:opacity-100" />
@@ -277,7 +277,7 @@ function FeedRow({
           onClick={() => onFilterActor(actor)}
           title={`Show only ${actor}`}
           aria-label={`Show only activity from ${actor}`}
-          className="mt-1 flex max-w-full items-center rounded-[4px] px-3 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+          className="mt-1 flex max-w-full items-center rounded px-3 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
         >
           <span className="truncate font-code text-[11.5px] font-medium text-ink">{actor}</span>
         </button>
@@ -289,7 +289,7 @@ function FeedRow({
             onClick={() => onOpenTask(event.actionId)}
             title={`${event.ticketId ? `${event.ticketId} — ` : ""}${title}\nOpen on the Board`}
             aria-label={`${spoken(event)} Open it on the board.`}
-            className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded-[4px] px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-px text-left transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             {line}
           </button>

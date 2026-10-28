@@ -131,8 +131,8 @@ function CopyField({
         className={[
           // tandem-tap (index.css): copying the code IS the primary action of
           // this modal on a phone, so it gets the touch floor.
-          "tandem-tap inline-flex shrink-0 items-center justify-center gap-1 rounded-[5px] px-2.5 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-          accent ? "bg-accent text-white hover:bg-accent/90" : "bg-ink text-paper hover:bg-ink/80",
+          "tandem-tap inline-flex shrink-0 items-center justify-center gap-1 rounded px-2.5 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          accent ? "bg-primary text-primary-fg hover:bg-primary/90" : "bg-ink text-paper hover:bg-ink/80",
         ].join(" ")}
       >
         <Icon name={copied ? "check" : "copy"} className="h-3 w-3" />
@@ -217,7 +217,7 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
     return [
       "tandem-tap inline-flex items-center justify-center rounded-md border px-2.5 py-1 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
       active
-        ? "border-accent bg-accent text-white"
+        ? "border-ink/30 bg-ink/[0.06] text-ink"
         : "border-ink/15 bg-surface text-ink/50 hover:border-ink/35 hover:text-ink",
     ].join(" ");
   }
@@ -237,7 +237,7 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
         aria-labelledby="connect-title"
         // dvh, not vh — see ShareDialog: 88vh over-measures on mobile Safari and
         // pushes this modal's pinned footer below the visible fold.
-        className="relative flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-[10px] border border-ink/10 bg-surface text-ink shadow-lg outline-none"
+        className="relative flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-md border border-ink/10 bg-surface text-ink shadow-lg outline-none"
       >
         <div className="overflow-y-auto px-5 pb-5 pt-5">
           {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -249,11 +249,11 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
           {connected ? (
             <>
               {/* ── Confirmation strip — shown only once an agent has joined ── */}
-              <div className="mt-3 flex items-center gap-2.5 rounded-md border border-emerald-600/25 bg-emerald-500/10 px-3 py-2">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+              <div className="mt-3 flex items-center gap-2.5 rounded-md border border-state-done/25 bg-state-done/10 px-3 py-2">
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-sm bg-state-done text-paper">
                   <Icon name="check" className="h-2.5 w-2.5" />
                 </span>
-                <span className="text-[11.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="text-[11.5px] font-medium text-state-done">
                   {connectedAgent?.name ?? "An agent"} joined this canvas
                 </span>
               </div>
@@ -348,7 +348,7 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
                           </pre>
                           <button
                             onClick={() => copy(config, "config")}
-                            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[5px] bg-surface/15 px-2 py-1 text-[10.5px] font-medium text-paper transition-colors hover:bg-surface/25"
+                            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded bg-surface/15 px-2 py-1 text-[10.5px] font-medium text-paper transition-colors hover:bg-surface/25"
                           >
                             <Icon name={copied === "config" ? "check" : "copy"} className="h-3 w-3" />
                             {copied === "config" ? "Copied" : "Copy"}
@@ -378,7 +378,7 @@ export default function ConnectModal({ code, version, agents, onClose, onSwitchC
           {connected ? (
             <button
               onClick={done}
-              className="tandem-tap inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-6 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="tandem-tap inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-6 py-2.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               Start working
               <Icon name="arrow" className="h-4 w-4" />

@@ -53,8 +53,8 @@ function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={[
-            "tandem-tap flex flex-1 items-center justify-center rounded-[5px] px-3 py-1 text-[12px] font-medium transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:flex-none",
-            value === o.value ? "bg-accent text-white" : "text-ink/55 hover:text-ink",
+            "tandem-tap flex flex-1 items-center justify-center rounded px-3 py-1 text-[12px] font-medium transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:flex-none",
+            value === o.value ? "bg-ink/[0.08] text-ink" : "text-ink/55 hover:text-ink",
           ].join(" ")}
         >
           {o.label}
@@ -200,7 +200,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
         // WITHOUT the URL bar, so the dialog can be taller than what's visible
         // and the pinned "Done" footer ends up below the fold with no way to
         // scroll to it (the scroller is the body above the footer, not this box).
-        className="relative flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-[10px] border border-ink/10 bg-surface text-ink shadow-lg outline-none"
+        className="relative flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-md border border-ink/10 bg-surface text-ink shadow-lg outline-none"
       >
         <div className="overflow-y-auto px-5 pb-5 pt-5">
           <Kicker>Share · {code}</Kicker>
@@ -268,7 +268,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
                 />
               </div>
             )}
-            {postureError && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{postureError}</p>}
+            {postureError && <p className="mt-2 text-[12px] text-state-failed">{postureError}</p>}
           </div>
           )}
 
@@ -303,7 +303,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
                   : "Nothing waits for you. Every agent-proposed task is ready to work the moment it is created, and the board marks it as never reviewed."}
               </p>
             )}
-            {policyError && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{policyError}</p>}
+            {policyError && <p className="mt-2 text-[12px] text-state-failed">{policyError}</p>}
           </div>
 
           {/* ── Share with specific people (hosted only) ───────────────────── */}
@@ -338,13 +338,13 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
                 <button
                   type="submit"
                   disabled={inviting || !email.trim()}
-                  className="tandem-tap flex shrink-0 items-center justify-center rounded-md bg-accent px-4 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
+                  className="tandem-tap flex shrink-0 items-center justify-center rounded-md bg-primary px-4 py-1.5 text-[12.5px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
                 >
                   {inviting ? "…" : "Add"}
                 </button>
               </div>
             </form>
-            {shareError && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{shareError}</p>}
+            {shareError && <p className="mt-2 text-[12px] text-state-failed">{shareError}</p>}
 
             <ul className="mt-3 space-y-1.5">
               {/* Owner — always first, can't be removed. */}
@@ -382,7 +382,7 @@ export default function ShareDialog({ code, canvas, onClose }: Props) {
                         dialog, and the destructive one. */}
                     <button
                       onClick={() => revoke(m.userId)}
-                      className="tandem-tap flex shrink-0 items-center justify-center rounded px-2 py-0.5 text-[11px] text-ink/40 transition-colors hover:bg-ink/5 hover:text-rose-600 dark:hover:text-rose-400"
+                      className="tandem-tap flex shrink-0 items-center justify-center rounded px-2 py-0.5 text-[11px] text-ink/40 transition-colors hover:bg-ink/5 hover:text-state-failed"
                       title="Remove access"
                     >
                       Remove

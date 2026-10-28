@@ -84,7 +84,7 @@ export default function OAuthConsent() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4 text-ink">
-      <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-surface p-7 shadow-xl shadow-ink/5 sm:p-8">
+      <div className="w-full max-w-md rounded-md border border-ink/10 bg-surface p-7 sm:p-8">
         <div className="flex items-center gap-2.5">
           <TandemLogo size={30} animate={false} />
           <span className="text-lg font-semibold tracking-tight">Tandem</span>
@@ -93,8 +93,8 @@ export default function OAuthConsent() {
         {phase === "loading" && (
           <div className="mt-6 space-y-3">
             <div className="h-6 w-3/4 animate-pulse rounded bg-ink/[0.06]" />
-            <div className="h-20 animate-pulse rounded-xl bg-ink/[0.05]" />
-            <div className="h-10 animate-pulse rounded-lg bg-ink/[0.05]" />
+            <div className="h-20 animate-pulse rounded-md bg-ink/[0.05]" />
+            <div className="h-10 animate-pulse rounded-md bg-ink/[0.05]" />
           </div>
         )}
 
@@ -133,7 +133,7 @@ export default function OAuthConsent() {
         {(phase === "consent" || phase === "working") && (
           <>
             <div className="mt-6 flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-state-approved/10 text-state-approved">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -146,17 +146,17 @@ export default function OAuthConsent() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-ink/10 bg-paper/50 p-4">
+            <div className="mt-5 rounded-md border border-ink/10 bg-paper/50 p-4">
               <div className="text-xs font-medium uppercase tracking-[0.08em] text-ink/40">
                 This grants access to
               </div>
               <ul className="mt-2 space-y-1.5 text-sm text-ink/75">
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-600" />
+                  <Check className="h-4 w-4 text-state-done" />
                   Read and edit canvases you own or that are shared with you
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-600" />
+                  <Check className="h-4 w-4 text-state-done" />
                   Create new canvases on your behalf
                 </li>
               </ul>
@@ -176,7 +176,7 @@ export default function OAuthConsent() {
               <button
                 onClick={handleDeny}
                 disabled={phase === "working"}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-paper disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-ink/15 px-4 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-paper disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
                 Deny
@@ -184,7 +184,7 @@ export default function OAuthConsent() {
               <button
                 onClick={handleAllow}
                 disabled={phase === "working"}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {phase === "working" ? "Authorizing…" : "Allow"}
               </button>

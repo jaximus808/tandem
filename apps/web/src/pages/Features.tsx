@@ -1204,7 +1204,7 @@ export default function Features({
             limits get their own section rather than being quietly rounded up.
           </p>
 
-          <nav aria-label="Sections" className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-ink/10 bg-ink/10 sm:grid-cols-3 lg:grid-cols-4">
+          <nav aria-label="Sections" className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ink/10 bg-ink/10 sm:grid-cols-3 lg:grid-cols-4">
             {PILLARS.map((p) => (
               <a
                 key={p.id}

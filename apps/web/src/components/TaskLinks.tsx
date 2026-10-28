@@ -48,19 +48,19 @@ type Tone = { dot: string; text: string; pulse?: boolean };
 function toneFor(status: GitHubLinkStatus | null): Tone | null {
   if (!status) return null;
   if (status.checks === "fail" || status.state === "failure") {
-    return { dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" };
+    return { dot: "bg-state-failed", text: "text-state-failed" };
   }
   switch (status.state) {
     case "merged":
     case "ok":
-      return { dot: "bg-emerald-500", text: "" };
+      return { dot: "bg-state-done", text: "" };
     case "open":
-      return { dot: "bg-sky-500", text: "" };
+      return { dot: "bg-state-approved", text: "" };
     case "pending":
-      return { dot: "bg-amber-500", text: "", pulse: true };
+      return { dot: "bg-state-proposed", text: "", pulse: true };
     case "draft":
     case "closed":
-      return { dot: "bg-zinc-400", text: "" };
+      return { dot: "bg-state-rejected", text: "" };
     default:
       return null; // unknown — see the note above
   }
@@ -131,7 +131,7 @@ function LinkChip({
       onClick={(e) => e.stopPropagation()}
       title={statusSentence(link, status)}
       className={[
-        "inline-flex min-w-0 max-w-full items-center gap-1 rounded-[4px] transition-colors",
+        "inline-flex min-w-0 max-w-full items-center gap-1 rounded transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
         boxed
           ? "border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 hover:border-ink/25"

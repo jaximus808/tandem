@@ -466,7 +466,7 @@ function FolderRow({
         <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => s.onConfirmDelete(folder.id)}
-            className="rounded-md bg-rose-600 px-1.5 py-0.5 text-[11px] font-semibold text-white"
+            className="rounded-md bg-state-failed px-1.5 py-0.5 text-[11px] font-semibold text-paper"
             title="Delete this folder (its documents move to the root)"
           >
             Delete
@@ -503,7 +503,7 @@ function FolderRow({
                   s.onAskDelete(folder.id);
                 }}
                 title="Delete folder"
-                className="flex h-5 w-5 items-center justify-center rounded text-ink/50 hover:bg-rose-600/10 hover:text-rose-600"
+                className="flex h-5 w-5 items-center justify-center rounded text-ink/50 hover:bg-state-failed/10 hover:text-state-failed"
               >
                 <Trash2 size={12} />
               </button>
@@ -573,7 +573,7 @@ function DocRow({
         <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => s.onConfirmDelete(doc.id)}
-            className="rounded-md bg-rose-600 px-1.5 py-0.5 text-[11px] font-semibold text-white"
+            className="rounded-md bg-state-failed px-1.5 py-0.5 text-[11px] font-semibold text-paper"
             title="Delete this document and everything in it"
           >
             Delete
@@ -618,7 +618,7 @@ function DocRow({
                   s.onAskDelete(doc.id);
                 }}
                 title="Delete document"
-                className="flex h-5 w-5 items-center justify-center rounded text-current/50 hover:bg-rose-600/10 hover:text-rose-600"
+                className="flex h-5 w-5 items-center justify-center rounded text-current/50 hover:bg-state-failed/10 hover:text-state-failed"
               >
                 <Trash2 size={12} />
               </button>

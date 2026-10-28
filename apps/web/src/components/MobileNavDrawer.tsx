@@ -85,7 +85,7 @@ export default function MobileNavDrawer({
         // 80dvh, not 80vh: vh measures the viewport WITHOUT mobile Safari's URL
         // bar, so on a phone the sheet could be taller than what you can see and
         // the panel body's own scroller would start below the fold.
-        className="tandem-safe-pb tandem-sheet-in absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-[10px] border-t border-ink/10 bg-surface shadow-lg"
+        className="tandem-safe-pb tandem-sheet-in absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-md border-t border-ink/10 bg-surface shadow-lg"
         role="dialog"
         aria-modal="true"
         aria-label="Canvas navigation"
@@ -114,7 +114,7 @@ export default function MobileNavDrawer({
                 <span className="relative">
                   <Icon size={18} strokeWidth={isActive ? 2 : 1.75} />
                   {badge > 0 && (
-                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-agent px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-agent px-1 text-[9px] font-bold text-paper">
                       {badge}
                     </span>
                   )}
