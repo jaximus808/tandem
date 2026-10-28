@@ -12,6 +12,7 @@ import (
 	"github.com/agentcanvas/api/internal/auth"
 	"github.com/agentcanvas/api/internal/metrics"
 	"github.com/agentcanvas/api/internal/store"
+	"github.com/agentcanvas/api/internal/transcripts"
 	"github.com/agentcanvas/api/internal/webdist"
 	"github.com/agentcanvas/api/internal/webhooks"
 	"github.com/agentcanvas/api/internal/ws"
@@ -79,6 +80,14 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 		// source is the hub): parked long-poll waiters live on the Handler.
 		metricsReg.RegisterGauge(metrics.GaugeQueueWaiters, h.QueueWaiterCount)
 	}
+	// Agent transcripts (TDM-18): local mode only — under TANDEM_AUTH=google no
+	// index is built at all, so the route can only refuse. TANDEM_TRANSCRIPTS=off
+	// and TANDEM_CLAUDE_DIR are read here (see transcripts.FromEnv).
+	var transcriptIdx *transcripts.Index
+	if local {
+		transcriptIdx = transcripts.FromEnv()
+	}
+	transcriptH := &transcriptHandler{store: s, index: transcriptIdx, local: local}
 	wsH := NewWSHandler(s, hub, authSvc)
 	authH := NewAuthHandler(s, authSvc, googleVerifier, cookieSecure)
 	oauthH := NewOAuthHandler(s, publicBaseURL)
@@ -110,6 +119,8 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 			"auth":    rc.authMode,
 			"local":   local,
 			"version": rc.version,
+			// Whether GET /api/canvas/agents/{agentId}/transcript serves (TDM-18).
+			"transcripts": transcriptIdx != nil,
 		})
 	})
 
@@ -295,6 +306,9 @@ func NewRouter(s store.Store, hub *ws.Hub, authSvc *auth.Service, googleVerifier
 		// never registered; the feed is derived from action state timestamps
 		// (no event table). Both are reads — see fleet_handler.go.
 		r.Get("/api/canvas/agents", h.ListAgentRoster)
+		// One agent's Claude Code transcript, tailed by byte offset (TDM-18).
+		// Local mode only; see transcript_handler.go for the gate and the shape.
+		r.Get("/api/canvas/agents/{agentId}/transcript", transcriptH.GetAgentTranscript)
 		r.Get("/api/canvas/activity", h.ListActivity)
 		// GitHub ground truth (TDM-45): resolve ONE evidence link from a task
 		// completion into a live state (merged / open / checks red). Registered
