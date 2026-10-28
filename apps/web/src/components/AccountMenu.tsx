@@ -183,7 +183,7 @@ export default function AccountMenu({
         )}
         {/* Unread badge — the notification signal now lives on the avatar. */}
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex min-w-[16px] items-center justify-center rounded-sm border-2 border-paper bg-agent px-1 text-[9px] font-bold leading-[14px] text-paper">
+          <span className="absolute -right-0.5 -top-0.5 flex min-w-[16px] items-center justify-center rounded-sm border-2 border-paper bg-agent px-1 text-[10px] font-bold leading-[14px] text-paper">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

@@ -278,7 +278,7 @@ export default function MyCanvases({ onOpenCanvas, onHome, onOpenMCP, onShowSett
             </div>
 
             {owned.length === 0 ? (
-              <EmptyState onCreate={() => setLauncherOpen(true)} />
+              <EmptyState local={config.local} onCreate={() => setLauncherOpen(true)} />
             ) : (
               <>
                 <Toolbar
@@ -545,14 +545,23 @@ function Select({
 
 /* ── empty state ────────────────────────────────────────────────────────────── */
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+// Local mode has no accounts (one owner, everything on this machine), so its
+// empty state can't talk about signing in or copying a canvas "to my account".
+function EmptyState({ local, onCreate }: { local: boolean; onCreate: () => void }) {
   return (
     <div className="rounded-md border border-dashed border-ink/20 bg-surface px-6 py-10 text-center">
       <p className="text-base font-semibold tracking-tight">No canvases yet</p>
-      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink/60">
-        Create a canvas while signed in and it’ll live here. Already have an anonymous canvas? Open it
-        and hit <span className="font-medium">Copy to my account</span>.
-      </p>
+      {local ? (
+        <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink/60">
+          Canvases are saved on this machine and listed here. Create one, or have an agent start one
+          with <span className="font-code text-[12px]">canvas_create</span>.
+        </p>
+      ) : (
+        <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink/60">
+          Create a canvas while signed in and it’ll live here. Already have an anonymous canvas? Open
+          it and hit <span className="font-medium">Copy to my account</span>.
+        </p>
+      )}
       <button
         onClick={onCreate}
         className="mt-4 inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3.5 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"

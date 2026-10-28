@@ -1293,7 +1293,7 @@ function AgentTaskToggle({ item, size = "sm" }: { item: RoadmapItem; size?: "sm"
       partial: { assignee: isAgent ? "human" : "agent" },
     });
   }
-  const pad = size === "xs" ? "px-1 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]";
+  const pad = size === "xs" ? "px-1 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-[10px]";
   return (
     <button
       onClick={toggle}
@@ -1448,7 +1448,7 @@ function EpicChips({
       ))}
       {extra > 0 && (
         <span
-          className="shrink-0 text-[9px] font-medium text-ink/40"
+          className="shrink-0 text-[10px] font-medium text-ink/40"
           title={`${extra} more epic${extra > 1 ? "s" : ""} linked to this item`}
         >
           +{extra}
@@ -1478,7 +1478,7 @@ function EpicChip({
 }) {
   const pct = epic.finished ? 100 : epic.total > 0 ? Math.round((epic.done / epic.total) * 100) : 0;
   const base = `inline-flex min-w-0 items-center gap-1 rounded border border-ink/10 bg-ink/[0.04] font-medium text-ink/60 ${
-    size === "xs" ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
+    size === "xs" ? "px-1 py-px text-[10px]" : "px-1.5 py-0.5 text-[10px]"
   }`;
   const body = (
     <>
@@ -1496,13 +1496,13 @@ function EpicChip({
         {epic.done}/{epic.total}
       </span>
       {epic.finished ? (
-        <span className="shrink-0 rounded-sm bg-state-done/10 px-1 text-[8px] font-medium uppercase tracking-wide text-state-done">
+        <span className="shrink-0 rounded-sm bg-state-done/10 px-1 text-[10px] font-medium uppercase tracking-wide text-state-done">
           done
         </span>
       ) : (
         epic.state !== "approved" && (
           <span
-            className={`shrink-0 rounded-sm px-1 text-[8px] font-medium uppercase tracking-wide ${
+            className={`shrink-0 rounded-sm px-1 text-[10px] font-medium uppercase tracking-wide ${
               EPIC_STATE_TAG[epic.state] ?? EPIC_STATE_TAG.proposed
             }`}
           >

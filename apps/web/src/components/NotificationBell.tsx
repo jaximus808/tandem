@@ -63,7 +63,7 @@ export default function NotificationBell({ log, unread, muted, toggleMute, markR
           {muted ? <BellOff className="h-[17px] w-[17px]" /> : <Bell className="h-[17px] w-[17px]" />}
         </span>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid min-w-[15px] place-items-center rounded-sm bg-agent px-1 font-code text-[9px] font-semibold leading-[15px] text-paper ring-2 ring-paper">
+          <span className="absolute -right-0.5 -top-0.5 grid min-w-[15px] place-items-center rounded-sm bg-agent px-1 font-code text-[10px] font-semibold leading-[15px] text-paper ring-2 ring-paper">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

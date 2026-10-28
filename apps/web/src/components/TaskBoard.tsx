@@ -4763,7 +4763,7 @@ function TaskDetail({
           <StateChip state={action.state} />
           {isTask && p.requiresApproval && action.state === "proposed" && (
             <span
-              className={`${CHIP_BASE} bg-state-proposed/10 text-state-proposed`}
+              className={`${CHIP_BASE} ${STATE_CHIP.proposed.ground}`}
               title="The agent flagged this task as needing explicit approval"
             >
               needs approval
