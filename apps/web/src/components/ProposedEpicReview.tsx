@@ -44,12 +44,12 @@ import { T_HEAD, T_META, TAP } from "../lib/boardScale";
  *  one step below the rose a reviewer's block earns (TDM-157) and one above the
  *  ink/45 the record metadata reads at. */
 const WARN_CHIP =
-  "inline-flex min-w-0 shrink items-center gap-1 rounded-[4px] bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-700 dark:text-amber-400 sm:py-px";
+  "inline-flex min-w-0 shrink items-center gap-1 rounded-sm bg-state-proposed/10 px-1.5 py-0.5 font-medium text-state-proposed sm:py-px";
 
 /** A surface the ticket names, in the code face — it is a path, and printing a
  *  path in prose type is how you make it look like prose. */
 const SURFACE_CHIP =
-  "inline-flex min-w-0 shrink items-center rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 font-code text-ink/60 sm:py-px";
+  "inline-flex min-w-0 shrink items-center rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 font-code text-ink/60 sm:py-px";
 
 /** How many surfaces a card prints before it counts the rest. Two is what fits
  *  beside a ticket ref on a 390px screen; the rest are one tap away, and by
@@ -73,7 +73,7 @@ export function PlanDigest({
   return (
     <div className="mt-2 rounded-md border border-ink/10 bg-ink/[0.02] px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/45">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
           Plan review
         </span>
         <span className={`font-code text-ink/50 ${T_META}`}>
@@ -95,12 +95,12 @@ export function PlanDigest({
                 : "Sort the flagged tickets to the top of the Proposed lane"
             }
             className={[
-              "ml-auto flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:py-0.5",
+              "ml-auto flex shrink-0 items-center gap-1 rounded border px-1.5 py-1 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-proposed/40 sm:py-0.5",
               T_META,
               TAP,
               flaggedFirst
-                ? "border-amber-500/45 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                : "border-ink/15 text-ink/60 hover:border-amber-500/45 hover:text-amber-700 dark:hover:text-amber-400",
+                ? "border-state-proposed/45 bg-state-proposed/10 text-state-proposed"
+                : "border-ink/15 text-ink/60 hover:border-state-proposed/45 hover:text-state-proposed",
             ].join(" ")}
           >
             <TriangleAlert size={10} className="shrink-0" aria-hidden="true" />
@@ -123,7 +123,7 @@ export function PlanDigest({
             </span>
           ))
         ) : (
-          <span className={`min-w-0 text-amber-700 dark:text-amber-400 ${T_HEAD}`}>
+          <span className={`min-w-0 text-state-proposed ${T_HEAD}`}>
             no package named anywhere in the batch
           </span>
         )}

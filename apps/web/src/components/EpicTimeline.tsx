@@ -3,7 +3,7 @@ import { Milestone } from "lucide-react";
 import type { CanvasState } from "../types";
 import { T_HEAD, T_META, T_ROW } from "../lib/boardScale";
 import { ageOf, fullDate } from "../lib/relativeTime";
-import { CHIP_BASE, STATE_CHIP } from "../lib/stateChips";
+import { STATE_CHIP } from "../lib/stateChips";
 import { epicTimeline, type TimelineEpic } from "../lib/summaryDerive";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ import { epicTimeline, type TimelineEpic } from "../lib/summaryDerive";
    nothing here reaches into SummaryPanel or its siblings.
    ──────────────────────────────────────────────────────────────────────────── */
 
-/** Lifecycle → the chip and dot it borrows from the closed state palette:
+/** Lifecycle → the rail dot it borrows from the closed state palette:
  *  a drained batch reads as done, an archived one as rejected. No new hues. */
 const LOOK = {
   finished: { chip: STATE_CHIP.done, label: "Drained" },
@@ -46,7 +46,7 @@ function TimelineEntry({ entry }: { entry: TimelineEpic }) {
           >
             {entry.title}
           </span>
-          <span className={`${CHIP_BASE} ${look.chip.chip}`}>{look.label}</span>
+          <span className={`mt-px shrink-0 font-medium text-ink/60 ${T_META}`}>{look.label}</span>
         </div>
 
         <div

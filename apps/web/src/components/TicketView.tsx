@@ -246,7 +246,7 @@ function EditEntry({ entry }: { entry: ContentAuditEntry }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {entry.reverted && (
           <span
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-state-proposed"
             title="This edit withdrew the approval: the task went back to proposed and its claim was released."
           >
             <RotateCcw size={11} className="shrink-0" aria-hidden="true" />
@@ -280,7 +280,7 @@ function AuditHistory({ trail }: { trail: ContentAuditEntry[] }) {
             key={`${e.at}-${i}`}
             className={`rounded-md border px-2.5 py-2 ${
               e.reverted && !move
-                ? "border-amber-500/25 bg-amber-500/[0.07]"
+                ? "border-state-proposed/25 bg-state-proposed/[0.07]"
                 : "border-ink/10 bg-ink/[0.02]"
             }`}
           >
@@ -473,9 +473,9 @@ function moveIcon(move: HumanMove) {
 }
 
 const MOVE_PRIMARY =
-  "tandem-tap flex flex-1 items-center justify-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:flex-none";
+  "tandem-tap flex flex-1 items-center justify-center gap-1 rounded bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:flex-none";
 const MOVE_QUIET =
-  "tandem-tap flex flex-1 items-center justify-center gap-1 rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:flex-none";
+  "tandem-tap flex flex-1 items-center justify-center gap-1 rounded border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:flex-none";
 
 function MoveControls({
   code,
@@ -538,7 +538,7 @@ function MoveControls({
   return (
     <div className={className}>
       {error && (
-        <div className="mb-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-600 dark:text-rose-400">
+        <div className="mb-2 rounded-md border border-state-failed/20 bg-state-failed/10 px-2.5 py-1.5 text-[12px] text-state-failed">
           {error}
         </div>
       )}
@@ -555,7 +555,7 @@ function MoveControls({
                 if (e.key === "Escape") setPending(null);
               }}
               placeholder={pending.notePrompt}
-              className="tandem-tap w-full rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40"
+              className="tandem-tap w-full rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
             />
           )}
           <div className="flex gap-1.5">
@@ -695,7 +695,7 @@ export default function TicketView({
             used to sit. */}
         <button
           onClick={onOpenBoard}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-ink/15 bg-surface px-2.5 text-[13px] font-medium text-ink/75 transition-colors hover:border-ink/25 hover:bg-ink/[0.03] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-8"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded border border-ink/15 bg-surface px-2.5 text-[13px] font-medium text-ink/75 transition-colors hover:border-ink/25 hover:bg-ink/[0.03] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-8"
           title="Back to the board"
         >
           <ArrowLeft size={14} />
@@ -777,7 +777,7 @@ export default function TicketView({
                   <StateChip state={task.state} />
                   {p.requiresApproval && task.state === "proposed" && (
                     <span
-                      className={`${CHIP_BASE} bg-amber-500/10 text-amber-600 dark:text-amber-400`}
+                      className={`${CHIP_BASE} bg-state-proposed/10 text-state-proposed`}
                       title="The agent flagged this task as needing explicit approval"
                     >
                       needs approval
@@ -828,7 +828,7 @@ export default function TicketView({
                     epic has only its assignee to report, and the identity row
                     already said "for an agent" one line up. */}
                 {(task.claimedBy || (epicTitle && p.epicId)) && (
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-ink/10 bg-surface px-3 py-2 lg:hidden">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-ink/10 bg-surface px-3 py-2 lg:hidden">
                     <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-ink/70">
                       <span className={EYEBROW}>Holder</span>
                       {task.claimedBy ? (
@@ -927,8 +927,8 @@ export default function TicketView({
                 {/* Why this is back in triage — above the brief, because it
                     changes how you read every word of it. */}
                 {task.state === "proposed" && reapproval && (
-                  <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2.5">
-                    <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-amber-700 dark:text-amber-400">
+                  <div className="mt-4 rounded-md border border-state-proposed/25 bg-state-proposed/[0.07] px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-state-proposed">
                       <RotateCcw size={13} className="shrink-0" aria-hidden="true" />
                       Edited after approval — needs re-approval
                     </div>
@@ -971,7 +971,7 @@ export default function TicketView({
 
                 {task.result && (
                   <Section label="Result">
-                    <p className="whitespace-pre-wrap rounded-lg bg-emerald-500/10 px-3 py-2.5 text-[13px] leading-relaxed text-emerald-700 dark:text-emerald-300">
+                    <p className="whitespace-pre-wrap rounded-md border border-state-done/25 bg-state-done/[0.06] px-3 py-2.5 text-[13px] leading-relaxed text-ink/80">
                       {task.result}
                     </p>
                     {commits.length > 0 && (
@@ -980,7 +980,7 @@ export default function TicketView({
                           <span
                             key={c}
                             title="Commit referenced in the result"
-                            className="inline-flex items-center gap-1 rounded-[4px] border border-emerald-600/20 bg-emerald-500/10 px-1.5 py-0.5 font-code text-[10.5px] text-emerald-600 dark:text-emerald-400"
+                            className="inline-flex items-center gap-1 rounded-sm bg-state-done/10 px-1.5 py-0.5 font-code text-[10.5px] text-state-done"
                           >
                             <GitCommitHorizontal size={10} className="shrink-0" />
                             {c.length > 12 ? c.slice(0, 12) : c}
@@ -993,7 +993,7 @@ export default function TicketView({
 
                 {(task.state === "failed" || task.state === "rejected") && task.error && (
                   <Section label={task.state === "failed" ? "Error" : "Rejection reason"}>
-                    <p className="whitespace-pre-wrap rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] leading-relaxed text-rose-700 dark:text-rose-300">
+                    <p className="whitespace-pre-wrap rounded-md bg-state-failed/10 px-3 py-2.5 text-[13px] leading-relaxed text-state-failed">
                       {task.error}
                     </p>
                   </Section>
@@ -1028,7 +1028,7 @@ export default function TicketView({
 
               {/* ── Record rail ───────────────────────────────────────────── */}
               <aside className="min-w-0 lg:sticky lg:top-0 lg:self-start">
-                <div className="flex flex-col gap-4 rounded-lg border border-ink/10 bg-surface p-3.5">
+                <div className="flex flex-col gap-4 rounded-md border border-ink/10 bg-surface p-3.5">
                   <Field label="State">
                     <StateChip state={task.state} />
                   </Field>
@@ -1145,7 +1145,7 @@ export default function TicketView({
                   <Field label="Canvas">
                     <span className="inline-flex items-center gap-1.5">
                       <Compass size={12} className="shrink-0 text-ink/45" />
-                      <span className="font-code text-[11px] tracking-[0.12em] text-ink/55">
+                      <span className="font-code text-[11px] tracking-widest text-ink/55">
                         {code}
                       </span>
                     </span>
@@ -1170,7 +1170,7 @@ function TicketSkeleton({ ticketRef, code }: { ticketRef: string; code: string }
           <span className="font-code text-[12px] font-medium tracking-tight text-ink/40">
             {ticketRef}
           </span>
-          <span className="h-4 w-16 rounded-[4px] bg-ink/[0.08]" />
+          <span className="h-4 w-16 rounded bg-ink/[0.08]" />
         </div>
         <div className="mt-3 h-7 w-3/4 rounded bg-ink/[0.08]" />
         <div className="mt-7 h-2.5 w-20 rounded bg-ink/[0.06]" />
@@ -1184,7 +1184,7 @@ function TicketSkeleton({ ticketRef, code }: { ticketRef: string; code: string }
         </p>
       </div>
       <aside className="hidden animate-pulse lg:block">
-        <div className="flex flex-col gap-4 rounded-lg border border-ink/10 bg-surface p-3.5">
+        <div className="flex flex-col gap-4 rounded-md border border-ink/10 bg-surface p-3.5">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="flex flex-col gap-1.5">
               <div className="h-2 w-14 rounded bg-ink/[0.06]" />
@@ -1211,19 +1211,19 @@ function NotFound({
 }) {
   return (
     <div className="mx-auto max-w-md py-10 text-center">
-      <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-ink/10 bg-surface">
+      <span className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-ink/10 bg-surface">
         <SearchX size={20} className="text-ink/45" />
       </span>
       <h1 className="mt-4 text-xl font-semibold tracking-tight text-ink">
         No ticket <span className="font-code text-[18px]">{ticketRef}</span> here
       </h1>
       <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-ink/55">
-        Canvas <span className="font-code text-[12px] tracking-[0.12em]">{code}</span> has no task
+        Canvas <span className="font-code text-[12px] tracking-widest">{code}</span> has no task
         with that number — it may have been deleted, or the ticket belongs to a different canvas.
       </p>
       <button
         onClick={onOpenBoard}
-        className="tandem-tap mt-6 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+        className="tandem-tap mt-6 inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
       >
         <ArrowLeft size={15} /> Back to the board
       </button>

@@ -175,7 +175,7 @@ import { T_BTN, T_HEAD, T_META, T_ROW, T_TITLE, TAP } from "../lib/boardScale";
    tasks" board and every other lane render exactly as they did.
    ──────────────────────────────────────────────────────────────────────────── */
 
-// Kanban columns. `dot` is the header hue (from the shared six-hue state set);
+// Kanban columns. `dot` is the header dot's fill class (from the shared six-hue state set);
 // Failed + Rejected share the terminal "closed" column so dead work doesn't
 // take two lanes. `short` is the mobile column-switcher label — the strip has
 // five segments to fit on a 390px screen, so "Failed / Rejected" spends width
@@ -407,7 +407,7 @@ function epicDrain(epic: Action, epicTasks: Action[]): string | null {
   return `drained in ${elapsedLabel(end - start)}`;
 }
 
-// Segmented progress: done in emerald, in-flight in pulsing violet, on an ink
+// Segmented progress: done in state-done, in-flight in pulsing state-executing, on an ink
 // track — the at-a-glance "is this moving?" signal, shared by the sidebar
 // entries and the scoped-epic header.
 function ProgressBar({
@@ -422,7 +422,7 @@ function ProgressBar({
   className?: string;
 }) {
   return (
-    <div className={`flex overflow-hidden rounded-full bg-ink/[0.08] ${className}`}>
+    <div className={`flex overflow-hidden rounded-sm bg-ink/[0.08] ${className}`}>
       {total > 0 && done > 0 && (
         <div className={`h-full ${STATE_CHIP.done.dot}`} style={{ width: `${(done / total) * 100}%` }} />
       )}
@@ -445,7 +445,21 @@ export function StateChip({ state, className = "" }: { state: string; className?
   );
 }
 
-// The one claimant treatment everywhere: who's executing, in working-violet.
+// The dense-surface form of the same fact (DESIGN.md "Chips"): a 6px dot in the
+// state token, then the word in ink. Cards and sidebar rows use this rather than
+// a filled chip, so a lane of cards reads as text with a colour cue, not a strip
+// of badges.
+export function StateDot({ state, className = "" }: { state: string; className?: string }) {
+  const chip = STATE_CHIP[state] ?? STATE_CHIP.proposed;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 font-medium text-ink/70 ${T_META} ${className}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${chip.dot}`} />
+      {chip.label}
+    </span>
+  );
+}
+
+// The one claimant treatment everywhere: who's executing, in the working hue.
 export function ClaimantChip({ name, className = "" }: { name: string; className?: string }) {
   return (
     <span
@@ -466,7 +480,7 @@ export function ClaimantChip({ name, className = "" }: { name: string; className
 // lease has lapsed so that any other agent may take the task over.
 //
 // Hue: the closed six-hue state set owns STATE, and a lapsed lease is not a new
-// state — the task is still Working. So live rides the working violet the
+// state — the task is still Working. So live rides the working (teal) hue the
 // claimant chip already wears, and the two states that want a human's attention
 // borrow the board's one attention hue (amber), the same hue "needs approval"
 // and "edited after approval" use. Those live only on PROPOSED cards and this
@@ -478,16 +492,16 @@ export function ClaimantChip({ name, className = "" }: { name: string; className
 // rides along as `title` and as screen-reader text.
 
 const LEASE_TONE: Record<"live" | "slipping" | "stale", { well: string; dot: string; text: string }> = {
-  live: { well: "", dot: "bg-violet-500 animate-pulse", text: "text-ink/50" },
+  live: { well: "", dot: "bg-state-executing animate-pulse", text: "text-ink/50" },
   slipping: {
     well: "",
-    dot: "border border-amber-500 bg-transparent",
-    text: "text-amber-600 dark:text-amber-400",
+    dot: "border border-state-proposed bg-transparent",
+    text: "text-state-proposed",
   },
   stale: {
-    well: "bg-amber-500/10",
-    dot: "bg-amber-500",
-    text: "text-amber-600 dark:text-amber-400",
+    well: "bg-state-proposed/10",
+    dot: "bg-state-proposed",
+    text: "text-state-proposed",
   },
 };
 
@@ -500,14 +514,14 @@ export function LeaseChip({ lease, className = "" }: { lease: Lease; className?:
   const sentence = leaseSentence(lease);
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-[4px] px-1 py-px ${tone.well} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1 py-px ${tone.well} ${className}`}
       title={sentence}
     >
       <span aria-hidden="true" className={`h-[6px] w-[6px] shrink-0 rounded-full ${tone.dot}`} />
       <span className={`font-code ${T_META} ${tone.text}`}>{leaseAge(lease.silentMs)}</span>
       {label && (
         <span
-          className={`shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em] ${tone.text}`}
+          className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide ${tone.text}`}
         >
           {label}
         </span>
@@ -537,9 +551,9 @@ export function LeaseNotice({
   if (lease.health !== "stale") return null;
   return (
     <div
-      className={`rounded-md border border-amber-500/25 bg-amber-500/[0.07] px-2.5 py-2 ${className}`}
+      className={`rounded-md border border-state-proposed/25 bg-state-proposed/[0.07] px-2.5 py-2 ${className}`}
     >
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-state-proposed">
         <Timer size={12} className="shrink-0" aria-hidden="true" />
         Claim lease lapsed — reclaimable
       </div>
@@ -599,7 +613,7 @@ export function ContentionMark({
   const Glyph = fenced ? Shield : Users;
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-[4px] ${
+      className={`inline-flex shrink-0 items-center gap-1 rounded ${
         fenced ? "bg-ink/[0.06] px-1 py-px text-ink/70" : "text-ink/45"
       } ${T_META} ${className}`}
       title={sentence}
@@ -794,7 +808,7 @@ export function ApprovalLine({
 function ReapprovalMark({ edit }: { edit: ContentAuditEntry }) {
   return (
     <div
-      className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-amber-600 dark:text-amber-400 sm:text-[10.5px]"
+      className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-state-proposed sm:text-[10.5px]"
       title={`${auditActorLabel(edit.actor)} changed the ${auditChangeLabel(edit.change)} after this was approved, so it went back for approval. ${edit.summary}`}
     >
       <RotateCcw size={10} className="shrink-0" aria-hidden="true" />
@@ -809,8 +823,8 @@ function ReapprovalMark({ edit }: { edit: ContentAuditEntry }) {
 // code face with the arrow intact, because it is a quotation, not a sentence.
 function ReapprovalNotice({ edit }: { edit: ContentAuditEntry }) {
   return (
-    <div className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/[0.07] px-2.5 py-2">
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+    <div className="mt-3 rounded-md border border-state-proposed/25 bg-state-proposed/[0.07] px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-state-proposed">
         <RotateCcw size={12} className="shrink-0" aria-hidden="true" />
         Edited after approval — needs re-approval
       </div>
@@ -925,18 +939,18 @@ export function BouncedNotice({
     <div
       role="note"
       aria-label={`Sent back for rework by ${who}${bounce.reason ? `: ${bounce.reason}` : ""}`}
-      className={`rounded-md border border-rose-500/35 bg-rose-500/[0.09] ${
+      className={`rounded-md border border-state-failed/35 bg-state-failed/[0.09] ${
         compact ? "px-2 py-1.5" : "px-3 py-2.5"
       } ${className}`}
     >
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <CornerUpLeft
           size={compact ? 11 : 13}
-          className="shrink-0 text-rose-600 dark:text-rose-400"
+          className="shrink-0 text-state-failed"
           aria-hidden="true"
         />
         <span
-          className={`min-w-0 font-semibold text-rose-700 dark:text-rose-400 ${
+          className={`min-w-0 font-semibold text-state-failed ${
             compact ? "text-[11.5px] sm:text-[11px]" : "text-[12.5px]"
           }`}
         >
@@ -1089,19 +1103,19 @@ function TriageControls({
                 : "Why this is being turned down (optional)"
             }
             aria-label="Reason for rejecting this ticket"
-            className={`w-full resize-y rounded-md border border-ink/15 bg-paper px-2 py-1.5 leading-relaxed text-ink placeholder:text-ink/35 focus:border-rose-500/50 focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${T_BTN}`}
+            className={`w-full resize-y rounded border border-ink/15 bg-surface px-2 py-1.5 leading-relaxed text-ink placeholder:text-ink/35 focus:border-state-failed/50 focus:outline-none focus:ring-2 focus:ring-state-failed/20 ${T_BTN}`}
           />
           <div className="flex gap-1.5">
             <button
               onClick={submit}
               disabled={busy}
-              className={`flex-1 rounded-md bg-rose-600 px-2 py-1 font-medium text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+              className={`flex-1 rounded bg-state-failed px-2 py-1 font-medium text-paper transition-colors hover:bg-state-failed/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
             >
               {confirmReject ? "Confirm reject" : "Reject"}
             </button>
             <button
               onClick={close}
-              className={`rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
+              className={`rounded border border-ink/15 px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
             >
               Cancel
             </button>
@@ -1112,7 +1126,7 @@ function TriageControls({
           <button
             onClick={onApprove}
             disabled={busy}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-md bg-accent px-2 py-1 font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+            className={`flex flex-1 items-center justify-center gap-1 rounded bg-primary px-2 py-1 font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
           >
             <Check size={12} /> {approveLabel}
           </button>
@@ -1125,7 +1139,7 @@ function TriageControls({
                 ? undefined
                 : "Reject this ticket — say why if you want, and you can undo it"
             }
-            className={`flex flex-1 items-center justify-center gap-1 rounded-md border border-rose-500/30 px-2 py-1 font-medium text-rose-600 transition-colors hover:border-rose-500/60 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:opacity-40 dark:text-rose-400 ${T_BTN} ${TAP}`}
+            className={`flex flex-1 items-center justify-center gap-1 rounded border border-ink/15 bg-surface px-2 py-1 font-medium text-state-failed transition-colors hover:border-state-failed/40 hover:bg-state-failed/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
           >
             <X size={12} /> Reject
           </button>
@@ -1135,7 +1149,7 @@ function TriageControls({
               disabled={busy}
               title="Amend this ticket — fix the title or body without leaving the list"
               aria-label="Amend this ticket"
-              className={`flex shrink-0 items-center justify-center rounded-md border border-ink/15 px-2 py-1 text-ink/55 transition-colors hover:border-ink/30 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+              className={`flex shrink-0 items-center justify-center rounded border border-ink/15 px-2 py-1 text-ink/55 transition-colors hover:border-ink/30 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
             >
               <Pencil size={12} />
             </button>
@@ -1178,7 +1192,7 @@ function InlineAmend({
   const changed = title.trim() !== (p.title ?? "").trim() || body.trim() !== (p.body ?? "").trim();
   const canSave = !busy && title.trim().length > 0 && changed;
   const field =
-    "w-full rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-ink placeholder:text-ink/35 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20";
+    "w-full rounded border border-ink/15 bg-surface px-2 py-1.5 text-ink placeholder:text-ink/35 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20";
   // Cmd/Ctrl+Enter saves and Escape backs out, so amending never needs a second
   // hand on a phone keyboard — and Enter inside the body stays a newline.
   function keys(e: ReactKeyboardEvent) {
@@ -1216,13 +1230,13 @@ function InlineAmend({
         <button
           onClick={() => onSave(title, body)}
           disabled={!canSave}
-          className={`flex flex-1 items-center justify-center gap-1 rounded-md bg-accent px-2 py-1 font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+          className={`flex flex-1 items-center justify-center gap-1 rounded bg-primary px-2 py-1 font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
         >
           <Check size={12} /> Save
         </button>
         <button
           onClick={onCancel}
-          className={`flex-1 rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
+          className={`flex-1 rounded border border-ink/15 bg-surface px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
         >
           Cancel
         </button>
@@ -1262,7 +1276,7 @@ function PrimaryMoveControl({
         onClick={onGo}
         disabled={busy}
         title={move.hint}
-        className={`flex w-full items-center justify-center gap-1 rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/70 transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+        className={`flex w-full items-center justify-center gap-1 rounded border border-ink/15 px-2 py-1 font-medium text-ink/70 transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
       >
         {moveIcon(move)} {move.label}
       </button>
@@ -1287,19 +1301,19 @@ const NO_FILTERS: Filters = {
 };
 
 const FILTER_SELECT_CLS =
-  "h-9 max-w-[10rem] shrink-0 rounded-md border border-ink/15 bg-surface px-1.5 text-[12px] font-medium text-ink/70 outline-none transition-colors focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7 sm:text-[11px]";
+  "h-9 max-w-[10rem] shrink-0 rounded border border-ink/15 bg-surface px-1.5 text-[12px] font-medium text-ink/70 outline-none transition-colors focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7 sm:text-[11px]";
 
 // The same selects inside the mobile filter sheet: full width, one per row, at a
 // real touch height. (index.css forces every select to 16px on coarse-pointer
 // phones so focusing one can't auto-zoom the app — hence the generous height.)
 const SHEET_SELECT_CLS =
-  "h-11 w-full rounded-md border border-ink/15 bg-surface px-2 text-[13px] font-medium text-ink outline-none transition-colors focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40";
+  "h-11 w-full rounded border border-ink/15 bg-surface px-2 text-[13px] font-medium text-ink outline-none transition-colors focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40";
 
 // One search hit in the results strip (TDM-144) — an epic to scope to, or a
 // task the current scope is hiding. Same quiet chip vocabulary as the epic's
 // plan chip in the scope header: these are navigation, not another filter row.
 const SEARCH_CHIP =
-  "inline-flex min-w-0 shrink items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-1 text-[11px] text-ink/60 transition-colors hover:border-ink/30 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px sm:text-[10px]";
+  "inline-flex min-w-0 shrink items-center gap-1 rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-1 text-[11px] text-ink/60 transition-colors hover:border-ink/30 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px sm:text-[10px]";
 
 export default function TaskBoard({
   code,
@@ -2657,7 +2671,7 @@ export default function TaskBoard({
            card's `bg-surface` is one deliberate step above the board's paper in
            dark mode, and swapping it for a translucent accent would make the
            selected cards read as sunk BELOW the ones you didn't pick. */
-        className={`group cursor-pointer rounded-lg border bg-surface p-2.5 transition-[border-color,box-shadow] hover:border-ink/25 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
+        className={`group cursor-pointer rounded-md border bg-surface p-2.5 transition-[border-color,box-shadow] hover:border-ink/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
           isSelected ? "ring-2 ring-inset ring-accent/50" : ""
         } ${
           /* A bounce outranks the ordinary arrival ring in BOTH halves: the
@@ -2665,13 +2679,13 @@ export default function TaskBoard({
              has to keep saying so after the animation is spent. Everything
              else here is unchanged. */
           justLanded && bounce
-            ? "tandem-card-bounce border-rose-500/55"
+            ? "tandem-card-bounce border-state-failed/55"
             : justLanded
               ? "tandem-card-land border-agent/40"
               : bounce
-                ? "border-rose-500/45"
+                ? "border-state-failed/45"
                 : lease.health === "stale"
-                  ? "border-amber-500/40"
+                  ? "border-state-proposed/40"
                   : isSelected
                     ? "border-accent/45"
                     : "border-ink/10"
@@ -2695,7 +2709,7 @@ export default function TaskBoard({
                 if (ev.shiftKey) extendTo(t.id);
                 else toggleSelect(t.id);
               }}
-              className={`mt-px shrink-0 rounded-[4px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+              className={`mt-px shrink-0 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                 isSelected ? "text-accent" : "text-ink/35 hover:text-ink/70"
               } ${selecting ? "flex" : "hidden group-hover:flex group-focus-within:flex"}`}
             >
@@ -2717,7 +2731,7 @@ export default function TaskBoard({
                     spaLink(() => onOpenTicket(t.ticketId as string))(e);
                   }}
                   title={`Open ${t.ticketId} — the full ticket page`}
-                  className={`mr-1.5 rounded-[3px] font-code font-medium tracking-tight text-ink/50 transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${T_META}`}
+                  className={`mr-1.5 rounded-sm font-code font-medium tracking-tight text-ink/50 transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${T_META}`}
                 >
                   {t.ticketId}
                 </a>
@@ -2730,7 +2744,7 @@ export default function TaskBoard({
           </span>
           {/* State is the column in this view — chip only where the column is
               ambiguous (the merged Failed / Rejected lane). */}
-          {showState && <StateChip state={t.state} />}
+          {showState && <StateDot state={t.state} className="mt-px" />}
         </div>
         {/* Directly under the title, above everything else the card carries:
             the block changes what the title MEANS (this is not fresh work, it
@@ -2784,7 +2798,7 @@ export default function TaskBoard({
                 selectScope(epicId);
               }}
               title={`Scope the board to "${epicTitle}"`}
-              className={`inline-flex min-w-0 items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-ink/50 transition-colors hover:border-ink/30 hover:text-ink/75 sm:py-px ${T_META}`}
+              className={`inline-flex min-w-0 items-center gap-1 rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-ink/50 transition-colors hover:border-ink/30 hover:text-ink/75 sm:py-px ${T_META}`}
             >
               <Layers size={9} className="shrink-0" />
               <span className="max-w-[9rem] truncate">{epicTitle}</span>
@@ -2900,7 +2914,7 @@ export default function TaskBoard({
           >
             {p.title || "Untitled epic"}
           </span>
-          <StateChip state={lifecycle === "finished" ? "done" : e.state} />
+          <StateDot state={lifecycle === "finished" ? "done" : e.state} />
         </div>
         {/* The goal this epic delivers — quiet provenance, not a control (the
             plan chip in the scoped header is the interactive route). */}
@@ -2929,7 +2943,7 @@ export default function TaskBoard({
           <span>
             {done}/{total} done
           </span>
-          {drain && <span className="text-emerald-600 dark:text-emerald-400">{drain}</span>}
+          {drain && <span className="text-state-done">{drain}</span>}
         </div>
         {/* The sidebar doubles as the approval inbox. */}
         {renderApproveReject(e, "Approve epic")}
@@ -2977,7 +2991,7 @@ export default function TaskBoard({
       <div className="mt-2 rounded-md border border-ink/10 bg-ink/[0.02] px-2.5 py-2">
         {summary ? (
           <>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/45">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
               What this batch achieved
             </div>
             <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink/75">
@@ -3010,7 +3024,7 @@ export default function TaskBoard({
             <button
               onClick={() => setAchievedOpen((v) => !v)}
               aria-expanded={achievedOpen}
-              className={`mt-1.5 inline-flex items-center gap-1 rounded-[3px] font-code text-ink/45 transition-colors hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${T_META}`}
+              className={`mt-1.5 inline-flex items-center gap-1 rounded-sm font-code text-ink/45 transition-colors hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${T_META}`}
             >
               <ChevronDown
                 size={11}
@@ -3056,7 +3070,7 @@ export default function TaskBoard({
   function renderScopeHeader(e: Action) {
     const p = epicPayload(e);
     const { list, total, done, working, drain } = epicStats(e);
-    // Finished epics read as history: Done chip, full emerald bar, prominent
+    // Finished epics read as history: Done chip, full state-done bar, prominent
     // drained-in — no approve-era chrome.
     const finished = epicLifecycle(e, list) === "finished";
     const plan = epicPlan.get(e.id);
@@ -3080,7 +3094,7 @@ export default function TaskBoard({
               onClick={() => onOpenRoadmapDoc(plan.docId)}
               title="Open the roadmap this epic belongs to"
               aria-label="Open the roadmap this epic belongs to"
-              className={`inline-flex min-w-0 shrink items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-ink/50 transition-colors hover:border-ink/30 hover:text-ink/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
+              className={`inline-flex min-w-0 shrink items-center gap-1 rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-ink/50 transition-colors hover:border-ink/30 hover:text-ink/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
             >
               <Milestone size={9} className="shrink-0" />
               <span className="truncate">
@@ -3089,7 +3103,7 @@ export default function TaskBoard({
             </button>
           )}
           {finished && drain && (
-            <span className="shrink-0 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="shrink-0 text-[12px] font-semibold text-state-done">
               {drain}
             </span>
           )}
@@ -3118,7 +3132,7 @@ export default function TaskBoard({
             with the receipts collapsed under it. */}
         {renderAchieved(e)}
         {finished ? (
-          <div className="mt-2 h-1.5 rounded-full bg-emerald-500" />
+          <div className="mt-2 h-1.5 rounded-sm bg-state-done" />
         ) : (
           <>
             <ProgressBar done={done} working={working} total={total} className="mt-2 h-1.5" />
@@ -3171,7 +3185,7 @@ export default function TaskBoard({
     const shownEpics = epicHits.slice(0, SEARCH_HITS);
     const shownOut = outOfScopeHits.slice(0, SEARCH_HITS);
     return (
-      <div className="flex shrink-0 flex-col gap-1.5 border-b border-ink/10 bg-accent/[0.03] px-4 py-2">
+      <div className="flex shrink-0 flex-col gap-1.5 border-b border-ink/10 bg-ink/[0.02] px-4 py-2">
         {/* The ticket ref: ONE exact card, canvas-wide, ahead of every fuzzy
             hit — and it takes the Enter key straight from the search box. */}
         {ticketHit && (
@@ -3187,7 +3201,7 @@ export default function TaskBoard({
             <span className={`min-w-0 flex-1 truncate font-medium text-ink ${T_BTN}`}>
               {taskPayload(ticketHit).title || "Untitled task"}
             </span>
-            <StateChip state={ticketHit.state} />
+            <StateDot state={ticketHit.state} />
             <span className={`hidden shrink-0 font-code text-ink/40 sm:inline ${T_META}`}>
               Enter
             </span>
@@ -3258,7 +3272,7 @@ export default function TaskBoard({
             <button
               onClick={() => selectScope("all")}
               title="Widen the board to every task and keep searching"
-              className={`shrink-0 rounded-[4px] px-1.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
+              className={`shrink-0 rounded px-1.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
             >
               Search all tasks
             </button>
@@ -3294,7 +3308,7 @@ export default function TaskBoard({
             aria-expanded={sidebarOpen}
             title="Choose which epic scopes the board"
             className={[
-              "flex h-9 min-w-0 shrink items-center gap-1.5 rounded-md border px-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden",
+              "flex h-9 min-w-0 shrink items-center gap-1.5 rounded border px-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden",
               T_BTN,
               sidebarOpen
                 ? "border-accent/40 bg-accent/[0.08] text-accent"
@@ -3336,7 +3350,7 @@ export default function TaskBoard({
           <button
             onClick={() => setComposing((v) => !v)}
             aria-expanded={composing}
-            className="ml-auto flex h-9 shrink-0 items-center gap-1 rounded-md bg-accent pl-2.5 pr-3 text-[13px] font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7 sm:pl-2 sm:pr-2.5 sm:text-xs"
+            className="ml-auto flex h-9 shrink-0 items-center gap-1 rounded bg-primary pl-2.5 pr-3 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7 sm:pl-2 sm:pr-2.5 sm:text-xs"
           >
             <Plus size={13} /> New task
           </button>
@@ -3386,7 +3400,7 @@ export default function TaskBoard({
               }}
               placeholder='Search tasks, epics, TDM-104  ·  "/"'
               title="Search task and epic titles, bodies and results. A ticket ref (TDM-104, #104, 104) jumps straight to that ticket — press Enter."
-              className="h-9 w-full rounded-md border border-ink/15 bg-surface pl-[26px] pr-2 text-[12px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40 md:h-7 md:w-64"
+              className="h-9 w-full rounded border border-ink/15 bg-surface pl-[26px] pr-2 text-[12px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20 md:h-7 md:w-64"
             />
           </div>
 
@@ -3403,7 +3417,7 @@ export default function TaskBoard({
                 : "Filters"
             }
             className={[
-              "flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden",
+              "flex h-9 shrink-0 items-center gap-1.5 rounded border px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden",
               T_BTN,
               activeFilterCount > 0
                 ? "border-accent/40 bg-accent/[0.08] text-accent"
@@ -3413,7 +3427,7 @@ export default function TaskBoard({
             <SlidersHorizontal size={13} className="shrink-0" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 font-code text-[10px] font-semibold leading-none text-white">
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-sm bg-primary px-1 font-code text-[10px] font-semibold leading-none text-primary-fg">
                 {activeFilterCount}
               </span>
             )}
@@ -3452,7 +3466,7 @@ export default function TaskBoard({
               aria-pressed={filters.hasCommit}
               title="Only tasks whose result mentions a commit hash"
               className={[
-                "flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                "flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                 filters.hasCommit
                   ? "border-accent/40 bg-accent/[0.08] text-accent"
                   : "border-ink/15 text-ink/60 hover:border-ink/30",
@@ -3464,7 +3478,7 @@ export default function TaskBoard({
               <button
                 onClick={clearFilters}
                 title="Clear search and filters (Esc)"
-                className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/75"
+                className="flex h-7 shrink-0 items-center gap-1 rounded px-2 text-[11px] font-medium text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/75"
               >
                 <X size={12} /> Clear
               </button>
@@ -3490,7 +3504,7 @@ export default function TaskBoard({
             role="dialog"
             aria-modal="true"
             aria-label="Filter tasks"
-            className="tandem-safe-pb tandem-sheet-in relative flex max-h-[85%] flex-col rounded-t-[10px] border-t border-ink/10 bg-surface shadow-lg"
+            className="tandem-safe-pb tandem-sheet-in relative flex max-h-[85%] flex-col rounded-t-md border-t border-ink/10 bg-surface shadow-lg"
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-ink/10 px-4 py-2.5">
               <SlidersHorizontal size={14} className="shrink-0 text-ink/45" />
@@ -3498,7 +3512,7 @@ export default function TaskBoard({
               <button
                 onClick={() => setFilterSheetOpen(false)}
                 aria-label="Close the filters"
-                className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <X size={16} />
               </button>
@@ -3550,7 +3564,7 @@ export default function TaskBoard({
                 onClick={() => setFilters((f) => ({ ...f, hasCommit: !f.hasCommit }))}
                 aria-pressed={filters.hasCommit}
                 className={[
-                  "flex h-11 w-full items-center gap-2 rounded-md border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                  "flex h-11 w-full items-center gap-2 rounded border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                   filters.hasCommit
                     ? "border-accent/40 bg-accent/[0.08] text-accent"
                     : "border-ink/15 text-ink/70",
@@ -3565,14 +3579,14 @@ export default function TaskBoard({
               {filtering && (
                 <button
                   onClick={clearFilters}
-                  className="flex h-11 shrink-0 items-center gap-1.5 rounded-md border border-ink/15 px-3 text-[13px] font-medium text-ink/60 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  className="flex h-11 shrink-0 items-center gap-1.5 rounded border border-ink/15 px-3 text-[13px] font-medium text-ink/60 transition-colors hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                 >
                   <X size={14} /> Clear all
                 </button>
               )}
               <button
                 onClick={() => setFilterSheetOpen(false)}
-                className="flex h-11 min-w-0 flex-1 items-center justify-center rounded-md bg-accent px-3 text-[13px] font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="flex h-11 min-w-0 flex-1 items-center justify-center rounded bg-primary px-3 text-[13px] font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 {filtering
                   ? `Show ${visibleTasks.length} of ${scopedTasks.length}`
@@ -3599,7 +3613,7 @@ export default function TaskBoard({
           is the state you are in right after pressing "Select", and it is where
           "All 11" lives. */}
       {selecting && (
-        <div className="mx-4 mt-2 shrink-0 rounded-md border border-accent/30 bg-accent/[0.06] px-2.5 py-1.5">
+        <div className="mx-4 mt-2 shrink-0 rounded-md border border-ink/15 border-l-2 border-l-accent bg-surface px-2.5 py-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             <span className={`shrink-0 font-medium text-ink/80 ${T_BTN}`}>
               {selectedIds.length} selected
@@ -3607,7 +3621,7 @@ export default function TaskBoard({
             {selectedIds.length < proposedOrder.length && proposedOrder.length > 0 && (
               <button
                 onClick={selectAllProposed}
-                className={`shrink-0 rounded-[4px] px-1.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
+                className={`shrink-0 rounded px-1.5 py-1 font-semibold text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
               >
                 All {proposedOrder.length}
               </button>
@@ -3615,7 +3629,7 @@ export default function TaskBoard({
             {selectedIds.length > 0 && (
               <button
                 onClick={clearSelection}
-                className={`shrink-0 rounded-[4px] px-1.5 py-1 font-medium text-ink/55 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
+                className={`shrink-0 rounded px-1.5 py-1 font-medium text-ink/55 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-px ${T_META}`}
               >
                 Clear
               </button>
@@ -3629,7 +3643,7 @@ export default function TaskBoard({
               <button
                 onClick={() => void approveSelection()}
                 disabled={batchBusy || selectedIds.length === 0}
-                className={`flex items-center justify-center gap-1 rounded-md bg-accent px-2.5 py-1 font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+                className={`flex items-center justify-center gap-1 rounded bg-primary px-2.5 py-1 font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
               >
                 <Check size={12} /> {batchBusy ? "Working…" : `Approve ${selectedIds.length}`}
               </button>
@@ -3637,7 +3651,7 @@ export default function TaskBoard({
                 onClick={() => setBulkReason(bulkReason === null ? "" : null)}
                 disabled={batchBusy || selectedIds.length === 0}
                 aria-expanded={bulkReason !== null}
-                className={`flex items-center justify-center gap-1 rounded-md border border-rose-500/30 px-2.5 py-1 font-medium text-rose-600 transition-colors hover:border-rose-500/60 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:opacity-40 dark:text-rose-400 ${T_BTN} ${TAP}`}
+                className={`flex items-center justify-center gap-1 rounded border border-ink/15 bg-surface px-2.5 py-1 font-medium text-state-failed transition-colors hover:border-state-failed/40 hover:bg-state-failed/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
               >
                 <X size={12} /> Reject {selectedIds.length}
               </button>
@@ -3662,20 +3676,20 @@ export default function TaskBoard({
                 rows={2}
                 placeholder={`Why these ${selectedIds.length} are being turned down (optional) — recorded on every one of them`}
                 aria-label="Shared reason for rejecting the selected tickets"
-                className={`w-full resize-y rounded-md border border-ink/15 bg-paper px-2 py-1.5 leading-relaxed text-ink placeholder:text-ink/35 focus:border-rose-500/50 focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${T_BTN}`}
+                className={`w-full resize-y rounded border border-ink/15 bg-surface px-2 py-1.5 leading-relaxed text-ink placeholder:text-ink/35 focus:border-state-failed/50 focus:outline-none focus:ring-2 focus:ring-state-failed/20 ${T_BTN}`}
               />
               <div className="flex gap-1.5">
                 <button
                   onClick={() => void rejectSelection(bulkReason)}
                   disabled={batchBusy}
-                  className={`flex flex-1 items-center justify-center gap-1 rounded-md bg-rose-600 px-2 py-1 font-medium text-white transition-colors hover:bg-rose-600/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
+                  className={`flex flex-1 items-center justify-center gap-1 rounded bg-state-failed px-2 py-1 font-medium text-paper transition-colors hover:bg-state-failed/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-failed/40 disabled:opacity-40 ${T_BTN} ${TAP}`}
                 >
                   <Ban size={12} />
                   {batchBusy ? "Rejecting…" : `Reject ${selectedIds.length}`}
                 </button>
                 <button
                   onClick={() => setBulkReason(null)}
-                  className={`flex-1 rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
+                  className={`flex-1 rounded border border-ink/15 bg-surface px-2 py-1 font-medium text-ink/60 transition-colors hover:border-ink/30 ${T_BTN} ${TAP}`}
                 >
                   Cancel
                 </button>
@@ -3694,7 +3708,7 @@ export default function TaskBoard({
           role="status"
           className="mx-4 mt-2 flex shrink-0 items-center gap-2 rounded-md border border-ink/10 bg-surface px-2.5 py-1.5 text-[12px] text-ink/70"
         >
-          <Ban size={12} className="shrink-0 text-rose-500" aria-hidden="true" />
+          <Ban size={12} className="shrink-0 text-state-failed" aria-hidden="true" />
           <span className="min-w-0 truncate">
             Rejected{" "}
             <span
@@ -3706,7 +3720,7 @@ export default function TaskBoard({
           <button
             onClick={undoLastReject}
             disabled={batchBusy}
-            className={`ml-auto shrink-0 rounded-md border border-ink/15 px-2 py-1 font-medium text-ink/75 transition-colors hover:border-ink/30 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:py-0.5 ${T_BTN} ${TAP}`}
+            className={`ml-auto shrink-0 rounded border border-ink/15 bg-surface px-2 py-1 font-medium text-ink/75 transition-colors hover:border-ink/30 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 sm:py-0.5 ${T_BTN} ${TAP}`}
           >
             Undo
           </button>
@@ -3721,7 +3735,7 @@ export default function TaskBoard({
       )}
 
       {error && (
-        <div className="mx-4 mt-2 shrink-0 rounded-md border border-rose-500/20 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-600 dark:text-rose-400">
+        <div className="mx-4 mt-2 shrink-0 rounded-md border border-state-failed/20 bg-state-failed/10 px-2.5 py-1.5 text-[12px] text-state-failed">
           {error}
         </div>
       )}
@@ -3731,7 +3745,7 @@ export default function TaskBoard({
            write a task, an agent claims it, you review. ONE primary action. */
         <div className="tandem-scroll flex flex-1 items-center justify-center overflow-y-auto p-8">
           <div className="w-full max-w-md text-center">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-ink/10 bg-surface">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-ink/10 bg-surface">
               <SquareKanban size={20} className="text-ink/45" />
             </span>
             <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">
@@ -3748,7 +3762,7 @@ export default function TaskBoard({
                 "Review the result when the card lands in Done.",
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-ink/60">
-                  <span className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-ink/15 bg-surface font-code text-[10px] font-medium text-ink/55">
+                  <span className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm border border-ink/15 bg-surface font-code text-[10px] font-medium text-ink/55">
                     {i + 1}
                   </span>
                   {step}
@@ -3763,7 +3777,7 @@ export default function TaskBoard({
               <>
                 <button
                   onClick={() => setComposing(true)}
-                  className="mt-6 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                  className="mt-6 inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
                 >
                   <Plus size={15} /> Write the first task
                 </button>
@@ -3814,7 +3828,7 @@ export default function TaskBoard({
               // own — App already shortens the whole board surface by
               // `tandem-fab-reserve`, which includes the home-indicator strip,
               // so this floor is already clear of it.
-              "tandem-sheet-in absolute inset-x-0 bottom-0 z-30 max-h-[78%] flex-col rounded-t-[10px] border-t border-ink/10 bg-paper shadow-lg",
+              "tandem-sheet-in absolute inset-x-0 bottom-0 z-30 max-h-[78%] flex-col rounded-t-md border-t border-ink/10 bg-paper shadow-lg",
               // md+: the original 16rem rail, unchanged.
               "md:static md:inset-auto md:z-auto md:flex md:max-h-none md:w-64 md:shrink-0 md:animate-none md:rounded-none md:border-r md:border-t-0 md:shadow-none",
             ].join(" ")}
@@ -3827,7 +3841,7 @@ export default function TaskBoard({
               <button
                 onClick={() => setSidebarOpen(false)}
                 aria-label="Close the epic list"
-                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <X size={16} />
               </button>
@@ -3910,7 +3924,7 @@ export default function TaskBoard({
                     onClick={() => setMobileCol(col.key)}
                     aria-pressed={selected}
                     className={[
-                      "flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                      "flex shrink-0 items-center gap-1.5 rounded border px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                       T_BTN,
                       TAP,
                       selected
@@ -3919,8 +3933,8 @@ export default function TaskBoard({
                     ].join(" ")}
                   >
                     <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: col.dot, opacity: shown.length === 0 ? 0.35 : 1 }}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${col.dot}`}
+                      style={{ opacity: shown.length === 0 ? 0.35 : 1 }}
                     />
                     {col.short}
                     <span className={`font-code ${selected ? "text-accent/70" : "text-ink/45"}`}>
@@ -3931,7 +3945,7 @@ export default function TaskBoard({
                         otherwise the signal is hidden behind a tap. */}
                     {col.key === "working" && stalledCount > 0 && (
                       <span
-                        className="inline-flex shrink-0 items-center gap-0.5 font-code text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                        className="inline-flex shrink-0 items-center gap-0.5 font-code text-[10px] font-semibold text-state-proposed"
                         aria-label={`${stalledCount} with a lapsed claim lease`}
                       >
                         <Timer size={10} className="shrink-0" aria-hidden="true" />
@@ -3943,7 +3957,7 @@ export default function TaskBoard({
                         you are not looking at is invisible until you tap it. */}
                     {laneBlocked > 0 && (
                       <span
-                        className="inline-flex shrink-0 items-center gap-0.5 font-code text-[10px] font-semibold text-rose-600 dark:text-rose-400"
+                        className="inline-flex shrink-0 items-center gap-0.5 font-code text-[10px] font-semibold text-state-failed"
                         aria-label={`${laneBlocked} sent back for rework`}
                       >
                         <CornerUpLeft size={10} className="shrink-0" aria-hidden="true" />
@@ -3978,11 +3992,11 @@ export default function TaskBoard({
                     >
                       <div className="mb-2 flex shrink-0 items-center gap-1.5 px-1">
                         <span
-                          className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: col.dot, opacity: slim ? 0.35 : 1 }}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${col.dot}`}
+                          style={{ opacity: slim ? 0.35 : 1 }}
                         />
                         <span
-                          className={`truncate font-medium uppercase tracking-wide ${T_HEAD} ${slim ? "text-ink/50" : "text-ink/60"}`}
+                          className={`truncate font-medium ${T_BTN} ${slim ? "text-ink/50" : "text-ink/70"}`}
                         >
                           {col.label}
                         </span>
@@ -3996,7 +4010,7 @@ export default function TaskBoard({
                         {col.key === "working" && stalledCount > 0 && (
                           <span
                             title={`${stalledCount} claim${stalledCount === 1 ? "" : "s"} here have run past the 15-minute lease with no report — any agent asking for the task takes it over`}
-                            className={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-amber-500/10 px-1.5 py-px font-semibold text-amber-600 dark:text-amber-400 ${T_META}`}
+                            className={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-sm bg-state-proposed/10 px-1.5 py-px font-semibold text-state-proposed ${T_META}`}
                           >
                             <Timer size={10} className="shrink-0" aria-hidden="true" />
                             {stalledCount} stalled
@@ -4009,7 +4023,7 @@ export default function TaskBoard({
                         {laneBlocked > 0 && (
                           <span
                             title={`${laneBlocked} ticket${laneBlocked === 1 ? "" : "s"} here came back for rework — a reviewer read the finished work and sent it down again. The reason is on the card.`}
-                            className={`inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-rose-500/10 px-1.5 py-px font-semibold text-rose-600 dark:text-rose-400 ${
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-sm bg-state-failed/10 px-1.5 py-px font-semibold text-state-failed ${
                               col.key === "working" && stalledCount > 0 ? "" : "ml-auto"
                             } ${T_META}`}
                           >
@@ -4031,7 +4045,7 @@ export default function TaskBoard({
                             {selecting ? (
                               <button
                                 onClick={clearSelection}
-                                className={`rounded-md px-1.5 py-1 font-semibold text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-0.5 ${T_META}`}
+                                className={`rounded px-1.5 py-1 font-medium text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-0.5 ${T_META}`}
                               >
                                 Done
                               </button>
@@ -4040,7 +4054,7 @@ export default function TaskBoard({
                                 <button
                                   onClick={() => setSelectMode(true)}
                                   title="Pick tickets to approve or reject together"
-                                  className={`flex items-center gap-1 rounded-md px-1.5 py-1 font-semibold text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-0.5 ${T_META}`}
+                                  className={`flex items-center gap-1 rounded px-1.5 py-1 font-medium text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:py-0.5 ${T_META}`}
                                 >
                                   <ListChecks size={11} className="shrink-0" />
                                   Select
@@ -4049,7 +4063,7 @@ export default function TaskBoard({
                                   onClick={() => approveAllProposed(colAll.map((t) => t.id))}
                                   disabled={batchBusy}
                                   title="Approve every proposed task in this scope in one batch"
-                                  className={`rounded-md px-1.5 py-1 font-semibold text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 sm:py-0.5 ${T_META}`}
+                                  className={`rounded px-1.5 py-1 font-medium text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 sm:py-0.5 ${T_META}`}
                                 >
                                   {batchBusy ? "Approving…" : `Approve all ${colAll.length}`}
                                 </button>
@@ -4064,7 +4078,7 @@ export default function TaskBoard({
                            it stays wordless. On mobile it is the ENTIRE screen,
                            and a bare dashed rectangle reads as a failure to
                            load, so the one lane on show says what it is. */
-                        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-ink/10 p-6">
+                        <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-ink/10 p-6">
                           <p className={`text-center text-ink/40 md:hidden ${T_HEAD}`}>
                             {filtering
                               ? `Nothing in ${col.label} matches the filters`
@@ -4386,13 +4400,13 @@ function TaskDetail({
         <button
           onClick={go}
           disabled={busy}
-          className={`flex flex-1 items-center justify-center rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-rose-700 disabled:opacity-40 sm:flex-none ${TAP}`}
+          className={`flex flex-1 items-center justify-center rounded bg-state-failed px-2.5 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-state-failed/90 disabled:opacity-40 sm:flex-none ${TAP}`}
         >
           {label}
         </button>
         <button
           onClick={cancel}
-          className={`flex flex-1 items-center justify-center rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink/60 hover:border-ink/30 sm:flex-none ${TAP}`}
+          className={`flex flex-1 items-center justify-center rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-xs font-medium text-ink/60 hover:border-ink/30 sm:flex-none ${TAP}`}
         >
           Cancel
         </button>
@@ -4429,7 +4443,7 @@ function TaskDetail({
               rows={2}
               placeholder="Why it is being turned down (optional) — recorded on the ticket"
               aria-label="Reason for rejecting this ticket"
-              className="w-full resize-y rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-[12px] leading-relaxed text-ink placeholder:text-ink/35 focus:border-rose-500/50 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              className="w-full resize-y rounded border border-ink/15 bg-surface px-2 py-1.5 text-[12px] leading-relaxed text-ink placeholder:text-ink/35 focus:border-state-failed/50 focus:outline-none focus:ring-2 focus:ring-state-failed/20"
             />
             {buttons}
           </>
@@ -4442,8 +4456,8 @@ function TaskDetail({
   // person moves a task by hand, and on a phone the row is three ~30px buttons
   // side by side unless the floor is applied. `flex-1` on the quiet buttons too
   // below sm — three equal thirds beat one wide button and two slivers.
-  const primaryBtn = `flex flex-1 items-center justify-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${TAP}`;
-  const quietBtn = `flex flex-1 items-center justify-center gap-1 rounded-md border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 disabled:opacity-40 sm:flex-none ${TAP}`;
+  const primaryBtn = `flex flex-1 items-center justify-center gap-1 rounded bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${TAP}`;
+  const quietBtn = `flex flex-1 items-center justify-center gap-1 rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 disabled:opacity-40 sm:flex-none ${TAP}`;
 
   // The state's legal human moves — or, once one is armed, its confirm strip
   // with the optional note. Reads entirely off the shared matrix: a move added
@@ -4466,7 +4480,7 @@ function TaskDetail({
                 if (e.key === "Escape") cancelMove();
               }}
               placeholder={pendingMove.notePrompt}
-              className={`w-full rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40 ${TAP}`}
+              className={`w-full rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20 ${TAP}`}
             />
           )}
           <div className="flex gap-1.5">
@@ -4522,7 +4536,7 @@ function TaskDetail({
                 href={`/c/${code}/ticket/${action.ticketId}`}
                 onClick={spaLink(() => onOpenTicket(action.ticketId as string))}
                 title={`Open ${action.ticketId} as its own page`}
-                className="shrink-0 rounded-[3px] font-code text-[12px] font-medium tracking-tight text-ink/50 transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="shrink-0 rounded-sm font-code text-[12px] font-medium tracking-tight text-ink/50 transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 {action.ticketId}
               </a>
@@ -4532,14 +4546,14 @@ function TaskDetail({
               </span>
             ))}
           {!isTask && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/50">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-ink/[0.05] px-1.5 py-px text-[11px] font-medium text-ink/60">
               <Layers size={10} /> Epic
             </span>
           )}
           <StateChip state={action.state} />
           {isTask && p.requiresApproval && action.state === "proposed" && (
             <span
-              className={`${CHIP_BASE} bg-amber-500/10 text-amber-600 dark:text-amber-400`}
+              className={`${CHIP_BASE} bg-state-proposed/10 text-state-proposed`}
               title="The agent flagged this task as needing explicit approval"
             >
               needs approval
@@ -4558,7 +4572,7 @@ function TaskDetail({
                 onClick={spaLink(() => onOpenTicket(action.ticketId as string))}
                 title={`Open ${action.ticketId} as its own page`}
                 aria-label={`Open ${action.ticketId} as its own page`}
-                className="flex h-11 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-ink/45 transition-colors hover:bg-ink/5 hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7"
+                className="flex h-11 items-center gap-1.5 rounded px-2 text-[11px] font-medium text-ink/45 transition-colors hover:bg-ink/5 hover:text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-7"
               >
                 <Maximize2 size={13} />
                 <span className="hidden sm:inline">Full page</span>
@@ -4569,7 +4583,7 @@ function TaskDetail({
                 dense desktop 28px. */}
             <button
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink/40 transition-colors hover:bg-ink/5 hover:text-ink/70 sm:h-7 sm:w-7"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-ink/40 transition-colors hover:bg-ink/5 hover:text-ink/70 sm:h-7 sm:w-7"
               aria-label="Close"
             >
               <X size={15} />
@@ -4590,14 +4604,14 @@ function TaskDetail({
                 onChange={(e) => setEditTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && saveEdit()}
                 placeholder="Task title"
-                className="w-full rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-sm font-semibold text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40"
+                className="w-full rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-sm font-semibold text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
               />
               <textarea
                 value={editBody}
                 onChange={(e) => setEditBody(e.target.value)}
                 placeholder="Brief: what, why, acceptance criteria (optional)"
                 rows={10}
-                className="w-full resize-y rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40"
+                className="w-full resize-y rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
               />
               <div className="flex gap-1.5">
                 <button onClick={saveEdit} disabled={!editTitle.trim() || busy} className={primaryBtn}>
@@ -4628,7 +4642,7 @@ function TaskDetail({
                     href={`/c/${code}/ticket/${action.ticketId}`}
                     onClick={spaLink(() => onOpenTicket(action.ticketId as string))}
                     title={`Open ${action.ticketId} as its own page`}
-                    className="rounded-[3px] decoration-ink/25 underline-offset-[3px] transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                    className="rounded-sm decoration-ink/25 underline-offset-[3px] transition-colors hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                   >
                     {p.title || "Untitled"}
                   </a>
@@ -4665,7 +4679,7 @@ function TaskDetail({
           {!isTask && !editing && (
             <div className="mt-3 rounded-md border border-ink/10 bg-ink/[0.02] px-2.5 py-2">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/45">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-ink/50">
                   What this batch achieved
                 </span>
                 {!readOnly && !summaryEditing && (
@@ -4688,7 +4702,7 @@ function TaskDetail({
                     onChange={(ev) => setSummaryDraft(ev.target.value)}
                     placeholder="What did this batch deliver? What shipped, what changed, what was decided — a paragraph a reader can trust instead of opening every ticket."
                     rows={6}
-                    className="w-full resize-y rounded-md border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/40"
+                    className="w-full resize-y rounded border border-ink/15 bg-surface px-2.5 py-1.5 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink/30 focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
                   />
                   <div className="flex items-center gap-1.5">
                     <button onClick={saveSummary} disabled={busy} className={primaryBtn}>
@@ -4760,7 +4774,7 @@ function TaskDetail({
                   return link ? (
                     <span
                       key={id}
-                      className="inline-flex max-w-full items-center gap-1 rounded-[4px] border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[11px] text-ink/60"
+                      className="inline-flex max-w-full items-center gap-1 rounded-sm border border-ink/10 bg-ink/[0.03] px-1.5 py-0.5 text-[11px] text-ink/60"
                     >
                       <Link2 size={10} className="shrink-0" />
                       <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink/50">
@@ -4772,7 +4786,7 @@ function TaskDetail({
                     <span
                       key={id}
                       title="Linked item is not on this canvas (deleted, or from another surface)"
-                      className="inline-flex max-w-full items-center gap-1 rounded-[4px] border border-dashed border-ink/15 px-1.5 py-0.5 font-code text-[10px] text-ink/50"
+                      className="inline-flex max-w-full items-center gap-1 rounded-sm border border-dashed border-ink/15 px-1.5 py-0.5 font-code text-[10px] text-ink/50"
                     >
                       <Link2 size={10} className="shrink-0" />
                       <span className="truncate">{id}</span>
@@ -4838,7 +4852,7 @@ function TaskDetail({
               <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/50">
                 Result
               </div>
-              <p className="whitespace-pre-wrap rounded-md bg-emerald-500/10 px-2.5 py-2 text-[12.5px] leading-relaxed text-emerald-700 dark:text-emerald-300">
+              <p className="whitespace-pre-wrap rounded-md border border-state-done/25 bg-state-done/[0.06] px-2.5 py-2 text-[12.5px] leading-relaxed text-ink/80">
                 {action.result}
               </p>
               {commits.length > 0 && (
@@ -4847,7 +4861,7 @@ function TaskDetail({
                     <span
                       key={c}
                       title="Commit referenced in the result"
-                      className="inline-flex items-center gap-1 rounded-[4px] border border-emerald-600/20 bg-emerald-500/10 px-1.5 py-0.5 font-code text-[10.5px] text-emerald-600 dark:text-emerald-400"
+                      className="inline-flex items-center gap-1 rounded-sm bg-state-done/10 px-1.5 py-0.5 font-code text-[10.5px] text-state-done"
                     >
                       <GitCommitHorizontal size={10} className="shrink-0" />
                       {c.length > 12 ? c.slice(0, 12) : c}
@@ -4864,7 +4878,7 @@ function TaskDetail({
               <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink/50">
                 {action.state === "failed" ? "Error" : "Rejection reason"}
               </div>
-              <p className="whitespace-pre-wrap rounded-md bg-rose-500/10 px-2.5 py-2 text-[12.5px] leading-relaxed text-rose-700 dark:text-rose-300">
+              <p className="whitespace-pre-wrap rounded-md bg-state-failed/10 px-2.5 py-2 text-[12.5px] leading-relaxed text-state-failed">
                 {action.error}
               </p>
             </div>
@@ -4914,7 +4928,7 @@ function TaskDetail({
         {!readOnly && !editing && (
           <div className="tandem-safe-pb-plus shrink-0 border-t border-ink/10 px-4 pt-3 [--tandem-pb-base:0.75rem]">
             {error && (
-              <div className="mb-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-600 dark:text-rose-400">
+              <div className="mb-2 rounded-md border border-state-failed/20 bg-state-failed/10 px-2.5 py-1.5 text-[12px] text-state-failed">
                 {error}
               </div>
             )}
@@ -4943,13 +4957,13 @@ function TaskDetail({
                     >
                       <span
                         aria-hidden="true"
-                        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
+                        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
                           p.requiresApproval
-                            ? "border-accent bg-accent"
+                            ? "border-primary bg-primary"
                             : "border-ink/25 bg-transparent"
                         }`}
                       >
-                        {p.requiresApproval && <Check size={10} className="text-white" />}
+                        {p.requiresApproval && <Check size={10} className="text-primary-fg" />}
                       </span>
                       <span className="min-w-0">
                         Requires explicit approval (won't auto-flow with its epic)
@@ -5018,7 +5032,7 @@ function TaskDetail({
                 <button
                   onClick={() => setConfirm("delete")}
                   disabled={busy}
-                  className={`mt-2 flex w-full items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-ink/40 transition-colors hover:bg-rose-500/10 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 dark:hover:text-rose-400 ${TAP}`}
+                  className={`mt-2 flex w-full items-center justify-center gap-1 rounded px-2.5 py-1.5 text-xs font-medium text-ink/50 transition-colors hover:bg-state-failed/10 hover:text-state-failed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40 ${TAP}`}
                 >
                   <Trash2 size={12} /> Delete task
                 </button>
